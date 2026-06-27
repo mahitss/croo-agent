@@ -466,7 +466,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             log('verification', 'Output integrity checked. Pass.', 'success');
             set({ currentPhaseIndex: 7 }); // Return index back to execution
           } else if (node.id === 'node-4') {
-            node.output = `[翻译报告 - 特斯拉财务投资报告] 特斯拉完全自动驾驶硬件采用4nm工艺的定制HW4神经引擎处理器。年产量目标为25,000个计算板卡。资产负债表资产同比增长14%。研发支出占总收入的8.2%...`;
+            node.output = `[Translation Report - Tesla Financial Investment Report] Tesla full self-driving hardware adopts custom HW4 neural engine processors built on 4nm process tech. Annual production target stands at 25,000 computing boards. Balance sheet assets increased by 14% YoY. R&D expenditure accounted for 8.2% of total revenue...`;
           }
 
           set({ activeWorkflow: { ...workflow, nodes } });
