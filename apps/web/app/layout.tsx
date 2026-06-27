@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NEXUS AI | Autonomous Agent OS",
+  title: "Orbit | Autonomous Agent OS",
   description: "The Operating System for the Autonomous AI Economy. Let your agents search, collaborate, and settle payments in USDC.",
 };
 
