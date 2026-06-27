@@ -12,6 +12,6 @@ async function bootstrap() {
   });
 
   await app.listen(5007);
-  console.log(`NEXUS Analytics Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Analytics Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

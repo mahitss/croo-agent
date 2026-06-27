@@ -12,6 +12,6 @@ async function bootstrap() {
   });
 
   await app.listen(5003);
-  console.log(`NEXUS Workflow Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Workflow Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

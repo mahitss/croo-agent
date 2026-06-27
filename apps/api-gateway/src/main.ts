@@ -7,7 +7,7 @@ async function bootstrap() {
 
   // Apply strict CORS options
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://nexusai.dev'],
+    origin: ['http://localhost:3000', 'https://orbitai.dev'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -28,6 +28,6 @@ async function bootstrap() {
   });
 
   await app.listen(5000);
-  console.log(`NEXUS API Gateway listening on: ${await app.getUrl()}`);
+  console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
 }
 bootstrap();

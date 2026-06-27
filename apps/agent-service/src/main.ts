@@ -12,6 +12,6 @@ async function bootstrap() {
   });
 
   await app.listen(5002);
-  console.log(`NEXUS Agent Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Agent Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

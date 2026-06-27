@@ -1,6 +1,6 @@
-# NEXUS AI — Engineering Execution Plan & Roadmap
+# Orbit — Engineering Execution Plan & Roadmap
 
-This document defines the success metrics, MVP feature scope, development sprint cycles, coding standards, demo checklists, and submission requirements for the **NEXUS AI Swarm Operating System** MVP.
+This document defines the success metrics, MVP feature scope, development sprint cycles, coding standards, demo checklists, and submission requirements for the **Orbit Swarm Operating System** MVP.
 
 ---
 

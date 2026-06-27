@@ -12,6 +12,6 @@ async function bootstrap() {
   });
 
   await app.listen(5006);
-  console.log(`NEXUS Notification Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Notification Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

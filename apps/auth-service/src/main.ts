@@ -26,6 +26,6 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   await app.listen(5001);
-  console.log(`NEXUS Authentication Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Authentication Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

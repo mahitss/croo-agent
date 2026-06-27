@@ -37,10 +37,10 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
-            N
+            O
           </div>
           <span className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-            NEXUS <span className="text-primary-neon font-normal text-sm tracking-widest ml-1 bg-none text-shadow-glow">AI</span>
+            ORBIT <span className="text-primary-neon font-normal text-sm tracking-widest ml-1 bg-none text-shadow-glow">AI</span>
           </span>
         </Link>
 

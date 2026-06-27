@@ -12,6 +12,6 @@ async function bootstrap() {
   });
 
   await app.listen(5005);
-  console.log(`NEXUS Wallet Service listening on: ${await app.getUrl()}`);
+  console.log(`Orbit Wallet Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();
