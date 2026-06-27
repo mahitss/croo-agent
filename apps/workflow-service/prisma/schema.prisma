@@ -1,0 +1,115 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ExecutionStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum TaskStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum LogLevel {
+  info
+  warn
+  error
+  debug
+}
+
+model Workflow {
+  id            String              @id @default(uuid())
+  userId        String              @map("user_id")
+  title         String
+  status        ExecutionStatus     @default(pending)
+  estimatedCost Decimal             @db.Decimal(18, 4) @map("estimated_cost")
+  actualCost    Decimal             @db.Decimal(18, 4) @map("actual_cost")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  deletedAt     DateTime?           @map("deleted_at")
+
+  nodes         WorkflowNode[]
+  edges         WorkflowEdge[]
+  executions    WorkflowExecution[]
+
+  @@map("workflows")
+}
+
+model WorkflowNode {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  agentId    String   @map("agent_id")
+  capability String
+  status     String
+  positionX  Int      @map("position_x")
+  positionY  Int      @map("position_y")
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_nodes")
+}
+
+model WorkflowEdge {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  sourceNode String   @map("source_node")
+  targetNode String   @map("target_node")
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_edges")
+}
+
+model WorkflowExecution {
+  id          String          @id @default(uuid())
+  workflowId  String          @map("workflow_id")
+  status      ExecutionStatus @default(pending)
+  startedAt   DateTime        @default(now()) @map("started_at")
+  completedAt DateTime?       @map("completed_at")
+
+  workflow    Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@map("workflow_executions")
+}
+
+model Task {
+  id              String            @id @default(uuid())
+  executionId     String            @map("execution_id")
+  assignedAgentId String?           @map("assigned_agent_id")
+  taskName        String            @map("task_name")
+  status          TaskStatus        @default(pending)
+  inputPayload    Json              @default("{}") @map("input_payload")
+  outputPayload   Json              @default("{}") @map("output_payload")
+  retryCount      Int               @default(0) @map("retry_count")
+  startedAt       DateTime          @default(now()) @map("started_at")
+  completedAt     DateTime?         @map("completed_at")
+
+  execution       WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  logs            TaskLog[]
+
+  @@map("tasks")
+}
+
+model TaskLog {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  logLevel  LogLevel @default(info) @map("log_level")
+  message   String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_logs")
+}

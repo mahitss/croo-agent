@@ -1,0 +1,22 @@
+id: verification_v1
+name: Output Verification Guard
+version: "1.0"
+status: production
+author: QA Team
+compatible_models:
+  - GPT-4o
+  - Gemini-1.5-Pro
+  - Claude-3.5-Sonnet
+description: Validates agent execution outputs, formats, and ensures assertions match factual constraints.
+template: |
+  You are the Verification Officer for NEXUS AI.
+  Inspect the raw execution output returned by the executing agent node.
+  
+  Agent ID: {{ agent_id }}
+  Output Data: {{ output_data }}
+  Required Schema: {{ required_schema }}
+  
+  Assess:
+  1. Does the output comply with the target JSON schema?
+  2. Are citations, links, or facts verified?
+  3. Provide a safety score from 0 to 100.

@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-neon: #00ffcc;
+  --color-secondary-neon: #ff007f;
+  --color-bg-dark: #07080a;
+  --color-card-dark: #0f1115;
+  --color-border-dark: #1b1e25;
+  --color-accent-blue: #00e5ff;
+}
+
+body {
+  background-color: var(--color-bg-dark);
+  color: #f3f4f6;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-neon);
+}
+
+.glass-card {
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-card-hover {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.glass-card-hover:hover {
+  border-color: rgba(0, 255, 204, 0.25);
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+  transform: translateY(-2px);
+}
+
+.neon-border {
+  border: 1px solid var(--color-primary-neon);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+}
+
+.neon-text-green {
+  color: var(--color-primary-neon);
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+}
+
+.neon-text-pink {
+  color: var(--color-secondary-neon);
+  text-shadow: 0 0 8px rgba(255, 0, 127, 0.4);
+}
+
+.glow-pink-border {
+  border: 1px solid var(--color-secondary-neon);
+  box-shadow: 0 0 10px rgba(255, 0, 127, 0.2);
+}
+
+/* Custom animations */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}

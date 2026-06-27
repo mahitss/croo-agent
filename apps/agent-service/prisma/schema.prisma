@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum PricingType {
+  per_request
+  subscription
+  enterprise
+  free_tier
+}
+
+model Agent {
+  id                 String             @id @default(uuid())
+  ownerId            String             @map("owner_id")
+  slug               String             @unique
+  name               String
+  description        String
+  logoUrl            String?            @map("logo_url")
+  verificationStatus VerificationStatus @default(pending) @map("verification_status")
+  averageRating      Decimal            @default(5.0) @db.Decimal(3, 2) @map("average_rating")
+  trustScore         Decimal            @default(100.0) @db.Decimal(5, 2) @map("trust_score")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  deletedAt          DateTime?          @map("deleted_at")
+
+  versions           AgentVersion[]
+  capabilities       AgentCapability[]
+  pricingModels      PricingModel[]
+  reviews            Review[]
+
+  @@index([ownerId])
+  @@index([slug])
+  @@map("agents")
+}
+
+model AgentVersion {
+  id           String   @id @default(uuid())
+  agentId      String   @map("agent_id")
+  version      String
+  endpoint     String
+  inputSchema  Json     @map("input_schema")
+  outputSchema Json     @map("output_schema")
+  publishedAt  DateTime @default(now()) @map("published_at")
+
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_versions")
+}
+
+model Capability {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  description String?
+  
+  agents      AgentCapability[]
+
+  @@map("capabilities")
+}
+
+model AgentCapability {
+  agentId      String @map("agent_id")
+  capabilityId String @map("capability_id")
+
+  agent      Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  capability Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, capabilityId])
+  @@map("agent_capabilities")
+}
+
+model PricingModel {
+  id          String      @id @default(uuid())
+  agentId     String      @map("agent_id")
+  pricingType PricingType @map("pricing_type")
+  price       Decimal     @db.Decimal(18, 4)
+  currency    String      @default("USDC")
+  billingUnit String      @default("invocation") @map("billing_unit")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  agent       Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("pricing_models")
+}
+
+model Review {
+  id               String   @id @default(uuid())
+  agentId          String   @map("agent_id")
+  userId           String   @map("user_id")
+  rating           Int
+  comment          String?
+  verifiedPurchase Boolean  @default(false) @map("verified_purchase")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  agent            Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
