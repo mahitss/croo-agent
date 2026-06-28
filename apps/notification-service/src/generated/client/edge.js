@@ -170,8 +170,8 @@ const config = {
       }
     }
   },
-  "inlineSchema": "datasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../src/generated/client\"\n}\n\nmodel Notification {\n  id        String   @id @default(uuid())\n  userId    String   @map(\"user_id\")\n  type      String\n  title     String\n  body      String\n  read      Boolean  @default(false)\n  createdAt DateTime @default(now()) @map(\"created_at\")\n\n  @@map(\"notifications\")\n}\n\nmodel NotificationPreference {\n  userId    String  @id @map(\"user_id\")\n  email     Boolean @default(true)\n  inApp     Boolean @default(true) @map(\"in_app\")\n  marketing Boolean @default(false)\n  security  Boolean @default(true)\n\n  @@map(\"notification_preferences\")\n}\n",
-  "inlineSchemaHash": "90788f0d3aaae88c2a06c8257ee897b271043df477768ae37709ce145426f0d4",
+  "inlineSchema": "datasource db {\n  provider  = \"postgresql\"\n  url       = env(\"DATABASE_URL\")\n  directUrl = env(\"DIRECT_URL\")\n}\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../src/generated/client\"\n}\n\nmodel Notification {\n  id        String   @id @default(uuid())\n  userId    String   @map(\"user_id\")\n  type      String\n  title     String\n  body      String\n  read      Boolean  @default(false)\n  createdAt DateTime @default(now()) @map(\"created_at\")\n\n  @@map(\"notifications\")\n}\n\nmodel NotificationPreference {\n  userId    String  @id @map(\"user_id\")\n  email     Boolean @default(true)\n  inApp     Boolean @default(true) @map(\"in_app\")\n  marketing Boolean @default(false)\n  security  Boolean @default(true)\n\n  @@map(\"notification_preferences\")\n}\n",
+  "inlineSchemaHash": "dbc97d7a242e8bde0f15aa1e05f358e6791842ed06386180a10484884b20677e",
   "copyEngine": true
 }
 config.dirname = '/'
