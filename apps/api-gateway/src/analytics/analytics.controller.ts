@@ -2,48 +2,88 @@ import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus } from 
 
 @Controller('api/v1')
 export class AnalyticsController {
+  private readonly analyticsUrl = 'http://localhost:5007/api/v1';
+  private readonly notificationUrl = 'http://localhost:5006/api/v1';
+
   @Get('notifications')
-  getNotifications() {
-    return { success: true, data: [] };
+  async getNotifications() {
+    try {
+      const res = await fetch(`${this.notificationUrl}/notifications`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Notification service unreachable: ${err.message}` };
+    }
   }
 
   @Patch('notifications/:id')
-  readNotification(@Param('id') id: string) {
-    return { success: true, message: `Notification ${id} marked read` };
+  async readNotification(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.notificationUrl}/notifications/${id}`, { method: 'PATCH' });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Notification service unreachable: ${err.message}` };
+    }
   }
 
   @Post('notifications/read-all')
-  readAllNotifications() {
-    return { success: true, message: 'All notifications marked read' };
+  async readAllNotifications() {
+    try {
+      const res = await fetch(`${this.notificationUrl}/notifications/read-all`, { method: 'POST' });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Notification service unreachable: ${err.message}` };
+    }
   }
 
   // --- ANALYTICS ---
   @Get('analytics/dashboard')
-  getDashboardAnalytics() {
-    return {
-      success: true,
-      data: { volumeUsdc: 384.50, activeAgents: 8 }
-    };
+  async getDashboardAnalytics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/dashboard`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
   }
 
   @Get('analytics/revenue')
-  getRevenueAnalytics() {
-    return { success: true, data: [] };
+  async getRevenueAnalytics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/revenue`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
   }
 
   @Get('analytics/marketplace')
-  getMarketplaceAnalytics() {
-    return { success: true, data: [] };
+  async getMarketplaceAnalytics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/marketplace`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
   }
 
   @Get('analytics/ai')
-  getAiMetrics() {
-    return { success: true, data: { modelUsage: { gemini: 140, gpt4: 280 } } };
+  async getAiMetrics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/ai`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
   }
 
   @Get('analytics/system')
-  getSystemMetrics() {
-    return { success: true, data: { cpu: '14%', ram: '42%' } };
+  async getSystemMetrics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/system`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
   }
 
   // --- ADMIN PANEL ---

@@ -2,94 +2,111 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, Htt
 
 @Controller('api/v1')
 export class AgentsController {
+  private readonly agentUrl = 'http://localhost:5002/api/v1';
+
   @Post('agents')
   @HttpCode(HttpStatus.CREATED)
-  publishAgent(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Agent published successfully',
-      data: { id: `agent-${Date.now()}`, ...body }
-    };
+  async publishAgent(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
+  }
+
+  @Get('agents')
+  async getAgents() {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Patch('agents/:id')
-  updateAgent(@Param('id') id: string, @Body() body: any) {
-    return {
-      success: true,
-      message: 'Agent updated successfully',
-      data: { id, ...body }
-    };
+  async updateAgent(@Param('id') id: string, @Body() body: any) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Delete('agents/:id')
-  deleteAgent(@Param('id') id: string) {
-    return { success: true, message: `Agent ${id} deprecated and deleted` };
+  async deleteAgent(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}`, {
+        method: 'DELETE',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Get('agents/search')
-  searchAgents(@Query('q') query: string) {
-    return {
-      success: true,
-      data: [
-        { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', score: 95 }
-      ]
-    };
+  async searchAgents(@Query('q') query: string) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/search?q=${query}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Get('agents/:id')
-  getAgent(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { id, name: 'InsightFinder Pro', category: 'Research', price: 0.15 }
-    };
+  async getAgent(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Get('agents/:id/analytics')
-  getAgentAnalytics(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { dailyRequests: [100, 120, 140], revenue: 45.50 }
-    };
+  async getAgentAnalytics(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/analytics`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Get('agents/:id/reviews')
-  getAgentReviews(@Param('id') id: string) {
-    return {
-      success: true,
-      data: [
-        { reviewer: '0xabc', rating: 5, comment: 'Excellent accuracy' }
-      ]
-    };
+  async getAgentReviews(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/reviews`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
-  @Get('agents/:id/versions')
-  getAgentVersions(@Param('id') id: string) {
-    return {
-      success: true,
-      data: [{ version: '1.0.0' }, { version: '1.1.0' }]
-    };
-  }
-
-  @Post('agents/:id/version')
-  publishAgentVersion(@Param('id') id: string, @Body() body: any) {
-    return {
-      success: true,
-      message: 'Agent version bumped',
-      data: { agentId: id, ...body }
-    };
-  }
-
-  @Get('agents/:id/health')
-  getAgentHealth(@Param('id') id: string) {
-    return { success: true, status: 'healthy', latency: 850 };
-  }
-
-  @Get('agents/:id/metrics')
-  getAgentMetrics(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { trustScore: 98, verificationCount: 140 }
-    };
+  @Post('agents/:id/reviews')
+  async createReview(@Param('id') id: string, @Body() body: any) {
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Agent service unreachable: ${err.message}` };
+    }
   }
 
   @Get('marketplace/featured')
@@ -106,22 +123,7 @@ export class AgentsController {
   getCategories() {
     return {
       success: true,
-      data: ['Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation']
+      data: ['Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'],
     };
-  }
-
-  @Get('marketplace/popular')
-  getPopular() {
-    return { success: true, data: [] };
-  }
-
-  @Get('marketplace/new')
-  getNew() {
-    return { success: true, data: [] };
-  }
-
-  @Get('marketplace/recommended')
-  getRecommended() {
-    return { success: true, data: [] };
   }
 }

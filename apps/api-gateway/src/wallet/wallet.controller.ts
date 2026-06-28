@@ -2,97 +2,146 @@ import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestj
 
 @Controller('api/v1')
 export class WalletController {
+  private readonly walletUrl = 'http://localhost:5005/api/v1';
+  private readonly paymentUrl = 'http://localhost:5004/api/v1';
+
   @Get('wallet')
-  getWallet() {
-    return {
-      success: true,
-      data: {
-        address: '0xUserWalletAddress789c',
-        balance: 100.0,
-        escrowBalance: 0.0
-      }
-    };
+  async getWallet() {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   @Get('wallet/balance')
-  getBalance() {
-    return {
-      success: true,
-      data: { available: 100.0, locked: 0.0 }
-    };
+  async getBalance() {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/balance`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   @Post('wallet/deposit')
-  deposit(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Deposit transaction successfully registered',
-      data: { balance: 100.0 + (parseFloat(body.amount) || 0) }
-    };
+  async deposit(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   @Post('wallet/withdraw')
-  withdraw(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Withdrawal processing queued',
-      data: { txHash: '0x' + Math.random().toString(16).substr(2, 40) }
-    };
+  async withdraw(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/withdraw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   @Get('wallet/transactions')
-  getTransactions() {
-    return { success: true, data: [] };
+  async getTransactions() {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/transactions`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   @Post('wallet/transfer')
-  transfer(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Tokens transferred successfully',
-      data: { txHash: '0x' + Math.random().toString(16).substr(2, 40) }
-    };
+  async transfer(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
   }
 
   // --- PAYMENTS ---
   @Post('payments')
   @HttpCode(HttpStatus.CREATED)
-  createPayment(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Payment invoice created',
-      data: { id: `pay-${Date.now()}`, ...body }
-    };
+  async createPayment(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
   }
 
   @Get('payments/:id')
-  getPaymentStatus(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { id, status: 'completed', amount: 0.48 }
-    };
+  async getPaymentStatus(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/${id}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
   }
 
   @Post('payments/:id/refund')
-  refundPayment(@Param('id') id: string) {
-    return { success: true, message: `Payment ${id} refunded successfully` };
+  async refundPayment(@Param('id') id: string, @Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/${id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
   }
 
   @Post('payments/escrow')
-  lockEscrow(@Body() body: any) {
-    return {
-      success: true,
-      message: 'SLA credits successfully locked in escrow contract',
-      data: { escrowId: `escrow-${Date.now()}`, ...body }
-    };
+  async lockEscrow(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/${body.paymentId || body.id}/escrow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
   }
 
   @Post('payments/settle')
-  settlePayment(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Escrow credits settled and released directly to node address',
-      data: { txHash: '0x' + Math.random().toString(16).substr(2, 40) }
-    };
+  async settlePayment(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/${body.paymentId || body.id}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
   }
 }

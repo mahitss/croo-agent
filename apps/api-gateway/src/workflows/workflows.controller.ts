@@ -2,158 +2,166 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, HttpCode, HttpStatus
 
 @Controller('api/v1')
 export class WorkflowsController {
+  private readonly workflowUrl = 'http://localhost:5003/api/v1';
+  private readonly aiUrl = 'http://localhost:8000';
+
   @Post('workflows')
   @HttpCode(HttpStatus.CREATED)
-  createWorkflow(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Workflow template saved successfully',
-      data: { id: `wf-${Date.now()}`, ...body }
-    };
+  async createWorkflow(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Patch('workflows/:id')
-  updateWorkflow(@Param('id') id: string, @Body() body: any) {
-    return {
-      success: true,
-      message: 'Workflow updated successfully',
-      data: { id, ...body }
-    };
-  }
-
-  @Delete('workflows/:id')
-  deleteWorkflow(@Param('id') id: string) {
-    return { success: true, message: `Workflow ${id} removed` };
+  async updateWorkflow(@Param('id') id: string, @Body() body: any) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Post('workflows/:id/run')
-  runWorkflow(@Param('id') id: string) {
-    return {
-      success: true,
-      message: 'Workflow execution triggered',
-      data: { executionId: `exec-${Date.now()}`, status: 'running' }
-    };
+  async runWorkflow(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Post('workflows/:id/pause')
-  pauseWorkflow(@Param('id') id: string) {
-    return { success: true, message: 'Workflow execution paused' };
+  async pauseWorkflow(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/pause`, { method: 'POST' });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Post('workflows/:id/resume')
-  resumeWorkflow(@Param('id') id: string) {
-    return { success: true, message: 'Workflow execution resumed' };
+  async resumeWorkflow(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/resume`, { method: 'POST' });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Post('workflows/:id/cancel')
-  cancelWorkflow(@Param('id') id: string) {
-    return { success: true, message: 'Workflow execution terminated' };
+  async cancelWorkflow(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/cancel`, { method: 'POST' });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Get('workflows/history')
-  getHistory() {
-    return { success: true, data: [] };
+  async getHistory() {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Get('workflows/:id/logs')
-  getWorkflowLogs(@Param('id') id: string) {
-    return { success: true, data: [] };
+  async getWorkflowLogs(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/logs`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   @Get('workflows/:id/graph')
-  getWorkflowGraph(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { nodes: [], edges: [], status: 'completed' }
-    };
-  }
-
-  @Get('tasks/:id')
-  getTask(@Param('id') id: string) {
-    return {
-      success: true,
-      data: { id, taskName: 'Analyze Tesla Q1', status: 'completed' }
-    };
-  }
-
-  @Post('tasks/:id/retry')
-  retryTask(@Param('id') id: string) {
-    return { success: true, message: `Task ${id} execution queued for retry` };
-  }
-
-  @Post('tasks/:id/cancel')
-  cancelTask(@Param('id') id: string) {
-    return { success: true, message: `Task ${id} execution cancelled` };
-  }
-
-  @Get('tasks/:id/output')
-  getTaskOutput(@Param('id') id: string) {
-    return { success: true, data: { result: 'Mock research data output' } };
-  }
-
-  @Get('tasks/:id/logs')
-  getTaskLogs(@Param('id') id: string) {
-    return { success: true, data: [] };
+  async getWorkflowGraph(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/graph`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
   }
 
   // --- AI ORCHESTRATION ---
   @Post('ai/plan')
-  planWorkflow(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Intention plan generated successfully',
-      data: {
-        nodes: [
-          { id: 'node-1', capability: 'market analysis', label: 'Retrieve Financial Matrix' }
-        ],
-        edges: []
-      }
-    };
-  }
-
-  @Post('ai/explain')
-  explainWorkflow() {
-    return { success: true, message: 'Workflow analysis explanation provided' };
+  async planWorkflow(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.aiUrl}/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
+      });
+      const data = await res.json();
+      return {
+        success: true,
+        message: 'Intention plan generated successfully',
+        data: {
+          nodes: data.workflow.map((node: any) => ({
+            id: node.id,
+            capability: node.capability,
+            label: node.id.toUpperCase(),
+          })),
+          edges: data.workflow.slice(1).map((node: any, idx: number) => ({
+            id: `edge-${idx}`,
+            source: data.workflow[idx].id,
+            target: node.id,
+          })),
+        },
+      };
+    } catch (err: any) {
+      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+    }
   }
 
   @Post('ai/cost')
-  estimateCost() {
-    return { success: true, data: { estimateUsdc: 0.48 } };
-  }
-
-  @Post('ai/time')
-  estimateTime() {
-    return { success: true, data: { estimateSeconds: 6 } };
+  async estimateCost(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.aiUrl}/estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+    }
   }
 
   @Post('ai/verify')
-  verifyOutput() {
-    return { success: true, score: 98, checkResult: 'pass' };
-  }
-
-  @Post('ai/consensus')
-  consensus() {
-    return { success: true, consensusAchieved: true, result: 'Consensus output data' };
-  }
-
-  @Post('ai/log-summary')
-  summarizeLogs() {
-    return { success: true, summary: 'All tasks completed successfully' };
-  }
-
-  // --- DISCOVERY ---
-  @Post('discover')
-  discoverAgents(@Body() body: any) {
-    return {
-      success: true,
-      data: [
-        { id: 'agent-research-1', name: 'InsightFinder Pro', matchScore: 98 }
-      ]
-    };
-  }
-
-  @Post('discover/workflow')
-  recommendWorkflow() {
-    return { success: true, data: { templates: [] } };
+  async verifyOutput(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.aiUrl}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+    }
   }
 }

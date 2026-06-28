@@ -1,33 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req } from '@nestjs/common';
 
 @Controller('api/v1')
 export class AuthController {
+  private readonly authUrl = 'http://localhost:5001/api/v1';
+
   @Post('auth/register')
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() body: any) {
-    return {
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        token: 'mock-jwt-token-xyz',
-        refreshToken: 'mock-refresh-token-abc',
-        profile: { id: 'user-1', email: body.email, username: body.username }
-      }
-    };
+  async register(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() body: any) {
-    return {
-      success: true,
-      message: 'User authenticated successfully',
-      data: {
-        token: 'mock-jwt-token-xyz',
-        refreshToken: 'mock-refresh-token-abc',
-        profile: { id: 'user-1', email: body.email || 'user@nexusai.dev', username: 'nexus_builder' }
-      }
-    };
+  async login(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Get('auth/google')
@@ -42,23 +46,25 @@ export class AuthController {
 
   @Post('auth/wallet')
   @HttpCode(HttpStatus.OK)
-  walletLogin(@Body() body: any) {
-    return {
-      success: true,
-      message: 'Wallet signature verified successfully',
-      data: {
-        token: 'mock-jwt-token-wallet',
-        address: body.address
-      }
-    };
+  async walletLogin(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/wallet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Post('auth/refresh')
-  refresh() {
+  async refresh() {
     return {
       success: true,
       message: 'Token refreshed',
-      data: { token: 'mock-jwt-token-new' }
+      data: { token: 'mock-jwt-token-new' },
     };
   }
 
@@ -79,10 +85,10 @@ export class AuthController {
   }
 
   @Get('users/me')
-  getMe() {
+  async getMe() {
     return {
       success: true,
-      data: { id: 'user-1', email: 'user@nexusai.dev', username: 'nexus_builder', role: 'developer' }
+      data: { id: 'user-1', email: 'user@orbitai.dev', username: 'orbit_builder', role: 'developer' },
     };
   }
 
@@ -93,23 +99,11 @@ export class AuthController {
 
   @Post('users/avatar')
   uploadAvatar() {
-    return { success: true, message: 'Avatar updated', data: { url: 'https://nexusai.dev/avatar.jpg' } };
+    return { success: true, message: 'Avatar updated', data: { url: 'https://orbitai.dev/avatar.jpg' } };
   }
 
   @Delete('users/me')
   deleteMe() {
-    return { success: true, message: 'Account flagged for deletion' };
-  }
-
-  @Get('users/stats')
-  getUserStats() {
-    return {
-      success: true,
-      data: {
-        totalTasks: 120,
-        spendUsdc: 24.50,
-        runningWorkflows: 3
-      }
-    };
+    return { success: true, message: 'Profile removed' };
   }
 }

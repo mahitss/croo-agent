@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test": "node scripts/test_runner.js"
   },
   "devDependencies": {
     "turbo": "^2.0.12",

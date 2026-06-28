@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Header } from '@nestjs/common';
 
 @Controller()
 export class HealthController {
@@ -12,7 +12,7 @@ export class HealthController {
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
       database: 'healthy',
       redis: 'healthy',
-      queue: 'healthy'
+      queue: 'healthy',
     };
   }
 
@@ -37,5 +37,116 @@ export class HealthController {
            `# TYPE nexus_api_http_requests_total counter\n` +
            `nexus_api_http_requests_total{method="GET",path="/health",status="200"} 42\n` +
            `nexus_api_http_requests_total{method="POST",path="/api/v1/workflows",status="201"} 14\n`;
+  }
+
+  @Get('docs')
+  @Header('Content-Type', 'text/html')
+  getDocsPage(): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Orbit AI API Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+  <style>
+    body { margin: 0; background: #111; }
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui .info .title { color: #fff !important; }
+    .swagger-ui .info p { color: #aaa !important; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: '/api/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout"
+      });
+    };
+  </script>
+</body>
+</html>
+    `;
+  }
+
+  @Get('api/openapi.json')
+  getOpenApiSchema() {
+    return {
+      openapi: '3.0.0',
+      info: {
+        title: 'Orbit AI API Engine',
+        version: '1.0.0',
+        description: 'Microservice API routes for user registry, swarm agent discovery, and credit balances.',
+      },
+      paths: {
+        '/api/v1/auth/register': {
+          post: {
+            summary: 'Register User',
+            responses: {
+              '201': { description: 'Success' }
+            }
+          }
+        },
+        '/api/v1/auth/login': {
+          post: {
+            summary: 'Login User',
+            responses: {
+              '200': { description: 'Success' }
+            }
+          }
+        },
+        '/api/v1/agents': {
+          get: {
+            summary: 'List Registered Agents',
+            responses: {
+              '200': { description: 'Success' }
+            }
+          },
+          post: {
+            summary: 'Register New Agent Specs',
+            responses: {
+              '201': { description: 'Success' }
+            }
+          }
+        },
+        '/api/v1/workflows': {
+          post: {
+            summary: 'Parse & Save DAG template',
+            responses: {
+              '201': { description: 'Success' }
+            }
+          }
+        },
+        '/api/v1/workflows/{id}/run': {
+          post: {
+            summary: 'Trigger Asynchronous Swarm run',
+            parameters: [
+              { name: 'id', in: 'path', required: true, schema: { type: 'string' } }
+            ],
+            responses: {
+              '200': { description: 'Success' }
+            }
+          }
+        },
+        '/api/v1/wallet': {
+          get: {
+            summary: 'Retrieve balances and sync keys',
+            responses: {
+              '200': { description: 'Success' }
+            }
+          }
+        }
+      }
+    };
   }
 }
