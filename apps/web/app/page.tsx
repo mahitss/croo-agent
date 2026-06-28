@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useNexusStore } from '../store/nexusStore';
 import Canvas from '../components/Canvas';
@@ -16,6 +16,11 @@ export default function PortalPage() {
   const isRunning = useNexusStore((state) => state.isRunning);
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
   const agents = useNexusStore((state) => state.agents);
+  const initialize = useNexusStore((state) => state.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const [routingMode, setLocalRoutingMode] = useState<'cheapest' | 'fastest' | 'accuracy' | 'balanced'>('balanced');
   const [budget, setLocalBudget] = useState<number>(2.0);

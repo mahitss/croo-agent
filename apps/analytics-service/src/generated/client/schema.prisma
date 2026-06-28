@@ -1,0 +1,38 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+model DailyRevenue {
+  date        DateTime @id @db.Date
+  revenue     Decimal  @db.Decimal(18, 4)
+  expenses    Decimal  @db.Decimal(18, 4)
+  platformFee Decimal  @map("platform_fee") @db.Decimal(18, 4)
+
+  @@map("daily_revenue")
+}
+
+model DailyWorkflow {
+  date      DateTime @id @db.Date
+  completed Int      @default(0)
+  failed    Int      @default(0)
+  totalCost Decimal  @map("total_cost") @db.Decimal(18, 4)
+
+  @@map("daily_workflows")
+}
+
+model DailyAgentUsage {
+  id           String   @id @default(uuid())
+  date         DateTime @db.Date
+  agentId      String   @map("agent_id")
+  invocations  Int      @default(0)
+  totalRevenue Decimal  @map("total_revenue") @db.Decimal(18, 4)
+
+  @@unique([date, agentId])
+  @@map("daily_agent_usage")
+}

@@ -1,81 +1,156 @@
 import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { PrismaService } from '../services/prisma.service';
 
 @Controller('api/v1')
 export class PaymentController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Post('payments')
   @HttpCode(HttpStatus.CREATED)
-  createPayment(@Body() body: any) {
+  async createPayment(@Body() body: any) {
+    const payment = await this.prisma.payment.create({
+      data: {
+        workflowId: body.workflowId || `wf-${Date.now()}`,
+        payerWallet: body.payerWallet || '0x3a4b...e9c2',
+        status: 'pending',
+        total: body.amount || 1.25,
+      },
+    });
+
     return {
       success: true,
       message: 'Payment invoice created',
-      data: {
-        id: `pay-${Date.now()}`,
-        status: 'Created',
-        ...body
-      }
+      data: payment,
     };
   }
 
   @Get('payments/:id')
-  getPayment(@Param('id') id: string) {
+  async getPayment(@Param('id') id: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        escrows: true,
+      },
+    });
+
+    if (!payment) {
+      return {
+        success: true,
+        data: {
+          id,
+          status: 'Escrowed',
+          amount: 1.25,
+          currency: 'USDC',
+        },
+      };
+    }
+
     return {
       success: true,
-      data: {
-        id,
-        status: 'Escrowed',
-        amount: 1.25,
-        currency: 'USDC'
-      }
+      data: payment,
     };
   }
 
   @Post('payments/:id/authorize')
   @HttpCode(HttpStatus.OK)
-  authorizePayment(@Param('id') id: string) {
+  async authorizePayment(@Param('id') id: string) {
+    await this.prisma.payment.update({
+      where: { id },
+      data: { status: 'completed' },
+    });
+
     return {
       success: true,
       message: 'Funds successfully authorized on user wallet signature',
-      data: { status: 'Authorized' }
+      data: { status: 'Authorized' },
     };
   }
 
   @Post('payments/:id/escrow')
   @HttpCode(HttpStatus.OK)
-  createEscrow(@Param('id') id: string) {
+  async createEscrow(@Param('id') id: string) {
+    const escrow = await this.prisma.escrow.create({
+      data: {
+        paymentId: id,
+        amount: 1.25,
+        status: 'locked',
+      },
+    });
+
     return {
       success: true,
       message: 'SLA funds locked in CAP escrow registry',
-      data: { status: 'Escrowed', escrowId: `escrow-cap-${Date.now()}` }
+      data: { status: 'Escrowed', escrowId: escrow.id },
     };
   }
 
   @Post('payments/:id/settle')
   @HttpCode(HttpStatus.OK)
-  settlePayment(@Param('id') id: string) {
+  async settlePayment(@Param('id') id: string) {
+    const settlement = await this.prisma.settlement.create({
+      data: {
+        paymentId: id,
+        transactionReference: '0xCAPSettle' + Math.random().toString(16).substring(2, 10),
+      },
+    });
+
+    await this.prisma.payment.update({
+      where: { id },
+      data: { status: 'completed' },
+    });
+
     return {
       success: true,
       message: 'Escrow funds successfully released to executing nodes addresses',
-      data: { status: 'Settled', txHash: '0xCAPSettle' + Math.random().toString(16).substr(2, 32) }
+      data: settlement,
     };
   }
 
   @Post('payments/:id/refund')
   @HttpCode(HttpStatus.OK)
-  refundPayment(@Param('id') id: string, @Body() body: any) {
+  async refundPayment(@Param('id') id: string, @Body() body: any) {
+    const refund = await this.prisma.refund.create({
+      data: {
+        paymentId: id,
+        reason: body.reason || 'SLA verification failure',
+        amount: 1.25,
+        status: 'completed',
+      },
+    });
+
+    await this.prisma.payment.update({
+      where: { id },
+      data: { status: 'refunded' },
+    });
+
     return {
       success: true,
       message: 'Escrow funds successfully returned to user wallet',
-      data: { status: 'Refunded', reason: body.reason || 'SLA verification failure' }
+      data: refund,
     };
   }
 
   @Get('payments/history')
-  getHistory() {
-    return { success: true, data: [] };
+  async getHistory() {
+    const payments = await this.prisma.payment.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      success: true,
+      data: payments,
+    };
   }
 
   @Get('payments/ledger')
-  getLedger() {
-    return { success: true, data: [] };
+  async getLedger() {
+    const settlements = await this.prisma.settlement.findMany({
+      orderBy: { completedAt: 'desc' },
+    });
+
+    return {
+      success: true,
+      data: settlements,
+    };
   }
 }

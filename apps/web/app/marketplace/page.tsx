@@ -9,6 +9,7 @@ import Link from 'next/link';
 
 export default function MarketplacePage() {
   const agents = useNexusStore((state) => state.agents);
+  const initialize = useNexusStore((state) => state.initialize);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -26,6 +27,7 @@ export default function MarketplacePage() {
 
   // Check URL query search parameters safely
   useEffect(() => {
+    initialize();
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlQuery = params.get('search');
@@ -33,7 +35,7 @@ export default function MarketplacePage() {
         setSearchTerm(urlQuery);
       }
     }
-  }, []);
+  }, [initialize]);
 
   const handleMatchmaker = () => {
     if (!matchmakerPrompt.trim()) return;

@@ -1,0 +1,74 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+enum EscrowStatus {
+  locked
+  released
+  refunded
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  workflowId  String        @map("workflow_id")
+  payerWallet String        @map("payer_wallet")
+  status      PaymentStatus @default(pending)
+  total       Decimal       @db.Decimal(18, 4)
+  currency    String        @default("USDC")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  escrows     Escrow[]
+  settlements Settlement[]
+  refunds     Refund[]
+
+  @@map("payments")
+}
+
+model Escrow {
+  id         String       @id @default(uuid())
+  paymentId  String       @map("payment_id")
+  amount     Decimal      @db.Decimal(18, 4)
+  status     EscrowStatus @default(locked)
+  releasedAt DateTime?    @map("released_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("escrows")
+}
+
+model Settlement {
+  id                   String   @id @default(uuid())
+  paymentId            String   @map("payment_id")
+  transactionReference String   @map("transaction_reference")
+  completedAt          DateTime @default(now()) @map("completed_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("settlements")
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  paymentId String   @map("payment_id")
+  reason    String
+  amount    Decimal  @db.Decimal(18, 4)
+  status    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
+}

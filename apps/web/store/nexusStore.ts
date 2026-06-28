@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Agent, Workflow, TaskNode, ExecutionLog, Transaction, WalletState } from '@nexus-ai/types';
+import { apiService } from '../services/api';
 
 interface NexusState {
   agents: Agent[];
@@ -20,6 +21,7 @@ interface NexusState {
   registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => void;
   depositUserWallet: (amount: number) => void;
   withdrawUserWallet: (amount: number) => void;
+  initialize: () => Promise<void>;
 }
 
 const seedAgents: Agent[] = [
@@ -536,6 +538,17 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }));
         }
       }
-    }
+    },
+
+    initialize: async () => {
+      try {
+        const data = await apiService.getAgentsList() as any;
+        if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+          set({ agents: data.data });
+        }
+      } catch (err) {
+        console.warn('API Gateway offline. Running in sandbox mode.', err);
+      }
+    },
   };
 });
