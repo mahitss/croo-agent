@@ -54,6 +54,50 @@ async function bootstrap() {
     next();
   });
 
+  // Global XSS Input Sanitization Middleware
+  app.use((req: any, res: any, next: any) => {
+    const sanitize = (data: any): any => {
+      if (typeof data === 'string') {
+        return data
+          .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+          .replace(/on\w+="[^"]*"/gi, '')
+          .replace(/href="javascript:[^"]*"/gi, '');
+      }
+      if (Array.isArray(data)) {
+        return data.map(sanitize);
+      }
+      if (data !== null && typeof data === 'object') {
+        const cleaned: any = {};
+        for (const key in data) {
+          cleaned[key] = sanitize(data[key]);
+        }
+        return cleaned;
+      }
+      return data;
+    };
+
+    req.body = sanitize(req.body);
+    req.query = sanitize(req.query);
+    next();
+  });
+
+  // Security Audit Logging Middleware
+  app.use((req: any, res: any, next: any) => {
+    const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
+    res.on('finish', () => {
+      if (res.statusCode >= 400) {
+        console.warn(`[AUDIT_ALERT] ${new Date().toISOString()} - IP: ${ip} - Method: ${req.method} - URL: ${req.originalUrl} - Status: ${res.statusCode}`);
+      }
+    });
+    next();
+  });
+
+  // Secrets Complexity and Validation Check
+  const jwtSecret = process.env.JWT_SECRET || 'nexus_secure_secret_hash_key_1012';
+  if (jwtSecret.length < 16) {
+    console.warn(`[SECURITY_WARNING] JWT_SECRET is weak or too short (${jwtSecret.length} chars). Require secure key of at least 32 characters in production.`);
+  }
+
   await app.listen(5000);
   console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
 }

@@ -1,4 +1,7 @@
-import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { GatewayAuthGuard } from '../guards/auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { Roles } from '../decorators/roles.decorator';
 
 @Controller('api/v1')
 export class AnalyticsController {
@@ -88,36 +91,50 @@ export class AnalyticsController {
 
   // --- ADMIN PANEL ---
   @Get('admin/users')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   getUsers() {
     return { success: true, data: [] };
   }
 
   @Get('admin/agents')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   getAgents() {
     return { success: true, data: [] };
   }
 
   @Post('admin/agents/:id/approve')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   approveAgent(@Param('id') id: string) {
     return { success: true, message: `Agent ${id} approved for listing` };
   }
 
   @Post('admin/agents/:id/reject')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   rejectAgent(@Param('id') id: string) {
     return { success: true, message: `Agent ${id} listing rejected` };
   }
 
   @Post('admin/users/:id/suspend')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   suspendUser(@Param('id') id: string) {
     return { success: true, message: `User ${id} suspended` };
   }
 
   @Get('admin/reports')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   getReports() {
     return { success: true, data: [] };
   }
 
   @Get('admin/fraud')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
+  @Roles('admin')
   getFraudDetections() {
     return { success: true, data: [] };
   }
