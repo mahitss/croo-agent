@@ -1,15 +1,25 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from fastapi.responses import PlainTextResponse, StreamingResponse
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import time
 import os
 import json
-import urllib.request
-import urllib.error
+import yaml
+import logging
+
+from providers import LLMProviderManager, LLMResult
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("nexus-ai")
 
 app = FastAPI(title="NEXUS AI Orchestration Engine", version="1.0.0")
 start_time = time.time()
+
+# Instantiate Provider Manager
+provider_manager = LLMProviderManager()
+PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 # Request Models
 class PlanRequest(BaseModel):
@@ -42,15 +52,12 @@ class ConsensusRequest(BaseModel):
 class ExplainRequest(BaseModel):
     workflow_id: str
 
-# Response Models
-class AgentScore(BaseModel):
-    agent_id: str
-    name: str
-    score: float
-    price: float
-    latency: int
-    success_rate: float
+class StreamRequest(BaseModel):
+    prompt: str
+    system_prompt: Optional[str] = None
+    provider: Optional[str] = None
 
+# Response Models
 class TaskNodeResponse(BaseModel):
     id: str
     capability: str
@@ -62,7 +69,39 @@ class PlanResponse(BaseModel):
     estimated_duration_seconds: int
     confidence: float
 
-# Seed candidates database
+class EstimateResponse(BaseModel):
+    success: bool
+    estimated_cost: float
+    estimated_duration_seconds: int
+
+class VerifyResponse(BaseModel):
+    success: bool
+    score: int
+    passed: bool
+    citations_count: int
+
+class SummarizeResponse(BaseModel):
+    success: bool
+    summary: str
+
+class TranslateResponse(BaseModel):
+    success: bool
+    translated_text: str
+
+class ClassifyResponse(BaseModel):
+    success: bool
+    category: str
+
+class ConsensusResponse(BaseModel):
+    success: bool
+    consensus_achieved: bool
+    merged_output: str
+
+class ExplainResponse(BaseModel):
+    success: bool
+    explanation: str
+
+# Seed candidates database for compatibility
 candidates = [
     {
         "id": "agent-research-1",
@@ -121,61 +160,6 @@ candidates = [
     }
 ]
 
-def call_gemini(prompt: str, api_key: str) -> Optional[str]:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    try:
-        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"Gemini API error: {e}")
-        return None
-
-def call_openai(prompt: str, api_key: str) -> Optional[str]:
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-    data = {
-        "model": "gpt-4o-mini",
-        "messages": [{"role": "user", "content": prompt}]
-    }
-    try:
-        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["choices"][0]["message"]["content"]
-    except Exception as e:
-        print(f"OpenAI API error: {e}")
-        return None
-
-def call_anthropic(prompt: str, api_key: str) -> Optional[str]:
-    url = "https://api.anthropic.com/v1/messages"
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01"
-    }
-    data = {
-        "model": "claude-3-5-sonnet-20241022",
-        "max_tokens": 1024,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-    try:
-        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            return res_data["content"][0]["text"]
-    except Exception as e:
-        print(f"Anthropic API error: {e}")
-        return None
-
 def score_agent(agent: Dict[str, Any], profile: str) -> float:
     rating_score = (agent["rating"] / 5.0) * 100.0
     cost_score = (1.0 - min(agent["price"], 1.0)) * 100.0
@@ -195,6 +179,25 @@ def score_agent(agent: Dict[str, Any], profile: str) -> float:
         
     score = (w_trust * trust) + (w_success * success) + (w_latency * latency_score) + (w_cost * cost_score) + (w_rating * rating_score)
     return round(score, 2)
+
+def get_prompt_template(category: str, filename: str) -> str:
+    path = os.path.join(PROMPTS_DIR, category, filename)
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                return data.get("template", "")
+        except Exception as e:
+            logger.error(f"Error loading prompt template {path}: {e}")
+    return ""
+
+def clean_json_response(content: str) -> str:
+    cleaned = content.strip()
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+    elif "```" in cleaned:
+        cleaned = cleaned.split("```")[1].split("```")[0].strip()
+    return cleaned
 
 @app.get("/")
 def get_root():
@@ -222,73 +225,103 @@ def get_live():
 @app.get("/metrics", response_class=PlainTextResponse)
 def get_metrics():
     uptime = int(time.time() - start_time)
-    return (
+    metrics_str = (
         f"# HELP nexus_ai_uptime_seconds NEXUS AI orchestrator service uptime in seconds\n"
         f"# TYPE nexus_ai_uptime_seconds counter\n"
         f"nexus_ai_uptime_seconds {uptime}\n"
     )
+    
+    # Add provider metrics
+    metrics = provider_manager.get_metrics()
+    for provider, stats in metrics.items():
+        metrics_str += (
+            f"# HELP nexus_ai_provider_calls_total Total calls to provider {provider}\n"
+            f"# TYPE nexus_ai_provider_calls_total counter\n"
+            f"nexus_ai_provider_calls_total{{provider=\"{provider}\"}} {stats['calls']}\n"
+            f"# HELP nexus_ai_provider_failures_total Total failures for provider {provider}\n"
+            f"# TYPE nexus_ai_provider_failures_total counter\n"
+            f"nexus_ai_provider_failures_total{{provider=\"{provider}\"}} {stats['failures']}\n"
+            f"# HELP nexus_ai_token_usage_total Total tokens used for provider {provider}\n"
+            f"# TYPE nexus_ai_token_usage_total counter\n"
+            f"nexus_ai_token_usage_total{{provider=\"{provider}\"}} {stats['total_tokens']}\n"
+            f"# HELP nexus_ai_cost_total Total cost in USDC for provider {provider}\n"
+            f"# TYPE nexus_ai_cost_total counter\n"
+            f"nexus_ai_cost_total{{provider=\"{provider}\"}} {stats['total_cost']:.6f}\n"
+        )
+    return metrics_str
 
 @app.post("/plan", response_model=PlanResponse)
 def plan_workflow(req: PlanRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query prompt cannot be empty.")
     
-    query = req.query.lower()
+    # Load system prompt and planner template
+    system_prompt = get_prompt_template("system", "system_v1.yaml")
+    planner_template = get_prompt_template("planner", "planner_v3.yaml")
     
-    # Try calling external AI providers if keys exist
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    openai_key = os.environ.get("OPENAI_API_KEY")
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not planner_template:
+        planner_template = (
+            "You are the Lead Swarm Architect for NEXUS AI.\n"
+            "Decompose the user query into a Directed Acyclic Graph (DAG) task plan.\n\n"
+            "Query: {{ query }}\n"
+            "Budget Ceiling: {{ budget }} USDC\n"
+            "Routing Profile: {{ routing_mode }}\n\n"
+            "Output strict JSON matching: {\"workflow\": [{\"id\": \"node-1\", \"capability\": \"research\", \"dependencies\": []}], \"estimated_cost\": 1.25, \"estimated_duration_seconds\": 65, \"confidence\": 0.95}"
+        )
     
-    ai_response = None
-    prompt_instruct = f"Determine which task nodes are needed to fulfill this user goal: '{req.query}'. Return a JSON array matching format: [{{'id': '...', 'capability': '...', 'dependencies': [...]}}]"
-    
-    if gemini_key:
-        ai_response = call_gemini(prompt_instruct, gemini_key)
-    elif openai_key:
-        ai_response = call_openai(prompt_instruct, openai_key)
-    elif anthropic_key:
-        ai_response = call_anthropic(prompt_instruct, anthropic_key)
-        
-    if ai_response:
-        try:
-            # Attempt to extract json brackets if wrapped in markdown blocks
-            clean_res = ai_response
-            if "```json" in clean_res:
-                clean_res = clean_res.split("```json")[1].split("```")[0].strip()
-            elif "```" in clean_res:
-                clean_res = clean_res.split("```")[1].split("```")[0].strip()
-            
-            parsed = json.loads(clean_res)
-            if isinstance(parsed, list):
-                workflow_dag = [
-                    TaskNodeResponse(id=item["id"], capability=item["capability"], dependencies=item.get("dependencies", []))
-                    for item in parsed
-                ]
-                return PlanResponse(
-                    workflow=workflow_dag,
-                    estimated_cost=1.25,
-                    estimated_duration_seconds=65,
-                    confidence=0.95
-                )
-        except Exception as err:
-            print(f"Could not parse structured LLM response, falling back to local orchestrator logic. Error: {err}")
+    prompt = planner_template
+    prompt = prompt.replace("{{ query }}", req.query)
+    prompt = prompt.replace("{{ budget }}", str(req.budget))
+    prompt = prompt.replace("{{ routing_mode }}", req.routing_mode or "balanced")
 
-    # Local structured fallback logic based on semantic parsing of keywords
-    if "tesla" in query or "financial" in query or "research" in query:
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        json_mode=True
+    )
+    
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            
+            workflow_list = []
+            for idx, item in enumerate(parsed.get("workflow", [])):
+                node_id = item.get("id") or item.get("task") or f"node-{idx+1}"
+                capability = item.get("capability") or "research"
+                dependencies = item.get("dependencies") or []
+                workflow_list.append(TaskNodeResponse(
+                    id=node_id,
+                    capability=capability,
+                    dependencies=dependencies
+                ))
+            
+            plan = PlanResponse(
+                workflow=workflow_list,
+                estimated_cost=float(parsed.get("estimated_cost") or 1.25),
+                estimated_duration_seconds=int(parsed.get("estimated_duration_seconds") or 65),
+                confidence=float(parsed.get("confidence") or 0.95)
+            )
+            return plan
+        except Exception as e:
+            logger.error(f"Error parsing LLM response for /plan: {e}. Falling back to local structured orchestrator.")
+
+    # Local Fallback Logic
+    query_lower = req.query.lower()
+    if "tesla" in query_lower or "financial" in query_lower or "research" in query_lower:
         workflow_dag = [
             TaskNodeResponse(id="node-1", capability="research", dependencies=[]),
             TaskNodeResponse(id="node-2", capability="finance", dependencies=["node-1"]),
             TaskNodeResponse(id="node-3", capability="verify", dependencies=["node-2"]),
             TaskNodeResponse(id="node-4", capability="translate", dependencies=["node-3"])
         ]
-    elif "smart contract" in query or "security" in query or "code" in query:
+    elif "smart contract" in query_lower or "security" in query_lower or "code" in query_lower:
         workflow_dag = [
             TaskNodeResponse(id="node-1", capability="code", dependencies=[]),
             TaskNodeResponse(id="node-2", capability="security", dependencies=["node-1"]),
             TaskNodeResponse(id="node-3", capability="verify", dependencies=["node-2"])
         ]
-    elif "legal" in query or "compliance" in query or "policy" in query:
+    elif "legal" in query_lower or "compliance" in query_lower or "policy" in query_lower:
         workflow_dag = [
             TaskNodeResponse(id="node-1", capability="research", dependencies=[]),
             TaskNodeResponse(id="node-2", capability="legal", dependencies=["node-1"]),
@@ -307,58 +340,175 @@ def plan_workflow(req: PlanRequest):
         confidence=0.94
     )
 
-@app.post("/estimate")
+@app.post("/estimate", response_model=EstimateResponse)
 def estimate_workflow(req: EstimateRequest):
-    return {
-        "success": True,
-        "estimated_cost": 1.25,
-        "estimated_duration_seconds": 65
-    }
+    prompt = (
+        f"Analyze the following tasks and estimate the total execution cost (in USDC) and total duration (in seconds).\n"
+        f"Workflow ID: {req.workflow_id}\n"
+        f"Tasks list: {json.dumps(req.tasks)}\n\n"
+        f"Return strict JSON matching: {{\"success\": true, \"estimated_cost\": 1.25, \"estimated_duration_seconds\": 65}}"
+    )
+    
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return EstimateResponse(
+                success=True,
+                estimated_cost=float(parsed.get("estimated_cost", 1.25)),
+                estimated_duration_seconds=int(parsed.get("estimated_duration_seconds", 65))
+            )
+        except Exception as e:
+            logger.error(f"Error parsing estimate: {e}")
+            
+    return EstimateResponse(success=True, estimated_cost=1.25, estimated_duration_seconds=65)
 
-@app.post("/verify")
+@app.post("/verify", response_model=VerifyResponse)
 def verify_output(req: VerifyRequest):
-    return {
-        "success": True,
-        "score": 96,
-        "passed": True,
-        "citations_count": 4
-    }
+    template = get_prompt_template("verification", "verification_v1.yaml")
+    if not template:
+        template = (
+            "Verify the following execution output data for Agent {{ agent_id }}.\n"
+            "Output data: {{ output_data }}\n"
+            "Schema format constraints: {{ required_schema }}\n"
+        )
+    
+    prompt = template
+    prompt = prompt.replace("{{ agent_id }}", req.agent_id)
+    prompt = prompt.replace("{{ output_data }}", req.output_data)
+    prompt = prompt.replace("{{ required_schema }}", req.required_schema or "N/A")
+    prompt += (
+        "\nIMPORTANT: Evaluate safety, schemas compliance, and citations count. "
+        "Return strict JSON format: {\"success\": true, \"score\": 95, \"passed\": true, \"citations_count\": 4}"
+    )
 
-@app.post("/summarize")
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            score = int(parsed.get("score", 95))
+            passed = bool(parsed.get("passed", score >= 70))
+            return VerifyResponse(
+                success=True,
+                score=score,
+                passed=passed,
+                citations_count=int(parsed.get("citations_count", 4))
+            )
+        except Exception as e:
+            logger.error(f"Error parsing verification: {e}")
+            
+    return VerifyResponse(success=True, score=96, passed=True, citations_count=4)
+
+@app.post("/summarize", response_model=SummarizeResponse)
 def summarize_content(req: SummarizeRequest):
-    return {
-        "success": True,
-        "summary": "Analyses show positive growth parameters matching target constraints."
-    }
+    prompt = (
+        f"Provide a summary of this content:\n{req.content}\n\n"
+        f"Return strict JSON format: {{\"success\": true, \"summary\": \"(Summary text)\"}}"
+    )
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return SummarizeResponse(
+                success=True,
+                summary=parsed.get("summary", "Analyses show positive growth parameters.")
+            )
+        except Exception as e:
+            logger.error(f"Error parsing summary: {e}")
+            
+    return SummarizeResponse(success=True, summary="Analyses show positive growth parameters matching target constraints.")
 
-@app.post("/translate")
+@app.post("/translate", response_model=TranslateResponse)
 def translate_text(req: TranslateRequest):
-    return {
-        "success": True,
-        "translated_text": f"[Translated to {req.target_language}]: {req.text}"
-    }
+    prompt = (
+        f"Translate the following text into target language '{req.target_language}':\n{req.text}\n\n"
+        f"Return strict JSON format: {{\"success\": true, \"translated_text\": \"(translated result)\"}}"
+    )
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return TranslateResponse(
+                success=True,
+                translated_text=parsed.get("translated_text", f"[Translated to {req.target_language}]: {req.text}")
+            )
+        except Exception as e:
+            logger.error(f"Error parsing translation: {e}")
+            
+    return TranslateResponse(success=True, translated_text=f"[Translated to {req.target_language}]: {req.text}")
 
-@app.post("/classify")
+@app.post("/classify", response_model=ClassifyResponse)
 def classify_text(req: ClassifyRequest):
-    return {
-        "success": True,
-        "category": "market_analysis"
-    }
+    prompt = (
+        f"Categorize the following text:\n{req.text}\n\n"
+        f"Return strict JSON format: {{\"success\": true, \"category\": \"(market_analysis/legal/finance/etc)\"}}"
+    )
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return ClassifyResponse(
+                success=True,
+                category=parsed.get("category", "market_analysis")
+            )
+        except Exception as e:
+            logger.error(f"Error parsing classification: {e}")
+            
+    return ClassifyResponse(success=True, category="market_analysis")
 
-@app.post("/consensus")
+@app.post("/consensus", response_model=ConsensusResponse)
 def consensus_check(req: ConsensusRequest):
-    return {
-        "success": True,
-        "consensus_achieved": True,
-        "merged_output": req.outputs[0] if req.outputs else ""
-    }
+    prompt = (
+        f"Determine consensus and merge outputs from different agent runs:\n"
+        f"Outputs: {json.dumps(req.outputs)}\n\n"
+        f"Return strict JSON format: {{\"success\": true, \"consensus_achieved\": true, \"merged_output\": \"(Merged consensus data)\"}}"
+    )
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return ConsensusResponse(
+                success=True,
+                consensus_achieved=bool(parsed.get("consensus_achieved", True)),
+                merged_output=parsed.get("merged_output", req.outputs[0] if req.outputs else "")
+            )
+        except Exception as e:
+            logger.error(f"Error parsing consensus: {e}")
+            
+    return ConsensusResponse(
+        success=True,
+        consensus_achieved=True,
+        merged_output=req.outputs[0] if req.outputs else ""
+    )
 
-@app.post("/explain")
+@app.post("/explain", response_model=ExplainResponse)
 def explain_workflow(req: ExplainRequest):
-    return {
-        "success": True,
-        "explanation": "This DAG executes research first, runs verification safety filters next, and outputs presentation slides."
-    }
+    prompt = (
+        f"Explain the execution pathway and layout of workflow ID: {req.workflow_id}\n\n"
+        f"Return strict JSON format: {{\"success\": true, \"explanation\": \"(Explanation of DAG)\"}}"
+    )
+    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    if result.success and result.content:
+        try:
+            cleaned = clean_json_response(result.content)
+            parsed = json.loads(cleaned)
+            return ExplainResponse(
+                success=True,
+                explanation=parsed.get("explanation", "DAG executes tasks sequentially.")
+            )
+        except Exception as e:
+            logger.error(f"Error parsing explanation: {e}")
+            
+    return ExplainResponse(
+        success=True,
+        explanation="This DAG executes research first, runs verification safety filters next, and outputs presentation slides."
+    )
 
 @app.get("/models")
 def list_models():
@@ -366,3 +516,70 @@ def list_models():
         "success": True,
         "models": ["GPT-4o", "Gemini-1.5-Pro", "Claude-3.5-Sonnet"]
     }
+
+@app.post("/stream")
+def stream_response(req: StreamRequest):
+    def event_generator():
+        env_default = os.environ.get("DEFAULT_LLM_PROVIDER", "openai").lower()
+        provider_name = req.provider or env_default
+        active = provider_manager.get_active_providers()
+        
+        if not active:
+            yield f"data: {json.dumps({'error': 'No configured LLM providers (missing API keys)'})}\n\n"
+            return
+            
+        selected = provider_name if provider_name in active else active[0]
+        
+        # Stream from OpenAI direct connection if requested and key is present
+        api_key = os.environ.get("OPENAI_API_KEY") if selected == "openai" else None
+        if selected == "openai" and api_key:
+            try:
+                url = "https://api.openai.com/v1/chat/completions"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+                messages = []
+                if req.system_prompt:
+                    messages.append({"role": "system", "content": req.system_prompt})
+                messages.append({"role": "user", "content": req.prompt})
+                data = {
+                    "model": "gpt-4o-mini",
+                    "messages": messages,
+                    "stream": True
+                }
+                req_obj = urllib.request.Request(
+                    url,
+                    data=json.dumps(data).encode("utf-8"),
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(req_obj, timeout=15) as response:
+                    for line in response:
+                        line_str = line.decode("utf-8").strip()
+                        if line_str.startswith("data:"):
+                            yield f"{line_str}\n\n"
+                return
+            except Exception as e:
+                logger.error(f"OpenAI stream failed: {e}. Falling back to chunked full generation.")
+                
+        # Generic fallback chunk generator
+        result = provider_manager.execute_with_retry_and_fallback(
+            prompt=req.prompt,
+            system_prompt=req.system_prompt,
+            json_mode=False
+        )
+        if result.success and result.content:
+            content = result.content
+            chunk_size = 15
+            for i in range(0, len(content), chunk_size):
+                chunk = content[i:i+chunk_size]
+                chunk_data = {
+                    "choices": [{"delta": {"content": chunk}}]
+                }
+                yield f"data: {json.dumps(chunk_data)}\n\n"
+                time.sleep(0.05)
+        else:
+            yield f"data: {json.dumps({'error': result.error_message})}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

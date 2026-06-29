@@ -1408,11 +1408,23 @@ export namespace Prisma {
   export type AgentAvgAggregateOutputType = {
     averageRating: Decimal | null
     trustScore: Decimal | null
+    capReputationScore: Decimal | null
+    price: number | null
+    latency: number | null
+    accuracy: number | null
+    verificationCount: number | null
+    failureRate: number | null
   }
 
   export type AgentSumAggregateOutputType = {
     averageRating: Decimal | null
     trustScore: Decimal | null
+    capReputationScore: Decimal | null
+    price: number | null
+    latency: number | null
+    accuracy: number | null
+    verificationCount: number | null
+    failureRate: number | null
   }
 
   export type AgentMinAggregateOutputType = {
@@ -1425,6 +1437,19 @@ export namespace Prisma {
     verificationStatus: $Enums.VerificationStatus | null
     averageRating: Decimal | null
     trustScore: Decimal | null
+    capDid: string | null
+    capRegisteredAt: Date | null
+    capReputationScore: Decimal | null
+    capEndpoint: string | null
+    capStoreId: string | null
+    category: string | null
+    price: number | null
+    latency: number | null
+    accuracy: number | null
+    verificationCount: number | null
+    failureRate: number | null
+    status: string | null
+    walletAddress: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -1440,6 +1465,19 @@ export namespace Prisma {
     verificationStatus: $Enums.VerificationStatus | null
     averageRating: Decimal | null
     trustScore: Decimal | null
+    capDid: string | null
+    capRegisteredAt: Date | null
+    capReputationScore: Decimal | null
+    capEndpoint: string | null
+    capStoreId: string | null
+    category: string | null
+    price: number | null
+    latency: number | null
+    accuracy: number | null
+    verificationCount: number | null
+    failureRate: number | null
+    status: string | null
+    walletAddress: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -1455,6 +1493,21 @@ export namespace Prisma {
     verificationStatus: number
     averageRating: number
     trustScore: number
+    capDid: number
+    capRegisteredAt: number
+    capReputationScore: number
+    capEndpoint: number
+    capStoreId: number
+    category: number
+    skills: number
+    tags: number
+    price: number
+    latency: number
+    accuracy: number
+    verificationCount: number
+    failureRate: number
+    status: number
+    walletAddress: number
     createdAt: number
     updatedAt: number
     deletedAt: number
@@ -1465,11 +1518,23 @@ export namespace Prisma {
   export type AgentAvgAggregateInputType = {
     averageRating?: true
     trustScore?: true
+    capReputationScore?: true
+    price?: true
+    latency?: true
+    accuracy?: true
+    verificationCount?: true
+    failureRate?: true
   }
 
   export type AgentSumAggregateInputType = {
     averageRating?: true
     trustScore?: true
+    capReputationScore?: true
+    price?: true
+    latency?: true
+    accuracy?: true
+    verificationCount?: true
+    failureRate?: true
   }
 
   export type AgentMinAggregateInputType = {
@@ -1482,6 +1547,19 @@ export namespace Prisma {
     verificationStatus?: true
     averageRating?: true
     trustScore?: true
+    capDid?: true
+    capRegisteredAt?: true
+    capReputationScore?: true
+    capEndpoint?: true
+    capStoreId?: true
+    category?: true
+    price?: true
+    latency?: true
+    accuracy?: true
+    verificationCount?: true
+    failureRate?: true
+    status?: true
+    walletAddress?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -1497,6 +1575,19 @@ export namespace Prisma {
     verificationStatus?: true
     averageRating?: true
     trustScore?: true
+    capDid?: true
+    capRegisteredAt?: true
+    capReputationScore?: true
+    capEndpoint?: true
+    capStoreId?: true
+    category?: true
+    price?: true
+    latency?: true
+    accuracy?: true
+    verificationCount?: true
+    failureRate?: true
+    status?: true
+    walletAddress?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -1512,6 +1603,21 @@ export namespace Prisma {
     verificationStatus?: true
     averageRating?: true
     trustScore?: true
+    capDid?: true
+    capRegisteredAt?: true
+    capReputationScore?: true
+    capEndpoint?: true
+    capStoreId?: true
+    category?: true
+    skills?: true
+    tags?: true
+    price?: true
+    latency?: true
+    accuracy?: true
+    verificationCount?: true
+    failureRate?: true
+    status?: true
+    walletAddress?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -1614,6 +1720,21 @@ export namespace Prisma {
     verificationStatus: $Enums.VerificationStatus
     averageRating: Decimal
     trustScore: Decimal
+    capDid: string | null
+    capRegisteredAt: Date | null
+    capReputationScore: Decimal | null
+    capEndpoint: string | null
+    capStoreId: string | null
+    category: string
+    skills: string[]
+    tags: string[]
+    price: number
+    latency: number
+    accuracy: number
+    verificationCount: number
+    failureRate: number
+    status: string
+    walletAddress: string
     createdAt: Date
     updatedAt: Date
     deletedAt: Date | null
@@ -1648,6 +1769,21 @@ export namespace Prisma {
     verificationStatus?: boolean
     averageRating?: boolean
     trustScore?: boolean
+    capDid?: boolean
+    capRegisteredAt?: boolean
+    capReputationScore?: boolean
+    capEndpoint?: boolean
+    capStoreId?: boolean
+    category?: boolean
+    skills?: boolean
+    tags?: boolean
+    price?: boolean
+    latency?: boolean
+    accuracy?: boolean
+    verificationCount?: boolean
+    failureRate?: boolean
+    status?: boolean
+    walletAddress?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
@@ -1668,6 +1804,21 @@ export namespace Prisma {
     verificationStatus?: boolean
     averageRating?: boolean
     trustScore?: boolean
+    capDid?: boolean
+    capRegisteredAt?: boolean
+    capReputationScore?: boolean
+    capEndpoint?: boolean
+    capStoreId?: boolean
+    category?: boolean
+    skills?: boolean
+    tags?: boolean
+    price?: boolean
+    latency?: boolean
+    accuracy?: boolean
+    verificationCount?: boolean
+    failureRate?: boolean
+    status?: boolean
+    walletAddress?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
@@ -1683,6 +1834,21 @@ export namespace Prisma {
     verificationStatus?: boolean
     averageRating?: boolean
     trustScore?: boolean
+    capDid?: boolean
+    capRegisteredAt?: boolean
+    capReputationScore?: boolean
+    capEndpoint?: boolean
+    capStoreId?: boolean
+    category?: boolean
+    skills?: boolean
+    tags?: boolean
+    price?: boolean
+    latency?: boolean
+    accuracy?: boolean
+    verificationCount?: boolean
+    failureRate?: boolean
+    status?: boolean
+    walletAddress?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
@@ -1715,6 +1881,21 @@ export namespace Prisma {
       verificationStatus: $Enums.VerificationStatus
       averageRating: Prisma.Decimal
       trustScore: Prisma.Decimal
+      capDid: string | null
+      capRegisteredAt: Date | null
+      capReputationScore: Prisma.Decimal | null
+      capEndpoint: string | null
+      capStoreId: string | null
+      category: string
+      skills: string[]
+      tags: string[]
+      price: number
+      latency: number
+      accuracy: number
+      verificationCount: number
+      failureRate: number
+      status: string
+      walletAddress: string
       createdAt: Date
       updatedAt: Date
       deletedAt: Date | null
@@ -2124,6 +2305,21 @@ export namespace Prisma {
     readonly verificationStatus: FieldRef<"Agent", 'VerificationStatus'>
     readonly averageRating: FieldRef<"Agent", 'Decimal'>
     readonly trustScore: FieldRef<"Agent", 'Decimal'>
+    readonly capDid: FieldRef<"Agent", 'String'>
+    readonly capRegisteredAt: FieldRef<"Agent", 'DateTime'>
+    readonly capReputationScore: FieldRef<"Agent", 'Decimal'>
+    readonly capEndpoint: FieldRef<"Agent", 'String'>
+    readonly capStoreId: FieldRef<"Agent", 'String'>
+    readonly category: FieldRef<"Agent", 'String'>
+    readonly skills: FieldRef<"Agent", 'String[]'>
+    readonly tags: FieldRef<"Agent", 'String[]'>
+    readonly price: FieldRef<"Agent", 'Float'>
+    readonly latency: FieldRef<"Agent", 'Int'>
+    readonly accuracy: FieldRef<"Agent", 'Float'>
+    readonly verificationCount: FieldRef<"Agent", 'Int'>
+    readonly failureRate: FieldRef<"Agent", 'Float'>
+    readonly status: FieldRef<"Agent", 'String'>
+    readonly walletAddress: FieldRef<"Agent", 'String'>
     readonly createdAt: FieldRef<"Agent", 'DateTime'>
     readonly updatedAt: FieldRef<"Agent", 'DateTime'>
     readonly deletedAt: FieldRef<"Agent", 'DateTime'>
@@ -7317,6 +7513,21 @@ export namespace Prisma {
     verificationStatus: 'verificationStatus',
     averageRating: 'averageRating',
     trustScore: 'trustScore',
+    capDid: 'capDid',
+    capRegisteredAt: 'capRegisteredAt',
+    capReputationScore: 'capReputationScore',
+    capEndpoint: 'capEndpoint',
+    capStoreId: 'capStoreId',
+    category: 'category',
+    skills: 'skills',
+    tags: 'tags',
+    price: 'price',
+    latency: 'latency',
+    accuracy: 'accuracy',
+    verificationCount: 'verificationCount',
+    failureRate: 'failureRate',
+    status: 'status',
+    walletAddress: 'walletAddress',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     deletedAt: 'deletedAt'
@@ -7483,6 +7694,34 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Float'
+   */
+  export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+  /**
+   * Reference to a field of type 'Float[]'
+   */
+  export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int'
+   */
+  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int[]'
+   */
+  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
    * Reference to a field of type 'Json'
    */
   export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
@@ -7504,37 +7743,9 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'Int'
-   */
-  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-  /**
-   * Reference to a field of type 'Int[]'
-   */
-  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
-    
-
-
-  /**
    * Reference to a field of type 'Boolean'
    */
   export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
-    
-
-
-  /**
-   * Reference to a field of type 'Float'
-   */
-  export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
-    
-
-
-  /**
-   * Reference to a field of type 'Float[]'
-   */
-  export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
   /**
    * Deep Input Types
@@ -7554,6 +7765,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFilter<"Agent"> | $Enums.VerificationStatus
     averageRating?: DecimalFilter<"Agent"> | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFilter<"Agent"> | Decimal | DecimalJsLike | number | string
+    capDid?: StringNullableFilter<"Agent"> | string | null
+    capRegisteredAt?: DateTimeNullableFilter<"Agent"> | Date | string | null
+    capReputationScore?: DecimalNullableFilter<"Agent"> | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: StringNullableFilter<"Agent"> | string | null
+    capStoreId?: StringNullableFilter<"Agent"> | string | null
+    category?: StringFilter<"Agent"> | string
+    skills?: StringNullableListFilter<"Agent">
+    tags?: StringNullableListFilter<"Agent">
+    price?: FloatFilter<"Agent"> | number
+    latency?: IntFilter<"Agent"> | number
+    accuracy?: FloatFilter<"Agent"> | number
+    verificationCount?: IntFilter<"Agent"> | number
+    failureRate?: FloatFilter<"Agent"> | number
+    status?: StringFilter<"Agent"> | string
+    walletAddress?: StringFilter<"Agent"> | string
     createdAt?: DateTimeFilter<"Agent"> | Date | string
     updatedAt?: DateTimeFilter<"Agent"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Agent"> | Date | string | null
@@ -7573,6 +7799,21 @@ export namespace Prisma {
     verificationStatus?: SortOrder
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capDid?: SortOrderInput | SortOrder
+    capRegisteredAt?: SortOrderInput | SortOrder
+    capReputationScore?: SortOrderInput | SortOrder
+    capEndpoint?: SortOrderInput | SortOrder
+    capStoreId?: SortOrderInput | SortOrder
+    category?: SortOrder
+    skills?: SortOrder
+    tags?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
+    status?: SortOrder
+    walletAddress?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
@@ -7585,6 +7826,8 @@ export namespace Prisma {
   export type AgentWhereUniqueInput = Prisma.AtLeast<{
     id?: string
     slug?: string
+    capDid?: string
+    capStoreId?: string
     AND?: AgentWhereInput | AgentWhereInput[]
     OR?: AgentWhereInput[]
     NOT?: AgentWhereInput | AgentWhereInput[]
@@ -7595,6 +7838,19 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFilter<"Agent"> | $Enums.VerificationStatus
     averageRating?: DecimalFilter<"Agent"> | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFilter<"Agent"> | Decimal | DecimalJsLike | number | string
+    capRegisteredAt?: DateTimeNullableFilter<"Agent"> | Date | string | null
+    capReputationScore?: DecimalNullableFilter<"Agent"> | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: StringNullableFilter<"Agent"> | string | null
+    category?: StringFilter<"Agent"> | string
+    skills?: StringNullableListFilter<"Agent">
+    tags?: StringNullableListFilter<"Agent">
+    price?: FloatFilter<"Agent"> | number
+    latency?: IntFilter<"Agent"> | number
+    accuracy?: FloatFilter<"Agent"> | number
+    verificationCount?: IntFilter<"Agent"> | number
+    failureRate?: FloatFilter<"Agent"> | number
+    status?: StringFilter<"Agent"> | string
+    walletAddress?: StringFilter<"Agent"> | string
     createdAt?: DateTimeFilter<"Agent"> | Date | string
     updatedAt?: DateTimeFilter<"Agent"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Agent"> | Date | string | null
@@ -7602,7 +7858,7 @@ export namespace Prisma {
     capabilities?: AgentCapabilityListRelationFilter
     pricingModels?: PricingModelListRelationFilter
     reviews?: ReviewListRelationFilter
-  }, "id" | "slug">
+  }, "id" | "slug" | "capDid" | "capStoreId">
 
   export type AgentOrderByWithAggregationInput = {
     id?: SortOrder
@@ -7614,6 +7870,21 @@ export namespace Prisma {
     verificationStatus?: SortOrder
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capDid?: SortOrderInput | SortOrder
+    capRegisteredAt?: SortOrderInput | SortOrder
+    capReputationScore?: SortOrderInput | SortOrder
+    capEndpoint?: SortOrderInput | SortOrder
+    capStoreId?: SortOrderInput | SortOrder
+    category?: SortOrder
+    skills?: SortOrder
+    tags?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
+    status?: SortOrder
+    walletAddress?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
@@ -7637,6 +7908,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusWithAggregatesFilter<"Agent"> | $Enums.VerificationStatus
     averageRating?: DecimalWithAggregatesFilter<"Agent"> | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalWithAggregatesFilter<"Agent"> | Decimal | DecimalJsLike | number | string
+    capDid?: StringNullableWithAggregatesFilter<"Agent"> | string | null
+    capRegisteredAt?: DateTimeNullableWithAggregatesFilter<"Agent"> | Date | string | null
+    capReputationScore?: DecimalNullableWithAggregatesFilter<"Agent"> | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: StringNullableWithAggregatesFilter<"Agent"> | string | null
+    capStoreId?: StringNullableWithAggregatesFilter<"Agent"> | string | null
+    category?: StringWithAggregatesFilter<"Agent"> | string
+    skills?: StringNullableListFilter<"Agent">
+    tags?: StringNullableListFilter<"Agent">
+    price?: FloatWithAggregatesFilter<"Agent"> | number
+    latency?: IntWithAggregatesFilter<"Agent"> | number
+    accuracy?: FloatWithAggregatesFilter<"Agent"> | number
+    verificationCount?: IntWithAggregatesFilter<"Agent"> | number
+    failureRate?: FloatWithAggregatesFilter<"Agent"> | number
+    status?: StringWithAggregatesFilter<"Agent"> | string
+    walletAddress?: StringWithAggregatesFilter<"Agent"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Agent"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Agent"> | Date | string
     deletedAt?: DateTimeNullableWithAggregatesFilter<"Agent"> | Date | string | null
@@ -7940,6 +8226,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -7959,6 +8260,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -7978,6 +8294,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -7997,6 +8328,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8016,6 +8362,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -8031,6 +8392,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8046,6 +8422,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -8386,17 +8777,6 @@ export namespace Prisma {
     not?: NestedDecimalFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string
   }
 
-  export type DateTimeFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeFilter<$PrismaModel> | Date | string
-  }
-
   export type DateTimeNullableFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -8406,6 +8786,58 @@ export namespace Prisma {
     gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type DecimalNullableFilter<$PrismaModel = never> = {
+    equals?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel> | null
+    in?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    notIn?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    lt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    lte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    not?: NestedDecimalNullableFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string | null
+  }
+
+  export type StringNullableListFilter<$PrismaModel = never> = {
+    equals?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    has?: string | StringFieldRefInput<$PrismaModel> | null
+    hasEvery?: string[] | ListStringFieldRefInput<$PrismaModel>
+    hasSome?: string[] | ListStringFieldRefInput<$PrismaModel>
+    isEmpty?: boolean
+  }
+
+  export type FloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type DateTimeFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeFilter<$PrismaModel> | Date | string
   }
 
   export type AgentVersionListRelationFilter = {
@@ -8463,6 +8895,21 @@ export namespace Prisma {
     verificationStatus?: SortOrder
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capDid?: SortOrder
+    capRegisteredAt?: SortOrder
+    capReputationScore?: SortOrder
+    capEndpoint?: SortOrder
+    capStoreId?: SortOrder
+    category?: SortOrder
+    skills?: SortOrder
+    tags?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
+    status?: SortOrder
+    walletAddress?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -8471,6 +8918,12 @@ export namespace Prisma {
   export type AgentAvgOrderByAggregateInput = {
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capReputationScore?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
   }
 
   export type AgentMaxOrderByAggregateInput = {
@@ -8483,6 +8936,19 @@ export namespace Prisma {
     verificationStatus?: SortOrder
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capDid?: SortOrder
+    capRegisteredAt?: SortOrder
+    capReputationScore?: SortOrder
+    capEndpoint?: SortOrder
+    capStoreId?: SortOrder
+    category?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
+    status?: SortOrder
+    walletAddress?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -8498,6 +8964,19 @@ export namespace Prisma {
     verificationStatus?: SortOrder
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capDid?: SortOrder
+    capRegisteredAt?: SortOrder
+    capReputationScore?: SortOrder
+    capEndpoint?: SortOrder
+    capStoreId?: SortOrder
+    category?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
+    status?: SortOrder
+    walletAddress?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -8506,6 +8985,12 @@ export namespace Prisma {
   export type AgentSumOrderByAggregateInput = {
     averageRating?: SortOrder
     trustScore?: SortOrder
+    capReputationScore?: SortOrder
+    price?: SortOrder
+    latency?: SortOrder
+    accuracy?: SortOrder
+    verificationCount?: SortOrder
+    failureRate?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -8570,20 +9055,6 @@ export namespace Prisma {
     _max?: NestedDecimalFilter<$PrismaModel>
   }
 
-  export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
-  }
-
   export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -8596,6 +9067,68 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedDateTimeNullableFilter<$PrismaModel>
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
+  export type DecimalNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel> | null
+    in?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    notIn?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    lt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    lte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    not?: NestedDecimalNullableWithAggregatesFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedDecimalNullableFilter<$PrismaModel>
+    _sum?: NestedDecimalNullableFilter<$PrismaModel>
+    _min?: NestedDecimalNullableFilter<$PrismaModel>
+    _max?: NestedDecimalNullableFilter<$PrismaModel>
+  }
+
+  export type FloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
   }
   export type JsonFilter<$PrismaModel = never> = 
     | PatchUndefined<
@@ -8774,17 +9307,6 @@ export namespace Prisma {
     _max?: NestedEnumPricingTypeFilter<$PrismaModel>
   }
 
-  export type IntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-
   export type BoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
@@ -8828,28 +9350,20 @@ export namespace Prisma {
     rating?: SortOrder
   }
 
-  export type IntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
-  }
-
   export type BoolWithAggregatesFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
+  }
+
+  export type AgentCreateskillsInput = {
+    set: string[]
+  }
+
+  export type AgentCreatetagsInput = {
+    set: string[]
   }
 
   export type AgentVersionCreateNestedManyWithoutAgentInput = {
@@ -8928,12 +9442,46 @@ export namespace Prisma {
     divide?: Decimal | DecimalJsLike | number | string
   }
 
-  export type DateTimeFieldUpdateOperationsInput = {
-    set?: Date | string
-  }
-
   export type NullableDateTimeFieldUpdateOperationsInput = {
     set?: Date | string | null
+  }
+
+  export type NullableDecimalFieldUpdateOperationsInput = {
+    set?: Decimal | DecimalJsLike | number | string | null
+    increment?: Decimal | DecimalJsLike | number | string
+    decrement?: Decimal | DecimalJsLike | number | string
+    multiply?: Decimal | DecimalJsLike | number | string
+    divide?: Decimal | DecimalJsLike | number | string
+  }
+
+  export type AgentUpdateskillsInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type AgentUpdatetagsInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type FloatFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type DateTimeFieldUpdateOperationsInput = {
+    set?: Date | string
   }
 
   export type AgentVersionUpdateManyWithoutAgentNestedInput = {
@@ -9156,14 +9704,6 @@ export namespace Prisma {
     connect?: AgentWhereUniqueInput
   }
 
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
   }
@@ -9222,17 +9762,6 @@ export namespace Prisma {
     not?: NestedDecimalFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string
   }
 
-  export type NestedDateTimeFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeFilter<$PrismaModel> | Date | string
-  }
-
   export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -9242,6 +9771,50 @@ export namespace Prisma {
     gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type NestedDecimalNullableFilter<$PrismaModel = never> = {
+    equals?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel> | null
+    in?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    notIn?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    lt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    lte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    not?: NestedDecimalNullableFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string | null
+  }
+
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type NestedIntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type NestedDateTimeFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeFilter<$PrismaModel> | Date | string
   }
 
   export type NestedStringWithAggregatesFilter<$PrismaModel = never> = {
@@ -9259,17 +9832,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedStringFilter<$PrismaModel>
     _max?: NestedStringFilter<$PrismaModel>
-  }
-
-  export type NestedIntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
   }
 
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -9326,20 +9888,6 @@ export namespace Prisma {
     _max?: NestedDecimalFilter<$PrismaModel>
   }
 
-  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
-  }
-
   export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -9352,6 +9900,68 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedDateTimeNullableFilter<$PrismaModel>
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
+  export type NestedDecimalNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel> | null
+    in?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    notIn?: Decimal[] | DecimalJsLike[] | number[] | string[] | ListDecimalFieldRefInput<$PrismaModel> | null
+    lt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    lte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gt?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    gte?: Decimal | DecimalJsLike | number | string | DecimalFieldRefInput<$PrismaModel>
+    not?: NestedDecimalNullableWithAggregatesFilter<$PrismaModel> | Decimal | DecimalJsLike | number | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedDecimalNullableFilter<$PrismaModel>
+    _sum?: NestedDecimalNullableFilter<$PrismaModel>
+    _min?: NestedDecimalNullableFilter<$PrismaModel>
+    _max?: NestedDecimalNullableFilter<$PrismaModel>
+  }
+
+  export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
+  }
+
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
   }
   export type NestedJsonFilter<$PrismaModel = never> = 
     | PatchUndefined<
@@ -9396,33 +10006,6 @@ export namespace Prisma {
   export type NestedBoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
-  }
-
-  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
-  }
-
-  export type NestedFloatFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatFilter<$PrismaModel> | number
   }
 
   export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
@@ -9656,6 +10239,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9674,6 +10272,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9708,6 +10321,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9726,6 +10354,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9778,6 +10421,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9796,6 +10454,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9847,6 +10520,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9865,6 +10553,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9906,6 +10609,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9924,6 +10642,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -9958,6 +10691,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9976,6 +10724,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -9994,6 +10757,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -10012,6 +10790,21 @@ export namespace Prisma {
     verificationStatus?: $Enums.VerificationStatus
     averageRating?: Decimal | DecimalJsLike | number | string
     trustScore?: Decimal | DecimalJsLike | number | string
+    capDid?: string | null
+    capRegisteredAt?: Date | string | null
+    capReputationScore?: Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: string | null
+    capStoreId?: string | null
+    category?: string
+    skills?: AgentCreateskillsInput | string[]
+    tags?: AgentCreatetagsInput | string[]
+    price?: number
+    latency?: number
+    accuracy?: number
+    verificationCount?: number
+    failureRate?: number
+    status?: string
+    walletAddress?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -10046,6 +10839,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -10064,6 +10872,21 @@ export namespace Prisma {
     verificationStatus?: EnumVerificationStatusFieldUpdateOperationsInput | $Enums.VerificationStatus
     averageRating?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     trustScore?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
+    capDid?: NullableStringFieldUpdateOperationsInput | string | null
+    capRegisteredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    capReputationScore?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
+    capEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    capStoreId?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: StringFieldUpdateOperationsInput | string
+    skills?: AgentUpdateskillsInput | string[]
+    tags?: AgentUpdatetagsInput | string[]
+    price?: FloatFieldUpdateOperationsInput | number
+    latency?: IntFieldUpdateOperationsInput | number
+    accuracy?: FloatFieldUpdateOperationsInput | number
+    verificationCount?: IntFieldUpdateOperationsInput | number
+    failureRate?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    walletAddress?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null

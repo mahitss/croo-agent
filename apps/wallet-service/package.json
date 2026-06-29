@@ -16,11 +16,13 @@
     "class-transformer": "^0.5.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "@nexus-ai/types": "workspace:*"
+    "@nexus-ai/types": "workspace:*",
+    "@nexus-ai/cap-sdk": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
+    "@types/node": "^20.11.0",
     "prisma": "^5.14.0",
     "typescript": "^5.0.0"
   }

@@ -1,9 +1,13 @@
-import { Controller, Get, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
+import { CAPWalletService } from '../services/cap-wallet.service';
 
 @Controller('api/v1')
 export class WalletController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capWallet: CAPWalletService,
+  ) {}
 
   @Get('wallet')
   async getWallet() {
@@ -191,6 +195,65 @@ export class WalletController {
         address: body.recipientAddress,
         status: 'pending',
       },
+    };
+  }
+
+  // ─── CROO Agent Protocol (CAP) Wallet Endpoints ─────────────────────────
+
+  @Post('wallet/cap/challenge')
+  @HttpCode(HttpStatus.OK)
+  async capGetChallenge(@Body() body: { address: string }) {
+    const challenge = await this.capWallet.generateChallenge(body.address);
+    return {
+      success: true,
+      data: { challenge },
+    };
+  }
+
+  @Post('wallet/cap/verify')
+  @HttpCode(HttpStatus.OK)
+  async capVerifyWallet(
+    @Body() body: { address: string; signature: string; challenge: string; userId?: string },
+  ) {
+    const result = await this.capWallet.verifyWallet(
+      body.address,
+      body.signature,
+      body.challenge,
+      body.userId,
+    );
+
+    return {
+      success: true,
+      message: 'Wallet verification on CROO CAP completed',
+      data: result,
+    };
+  }
+
+  @Get('wallet/cap/transactions')
+  async capGetTransactions(
+    @Query('address') address: string,
+    @Query('limit') limit?: string,
+  ) {
+    const transactions = await this.capWallet.getCapTransactions(
+      address,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: transactions,
+    };
+  }
+
+  @Post('wallet/cap/link')
+  @HttpCode(HttpStatus.OK)
+  async capLinkWallet(@Body() body: { address: string; did: string }) {
+    const result = await this.capWallet.linkWalletToDid(body.address, body.did);
+
+    return {
+      success: true,
+      message: 'Wallet linked to DID on CROO Agent Protocol store',
+      data: result,
     };
   }
 }

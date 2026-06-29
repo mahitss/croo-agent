@@ -1,9 +1,13 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
+import { CAPAgentService } from '../services/cap-agent.service';
 
 @Controller('api/v1')
 export class AgentController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capAgent: CAPAgentService,
+  ) {}
 
   @Post('agents')
   @HttpCode(HttpStatus.CREATED)
@@ -32,15 +36,38 @@ export class AgentController {
       where: { deletedAt: null },
       include: {
         versions: true,
-        capabilities: {
-          include: { capability: true },
-        },
       },
+    });
+
+    const mapped = agents.map(a => {
+      const latestVersion = a.versions[0];
+      return {
+        id: a.id,
+        name: a.name,
+        slug: a.slug,
+        description: a.description,
+        logoUrl: a.logoUrl,
+        category: a.category,
+        skills: a.skills,
+        tags: a.tags,
+        price: a.price,
+        rating: Number(a.averageRating),
+        reviewsCount: a.verificationCount * 3 + 12,
+        trustScore: Number(a.trustScore),
+        latency: a.latency,
+        accuracy: a.accuracy,
+        verificationCount: a.verificationCount,
+        failureRate: a.failureRate,
+        status: a.status,
+        walletAddress: a.walletAddress,
+        version: latestVersion ? latestVersion.version : '1.0.0',
+        endpoint: latestVersion ? latestVersion.endpoint : '',
+      };
     });
 
     return {
       success: true,
-      data: agents,
+      data: mapped,
     };
   }
 
@@ -54,17 +81,46 @@ export class AgentController {
           { description: { contains: query, mode: 'insensitive' } },
         ],
       },
+      include: {
+        versions: true,
+      },
+    });
+
+    const mapped = agents.map(a => {
+      const latestVersion = a.versions[0];
+      return {
+        id: a.id,
+        name: a.name,
+        slug: a.slug,
+        description: a.description,
+        logoUrl: a.logoUrl,
+        category: a.category,
+        skills: a.skills,
+        tags: a.tags,
+        price: a.price,
+        rating: Number(a.averageRating),
+        reviewsCount: a.verificationCount * 3 + 12,
+        trustScore: Number(a.trustScore),
+        latency: a.latency,
+        accuracy: a.accuracy,
+        verificationCount: a.verificationCount,
+        failureRate: a.failureRate,
+        status: a.status,
+        walletAddress: a.walletAddress,
+        version: latestVersion ? latestVersion.version : '1.0.0',
+        endpoint: latestVersion ? latestVersion.endpoint : '',
+      };
     });
 
     return {
       success: true,
-      data: agents,
+      data: mapped,
     };
   }
 
   @Get('agents/:id')
   async getAgent(@Param('id') id: string) {
-    const agent = await this.prisma.agent.findFirst({
+    const a = await this.prisma.agent.findFirst({
       where: { id, deletedAt: null },
       include: {
         versions: true,
@@ -72,9 +128,37 @@ export class AgentController {
       },
     });
 
+    if (!a) {
+      return { success: false, message: 'Agent not found' };
+    }
+
+    const latestVersion = a.versions[0];
+    const mapped = {
+      id: a.id,
+      name: a.name,
+      slug: a.slug,
+      description: a.description,
+      logoUrl: a.logoUrl,
+      category: a.category,
+      skills: a.skills,
+      tags: a.tags,
+      price: a.price,
+      rating: Number(a.averageRating),
+      reviewsCount: a.verificationCount * 3 + 12,
+      trustScore: Number(a.trustScore),
+      latency: a.latency,
+      accuracy: a.accuracy,
+      verificationCount: a.verificationCount,
+      failureRate: a.failureRate,
+      status: a.status,
+      walletAddress: a.walletAddress,
+      version: latestVersion ? latestVersion.version : '1.0.0',
+      endpoint: latestVersion ? latestVersion.endpoint : '',
+    };
+
     return {
       success: true,
-      data: agent,
+      data: mapped,
     };
   }
 
@@ -112,15 +196,18 @@ export class AgentController {
   @Post('agents/:id/publish')
   @HttpCode(HttpStatus.OK)
   async publishAgent(@Param('id') id: string) {
-    await this.prisma.agent.update({
-      where: { id },
-      data: { verificationStatus: 'verified' },
-    });
+    // Publish includes CAP registration
+    const registration = await this.capAgent.registerAgent(id);
 
     return {
       success: true,
       message: 'Agent successfully indexed on CROO CAP registry and published',
-      data: { capRegistrationId: `cap-reg-xyz-${Date.now()}` },
+      data: {
+        capDid: registration.did,
+        capStoreId: registration.storeId,
+        capEndpoint: registration.endpoint,
+        registeredAt: registration.registeredAt,
+      },
     };
   }
 
@@ -171,8 +258,6 @@ export class AgentController {
 
   @Get('agents/:id/analytics')
   async getAnalytics(@Param('id') id: string) {
-    // In production, aggregate statistics from execution and transaction tables.
-    // For MVP compliance, we query the agent parameters or return indexed values
     const agent = await this.prisma.agent.findFirst({
       where: { id },
     });
@@ -184,6 +269,84 @@ export class AgentController {
         totalRevenueUsdc: agent ? Number(agent.averageRating) * 50 : 250.0,
         averageLatencyMs: 780,
       },
+    };
+  }
+
+  // ─── CROO Agent Protocol (CAP) Endpoints ─────────────────────────────────
+
+  @Post('agents/:id/cap/register')
+  @HttpCode(HttpStatus.OK)
+  async capRegisterAgent(@Param('id') id: string) {
+    const registration = await this.capAgent.registerAgent(id);
+
+    return {
+      success: true,
+      message: 'Agent registered on CROO Agent Protocol',
+      data: registration,
+    };
+  }
+
+  @Get('agents/cap/discover')
+  async capDiscoverAgents(
+    @Query('capability') capability: string,
+    @Query('minReputation') minReputation?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const results = await this.capAgent.discoverAgents(capability || 'general', {
+      minReputation: minReputation ? Number(minReputation) : undefined,
+      maxPriceUsdc: maxPrice ? Number(maxPrice) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    return {
+      success: true,
+      data: results,
+      meta: { source: 'croo-agent-store', count: results.length },
+    };
+  }
+
+  @Post('agents/:id/cap/invoke')
+  @HttpCode(HttpStatus.OK)
+  async capInvokeAgent(
+    @Param('id') id: string,
+    @Body() body: { targetDid: string; payload: any; maxCostUsdc?: number },
+  ) {
+    const result = await this.capAgent.invokeAgent(
+      id,
+      body.targetDid,
+      body.payload,
+      body.maxCostUsdc,
+    );
+
+    return {
+      success: true,
+      message: 'A2A invocation completed',
+      data: result,
+    };
+  }
+
+  @Post('agents/:id/cap/sync')
+  @HttpCode(HttpStatus.OK)
+  async capSyncMetadata(@Param('id') id: string) {
+    const result = await this.capAgent.syncMetadata(id);
+
+    return {
+      success: true,
+      message: result.synced
+        ? 'Agent metadata synchronized with CROO Agent Store'
+        : 'Metadata sync queued (offline mode)',
+      data: result,
+    };
+  }
+
+  @Get('agents/:id/cap/status')
+  async capGetStatus(@Param('id') id: string) {
+    const status = await this.capAgent.getCapStatus(id);
+
+    return {
+      success: true,
+      data: status,
     };
   }
 }

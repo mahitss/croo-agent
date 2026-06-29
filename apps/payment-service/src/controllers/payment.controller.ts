@@ -1,9 +1,13 @@
-import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
+import { CAPPaymentService } from '../services/cap-payment.service';
 
 @Controller('api/v1')
 export class PaymentController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capPayment: CAPPaymentService,
+  ) {}
 
   @Post('payments')
   @HttpCode(HttpStatus.CREATED)
@@ -151,6 +155,51 @@ export class PaymentController {
     return {
       success: true,
       data: settlements,
+    };
+  }
+
+  // ─── CROO Agent Protocol (CAP) Payments Endpoints ───────────────────────
+
+  @Post('payments/:id/cap/escrow')
+  @HttpCode(HttpStatus.OK)
+  async capCreateEscrow(
+    @Param('id') id: string,
+    @Body() body: { payerAddress: string; recipientDid: string },
+  ) {
+    const result = await this.capPayment.createEscrow(id, body.payerAddress, body.recipientDid);
+
+    return {
+      success: true,
+      message: 'Escrow locked on CROO Agent Protocol',
+      data: result,
+    };
+  }
+
+  @Post('payments/:id/cap/settle')
+  @HttpCode(HttpStatus.OK)
+  async capSettleEscrow(
+    @Param('id') id: string,
+    @Body() body: { recipientAddress: string },
+  ) {
+    const result = await this.capPayment.settleEscrow(id, body.recipientAddress);
+
+    return {
+      success: true,
+      message: 'Escrow funds successfully settled and released on-chain via CAP',
+      data: result,
+    };
+  }
+
+  @Get('payments/cap/history')
+  async capGetHistory(
+    @Query('address') address: string,
+    @Query('limit') limit?: string,
+  ) {
+    const result = await this.capPayment.getCapHistory(address, limit ? Number(limit) : undefined);
+
+    return {
+      success: true,
+      data: result,
     };
   }
 }
