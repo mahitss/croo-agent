@@ -9,6 +9,9 @@ export class AgentController {
     private readonly capAgent: CAPAgentService,
   ) {}
 
+  private agentsCache: any = null;
+  private cacheExpiry = 0;
+
   @Post('agents')
   @HttpCode(HttpStatus.CREATED)
   async createAgent(@Body() body: any) {
@@ -32,6 +35,14 @@ export class AgentController {
 
   @Get('agents')
   async getAgents() {
+    const now = Date.now();
+    if (this.agentsCache && now < this.cacheExpiry) {
+      return {
+        success: true,
+        data: this.agentsCache,
+      };
+    }
+
     const agents = await this.prisma.agent.findMany({
       where: { deletedAt: null },
       include: {
@@ -64,6 +75,9 @@ export class AgentController {
         endpoint: latestVersion ? latestVersion.endpoint : '',
       };
     });
+
+    this.agentsCache = mapped;
+    this.cacheExpiry = now + 10000; // cache for 10 seconds
 
     return {
       success: true,

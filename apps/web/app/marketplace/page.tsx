@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
 import { Agent } from '@nexus-ai/types';
-import AgentDetailModal from '../../components/AgentDetailModal';
 import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '../../components/Toast';
 import { SkeletonCard } from '../../components/Skeleton';
+import dynamic from 'next/dynamic';
+
+const AgentDetailModal = dynamic(() => import('../../components/AgentDetailModal'), {
+  loading: () => <div className="text-gray-500 font-mono text-xs p-4 bg-black/40 border border-border-dark rounded-xl">Loading Swarm Overlay Details...</div>
+});
 
 export default function MarketplacePage() {
   const agents = useNexusStore((state) => state.agents);
@@ -25,6 +29,10 @@ export default function MarketplacePage() {
   const [sortBy, setSortBy] = useState<string>('trustScore');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Matchmaker State
   const [matchmakerPrompt, setMatchmakerPrompt] = useState('');
@@ -60,6 +68,10 @@ export default function MarketplacePage() {
     const timer = setTimeout(() => setIsInitialLoading(false), 800);
     return () => clearTimeout(timer);
   }, [initialize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, onlyVerified, minTrustScore, maxPrice, sortBy, showOnlyFavorites]);
 
   const toggleFavorite = (agentId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -117,6 +129,13 @@ export default function MarketplacePage() {
     if (sortBy === 'verificationCount') return b.verificationCount - a.verificationCount;
     return 0;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedAgents.length / itemsPerPage) || 1;
+  const paginatedAgents = sortedAgents.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
@@ -383,104 +402,129 @@ export default function MarketplacePage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedAgents.map((agent) => {
-                const isFav = favorites.includes(agent.id);
-                return (
-                  <div 
-                    key={agent.id} 
-                    onClick={() => setSelectedAgent(agent)}
-                    className="glass-card glass-card-hover p-6 rounded-2xl border border-border-dark flex flex-col justify-between h-[390px] relative overflow-hidden cursor-pointer transition-all duration-300"
-                  >
-                    {/* Top Layer Info */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-[9px] bg-white/5 border border-border-dark px-2.5 py-1 rounded-md text-gray-400 font-mono uppercase tracking-wider">
-                          {agent.category}
-                        </span>
+            <div className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedAgents.map((agent) => {
+                  const isFav = favorites.includes(agent.id);
+                  return (
+                    <div 
+                      key={agent.id} 
+                      onClick={() => setSelectedAgent(agent)}
+                      className="glass-card glass-card-hover p-6 rounded-2xl border border-border-dark flex flex-col justify-between h-[390px] relative overflow-hidden cursor-pointer transition-all duration-300"
+                    >
+                      {/* Top Layer Info */}
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[9px] bg-white/5 border border-border-dark px-2.5 py-1 rounded-md text-gray-400 font-mono uppercase tracking-wider">
+                            {agent.category}
+                          </span>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => toggleFavorite(agent.id, e)}
+                              className="text-gray-500 hover:text-yellow-500 transition-all p-1 hover:bg-white/5 rounded-md"
+                            >
+                              <Star className={`w-4 h-4 ${isFav ? 'text-yellow-500 fill-yellow-500' : ''}`} />
+                            </button>
+                            {agent.trustScore >= 95 && (
+                              <span className="text-primary-neon bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-[8px] font-mono font-extrabold uppercase tracking-wide flex items-center gap-0.5">
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                VERIFIED
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <h3 className="text-base font-extrabold text-white mb-2 flex items-center gap-1.5 leading-tight">
+                          {agent.name}
+                          <span className="text-[10px] text-gray-500 font-mono font-normal">v{agent.version}</span>
+                        </h3>
                         
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => toggleFavorite(agent.id, e)}
-                            className="text-gray-500 hover:text-yellow-500 transition-all p-1 hover:bg-white/5 rounded-md"
-                          >
-                            <Star className={`w-4 h-4 ${isFav ? 'text-yellow-500 fill-yellow-500' : ''}`} />
-                          </button>
-                          {agent.trustScore >= 95 && (
-                            <span className="text-primary-neon bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-[8px] font-mono font-extrabold uppercase tracking-wide flex items-center gap-0.5">
-                              <ShieldCheck className="w-3 h-3" />
-                              VERIFIED
+                        <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 mb-4">
+                          {agent.description}
+                        </p>
+
+                        {/* Skills Tags */}
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {agent.skills && agent.skills.slice(0, 3).map((skill, idx) => (
+                            <span 
+                              key={idx} 
+                              className="text-[9px] bg-black/40 border border-border-dark text-gray-300 px-2.5 py-1 rounded-lg"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                          {agent.skills && agent.skills.length > 3 && (
+                            <span className="text-[9px] text-gray-500 font-mono flex items-center pl-1">
+                              +{agent.skills.length - 3} more
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <h3 className="text-base font-extrabold text-white mb-2 flex items-center gap-1.5 leading-tight">
-                        {agent.name}
-                        <span className="text-[10px] text-gray-500 font-mono font-normal">v{agent.version}</span>
-                      </h3>
-                      
-                      <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 mb-4">
-                        {agent.description}
-                      </p>
+                      {/* Bottom stats details */}
+                      <div className="pt-4 border-t border-border-dark">
+                        
+                        {/* Trust Gauges */}
+                        <div className="grid grid-cols-2 gap-3 mb-4 text-[10px] font-mono">
+                          <div className="flex flex-col">
+                            <span className="text-gray-500">Trust Score</span>
+                            <span className="text-white font-extrabold mt-0.5">{agent.trustScore}%</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-500">Success Rate</span>
+                            <span className="text-white font-extrabold mt-0.5">{agent.accuracy}%</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-500">Latency (SLA)</span>
+                            <span className="text-white font-extrabold mt-0.5">{agent.latency}ms</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-500">Completed Jobs</span>
+                            <span className="text-white font-extrabold mt-0.5">{agent.verificationCount}</span>
+                          </div>
+                        </div>
 
-                      {/* Skills Tags */}
-                      <div className="flex flex-wrap gap-1 mb-4">
-                        {agent.skills && agent.skills.slice(0, 3).map((skill, idx) => (
-                          <span 
-                            key={idx} 
-                            className="text-[9px] bg-black/40 border border-border-dark text-gray-300 px-2.5 py-1 rounded-lg"
-                          >
-                            {skill}
+                        {/* Pricing Footer */}
+                        <div className="flex justify-between items-center pt-3 border-t border-dashed border-border-dark">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-gray-500 font-mono">Service Fee</span>
+                            <span className="text-sm font-extrabold text-primary-neon font-mono mt-0.5">
+                              {agent.price.toFixed(2)} <span className="text-[10px] text-gray-400">USDC</span>
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-gray-600 font-mono truncate max-w-[100px]" title={agent.walletAddress}>
+                            {agent.walletAddress}
                           </span>
-                        ))}
-                        {agent.skills && agent.skills.length > 3 && (
-                          <span className="text-[9px] text-gray-500 font-mono flex items-center pl-1">
-                            +{agent.skills.length - 3} more
-                          </span>
-                        )}
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Bottom stats details */}
-                    <div className="pt-4 border-t border-border-dark">
-                      
-                      {/* Trust Gauges */}
-                      <div className="grid grid-cols-2 gap-3 mb-4 text-[10px] font-mono">
-                        <div className="flex flex-col">
-                          <span className="text-gray-500">Trust Score</span>
-                          <span className="text-white font-extrabold mt-0.5">{agent.trustScore}%</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-gray-500">Success Rate</span>
-                          <span className="text-white font-extrabold mt-0.5">{agent.accuracy}%</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-gray-500">Latency (SLA)</span>
-                          <span className="text-white font-extrabold mt-0.5">{agent.latency}ms</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-gray-500">Completed Jobs</span>
-                          <span className="text-white font-extrabold mt-0.5">{agent.verificationCount}</span>
-                        </div>
-                      </div>
-
-                      {/* Pricing Footer */}
-                      <div className="flex justify-between items-center pt-3 border-t border-dashed border-border-dark">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-gray-500 font-mono">Service Fee</span>
-                          <span className="text-sm font-extrabold text-primary-neon font-mono mt-0.5">
-                            {agent.price.toFixed(2)} <span className="text-[10px] text-gray-400">USDC</span>
-                          </span>
-                        </div>
-                        <span className="text-[9px] text-gray-600 font-mono truncate max-w-[100px]" title={agent.walletAddress}>
-                          {agent.walletAddress}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Pagination Selector buttons */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-4 font-mono text-xs border-t border-border-dark pt-6">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="bg-white/5 border border-border-dark disabled:opacity-30 hover:bg-white/10 px-4 py-2 rounded-xl text-white font-bold transition-all"
+                  >
+                    &larr; Previous Page
+                  </button>
+                  <span className="text-gray-400">
+                    Page <strong className="text-white">{currentPage}</strong> of {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="bg-white/5 border border-border-dark disabled:opacity-30 hover:bg-white/10 px-4 py-2 rounded-xl text-white font-bold transition-all"
+                  >
+                    Next Page &rarr;
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

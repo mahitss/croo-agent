@@ -58,6 +58,8 @@ model Agent {
 
   @@index([ownerId])
   @@index([slug])
+  @@index([category])
+  @@index([status])
   @@map("agents")
 }
 
