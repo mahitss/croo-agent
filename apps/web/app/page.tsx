@@ -261,23 +261,124 @@ const workflow = await nexus.run({
 
       {/* 2. Interactive Prompt & Controller Panel */}
       <div id="launchpad" className="max-w-7xl w-full mx-auto p-6 flex flex-col gap-8">
-        <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase font-bold tracking-wider text-gray-500 font-mono">
-              Execute Natural Language Intention
-            </label>
-            <div className="flex flex-col md:flex-row gap-3">
-              <input
-                type="text"
-                className="flex-1 bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-3 rounded-xl text-white text-sm outline-none transition-colors"
-                placeholder="e.g. Create a complete investment report for Tesla..."
-                value={userQuery}
-                onChange={(e) => setUserQuery(e.target.value)}
-                disabled={isRunning}
-              />
-              
-              <div className="flex gap-2">
-                {activeWorkflow || isRunning ? (
+        {!activeWorkflow && !isRunning ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left Column: Intention Workspace */}
+            <div className="lg:col-span-2 glass-card p-6 rounded-2xl border border-border-dark flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase font-bold tracking-wider text-gray-500 font-mono">
+                  Execute Natural Language Intention
+                </label>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input
+                    type="text"
+                    className="flex-1 bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-3 rounded-xl text-white text-sm outline-none transition-colors"
+                    placeholder="e.g. Create a complete investment report for Tesla..."
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    disabled={isRunning}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleLaunch}
+                      disabled={!userQuery.trim()}
+                      className="bg-gradient-to-r from-primary-neon to-accent-blue text-black px-6 py-3 rounded-xl text-sm font-extrabold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none transition-all"
+                    >
+                      <Play className="w-4 h-4 fill-black" />
+                      Launch Swarm
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configurations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border-dark">
+                {/* Routing Mode */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase">
+                    <Sliders className="w-3.5 h-3.5 text-primary-neon" />
+                    Smart Routing Metrics
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['balanced', 'cheapest', 'fastest', 'accuracy'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setLocalRoutingMode(mode)}
+                        className={`text-xs py-2 rounded-lg font-bold border uppercase transition-all ${
+                          routingMode === mode
+                            ? 'border-primary-neon text-primary-neon bg-primary-neon/5'
+                            : 'border-border-dark text-gray-400 bg-white/2 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Budget Cap */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase justify-between">
+                    <span className="flex items-center gap-1">
+                      <Coins className="w-3.5 h-3.5 text-secondary-neon" />
+                      Budget Optimization Cap
+                    </span>
+                    <span className="text-secondary-neon">{budget.toFixed(2)} USDC</span>
+                  </span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.5"
+                    value={budget}
+                    onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-border-dark rounded-lg appearance-none cursor-pointer accent-secondary-neon"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-500 font-mono">
+                    <span>0.50 USDC</span>
+                    <span>5.00 USDC (Max Limit)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick seeds */}
+              <div className="flex flex-col gap-1.5 mt-2">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">Suggested Workflows</span>
+                <div className="flex flex-col gap-1.5">
+                  {quickQueries.map((q, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setUserQuery(q)}
+                      className="text-left text-xs text-gray-400 hover:text-white hover:bg-white/2 p-2 rounded border border-border-dark transition-all"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Live Activity Feed */}
+            <div className="lg:col-span-1 glass-card p-6 rounded-2xl border border-border-dark bg-black/40">
+              <LiveActivityFeed />
+            </div>
+
+          </div>
+        ) : (
+          <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs uppercase font-bold tracking-wider text-gray-500 font-mono">
+                Active Natural Language Intention
+              </label>
+              <div className="flex flex-col md:flex-row gap-3">
+                <input
+                  type="text"
+                  className="flex-1 bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-3 rounded-xl text-white text-sm outline-none transition-colors"
+                  value={userQuery}
+                  disabled
+                />
+                <div className="flex gap-2">
                   <button
                     onClick={resetExecution}
                     className="bg-white/5 border border-border-dark text-gray-400 hover:text-white px-5 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-white/10 transition-colors"
@@ -285,90 +386,11 @@ const workflow = await nexus.run({
                     <RotateCcw className="w-4 h-4" />
                     Reset
                   </button>
-                ) : (
-                  <button
-                    onClick={handleLaunch}
-                    disabled={!userQuery.trim()}
-                    className="bg-gradient-to-r from-primary-neon to-accent-blue text-black px-6 py-3 rounded-xl text-sm font-extrabold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none transition-all"
-                  >
-                    <Play className="w-4 h-4 fill-black" />
-                    Launch Swarm
-                  </button>
-                )}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Configurations */}
-          {!isRunning && !activeWorkflow && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border-dark">
-              {/* Routing Mode */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase">
-                  <Sliders className="w-3.5 h-3.5 text-primary-neon" />
-                  Smart Routing Metrics
-                </span>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['balanced', 'cheapest', 'fastest', 'accuracy'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setLocalRoutingMode(mode)}
-                      className={`text-xs py-2 rounded-lg font-bold border uppercase transition-all ${
-                        routingMode === mode
-                          ? 'border-primary-neon text-primary-neon bg-primary-neon/5'
-                          : 'border-border-dark text-gray-400 bg-white/2 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Budget Cap */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase justify-between">
-                  <span className="flex items-center gap-1">
-                    <Coins className="w-3.5 h-3.5 text-secondary-neon" />
-                    Budget Optimization Cap
-                  </span>
-                  <span className="text-secondary-neon">{budget.toFixed(2)} USDC</span>
-                </span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="5.0"
-                  step="0.5"
-                  value={budget}
-                  onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-border-dark rounded-lg appearance-none cursor-pointer accent-secondary-neon"
-                />
-                <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                  <span>0.50 USDC</span>
-                  <span>5.00 USDC (Max Limit)</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Quick seeds */}
-          {!isRunning && !activeWorkflow && (
-            <div className="flex flex-col gap-1.5 mt-2">
-              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">Suggested Workflows</span>
-              <div className="flex flex-col gap-1.5">
-                {quickQueries.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setUserQuery(q)}
-                    className="text-left text-xs text-gray-400 hover:text-white hover:bg-white/2 p-2 rounded border border-border-dark transition-all"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Output split dashboard sections (DAG Canvas & Log Timelines) */}
         {(activeWorkflow || isRunning) && (
@@ -475,3 +497,66 @@ const workflow = await nexus.run({
     </div>
   );
 }
+
+// Live Activity Feed Component showing real-time agent commerce updates
+function LiveActivityFeed() {
+  const [feed, setFeed] = useState([
+    { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
+    { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
+    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' },
+    { type: 'Registration', desc: 'New verified node "SentriScan" active on CAP', time: '20s ago' },
+    { type: 'Workflow Run', desc: 'Intention swarm started for "Compliance check"', time: '40s ago' }
+  ]);
+
+  useEffect(() => {
+    const feedTemplates = [
+      { type: 'Escrow Lock', desc: 'USDC funds locked in CAP escrow for task verify' },
+      { type: 'Payout Settle', desc: 'SLA payout released to InsightFinder Pro' },
+      { type: 'Consensus Check', desc: 'Validation node validated output node consensus score' },
+      { type: 'Registration', desc: 'Marketplace verified node synchronized profile rating' },
+      { type: 'Wallet Sync', desc: 'Balance synced successfully to CROO Ledger network' }
+    ];
+
+    const interval = setInterval(() => {
+      const template = feedTemplates[Math.floor(Math.random() * feedTemplates.length)];
+      const newEvent = {
+        type: template.type,
+        desc: template.desc,
+        time: 'Just now'
+      };
+      setFeed(prev => [newEvent, ...prev.slice(0, 4)]);
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
+      <div>
+        <div className="flex justify-between items-center border-b border-border-dark pb-2 mb-3">
+          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase">
+            <span className="w-1.5 h-1.5 bg-primary-neon rounded-full animate-ping"></span>
+            Agent Commerce Activity Feed
+          </h4>
+          <span className="text-[9px] text-gray-500">Live Sync</span>
+        </div>
+        <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          {feed.map((evt, idx) => (
+            <div key={idx} className="bg-white/2 border border-border-dark p-2.5 rounded-lg flex flex-col gap-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+              <div className="flex justify-between text-[8px]">
+                <span className="text-primary-neon font-bold uppercase tracking-wider">{evt.type}</span>
+                <span className="text-gray-500">{evt.time}</span>
+              </div>
+              <p className="text-[10px] text-gray-300 leading-normal">{evt.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="text-[9px] text-gray-500 border-t border-border-dark pt-3 flex justify-between items-center">
+        <span>CAP Protocol V2</span>
+        <span>Secure Escrows</span>
+      </div>
+    </div>
+  );
+}
+

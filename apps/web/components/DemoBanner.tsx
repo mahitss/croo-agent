@@ -5,7 +5,7 @@ import { useNexusStore } from '../store/nexusStore';
 import { 
   Sparkles, Compass, RotateCcw, X, ArrowRight, ArrowLeft, 
   Play, Pause, Eye, EyeOff, ShieldAlert, CheckCircle, 
-  HelpCircle, Timer, Server, Database, Wallet, Network, Volume2
+  HelpCircle, Timer, Server, Database, Wallet, Network, Volume2, CheckSquare
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from './Toast';
@@ -111,7 +111,8 @@ const DEMO_STAGES: DemoStage[] = [
 
 export default function DemoBanner() {
   const resetDemoMode = useNexusStore((state) => state.resetDemoMode);
-  const userWallet = useNexusStore((state) => state.userWallet);
+  const setUserQuery = useNexusStore((state) => state.setUserQuery);
+  const startExecution = useNexusStore((state) => state.startExecution);
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -123,6 +124,16 @@ export default function DemoBanner() {
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [demoTime, setDemoTime] = useState(0);
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+
+  // Presentation checklist
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({
+    intro: false,
+    discover: false,
+    planner: false,
+    exec: false,
+    escrow: false,
+    analytics: false
+  });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const autoplayRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,6 +188,22 @@ export default function DemoBanner() {
     toast('Emergency Demo Reset Successful: Store returned to seed defaults.', 'success');
   };
 
+  const triggerSampleWorkflow = async () => {
+    resetDemoMode();
+    setUserQuery("Compile Tesla Q1 financial analysis and translate reports to Chinese");
+    router.push('/workflow');
+    setTourActive(true);
+    setCurrentStep(2);
+    toast('Triggering automated sample workflow. Parsing intention...', 'info');
+    setTimeout(() => {
+      startExecution("Compile Tesla Q1 financial analysis and translate reports to Chinese", "balanced", 2.0);
+    }, 1200);
+  };
+
+  const toggleChecklistItem = (key: string) => {
+    setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const startDemo = () => {
     setTourActive(true);
     setCurrentStep(0);
@@ -213,7 +240,7 @@ export default function DemoBanner() {
   return (
     <>
       {/* 1. Presentation Control Center Top Bar */}
-      <div className="bg-black/90 backdrop-blur-md border-b border-border-dark py-2 px-6 flex justify-between items-center text-xs z-[9999] sticky top-0 font-mono select-none">
+      <div className="bg-black/95 backdrop-blur-md border-b border-border-dark py-2 px-6 flex justify-between items-center text-xs z-[9999] sticky top-0 font-mono select-none">
         
         {/* Left Section: Status & Stage Title */}
         <div className="flex items-center gap-3">
@@ -274,13 +301,22 @@ export default function DemoBanner() {
               </div>
             </>
           ) : (
-            <button
-              onClick={startDemo}
-              className="flex items-center gap-1.5 bg-primary-neon text-black font-extrabold px-4 py-1 rounded-md hover:bg-opacity-80 transition-all active-press"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              Start Presentation Tour
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={startDemo}
+                className="flex items-center gap-1.5 bg-white/5 border border-border-dark text-white font-extrabold px-3 py-1 rounded-md hover:bg-white/10 transition-all active-press"
+              >
+                <Compass className="w-3.5 h-3.5 text-primary-neon" />
+                Start Guided Tour
+              </button>
+              <button
+                onClick={triggerSampleWorkflow}
+                className="flex items-center gap-1.5 bg-primary-neon text-black font-extrabold px-4 py-1 rounded-md hover:bg-opacity-85 transition-all active-press"
+              >
+                <Play className="w-3.5 h-3.5 fill-black" />
+                1-Click Swarm Run
+              </button>
+            </div>
           )}
         </div>
 
@@ -316,7 +352,7 @@ export default function DemoBanner() {
 
       {/* 2. Interactive Presenter Mode Side Drawer */}
       {tourActive && presenterMode && !drawerCollapsed && (
-        <div className="fixed bottom-6 right-6 w-96 glass-card border border-primary-neon/20 shadow-2xl z-[10000] p-6 animate-in slide-in-from-bottom-5 duration-300 font-sans">
+        <div className="fixed bottom-6 right-6 w-96 max-h-[85vh] overflow-y-auto scrollbar-thin bg-black/95 backdrop-blur-md border border-primary-neon/20 shadow-2xl z-[10000] p-6 rounded-2xl font-sans">
           
           {/* Header */}
           <div className="flex justify-between items-start mb-3 border-b border-border-dark pb-3">
@@ -326,7 +362,7 @@ export default function DemoBanner() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] bg-white/5 border border-border-dark px-2 py-0.5 rounded text-gray-400 font-mono">
-                Notes Duration: {DEMO_STAGES[currentStep].narrationTime}
+                Notes: {DEMO_STAGES[currentStep].narrationTime}
               </span>
               <button 
                 onClick={() => setDrawerCollapsed(true)} 
@@ -355,25 +391,55 @@ export default function DemoBanner() {
             </ul>
           </div>
 
+          {/* Presentation Checklist (Judge Request) */}
+          <div className="border-t border-border-dark pt-3 mb-4">
+            <h4 className="text-[11px] font-mono uppercase tracking-wider text-primary-neon mb-2 flex items-center gap-1.5">
+              <CheckSquare className="w-3.5 h-3.5" />
+              Demo Milestones Checklist
+            </h4>
+            <div className="flex flex-col gap-1.5">
+              {[
+                { key: 'intro', label: '1. Problem Introduction Hook' },
+                { key: 'discover', label: '2. Dynamic Node Discovery' },
+                { key: 'planner', label: '3. AI Decomp & Visual DAG' },
+                { key: 'exec', label: '4. Run Execution & Live Logs' },
+                { key: 'escrow', label: '5. Secure CAP Escrow Settlement' },
+                { key: 'analytics', label: '6. Live System SLA Analytics' },
+              ].map(item => (
+                <label key={item.key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={checklist[item.key]}
+                    onChange={() => toggleChecklistItem(item.key)}
+                    className="rounded border-border-dark text-primary-neon focus:ring-primary-neon bg-black/60 w-3.5 h-3.5"
+                  />
+                  <span className={checklist[item.key] ? 'line-through text-gray-500' : ''}>
+                    {item.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Infrastructure Health Indicators */}
           <div className="border-t border-border-dark pt-3 font-mono text-[10px]">
             <h4 className="text-[9px] uppercase tracking-wider text-gray-500 mb-2">Systems Telemetry</h4>
             <div className="grid grid-cols-2 gap-2 text-gray-400">
               <div className="flex items-center gap-1.5">
                 <Server className="w-3 h-3 text-primary-neon" />
-                <span>API Gateway: <strong className="text-white">Active</strong></span>
+                <span>Gateway: <strong className="text-white">Active</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Database className="w-3 h-3 text-primary-neon" />
-                <span>Prisma Neon: <strong className="text-white">Live</strong></span>
+                <span>Neon DB: <strong className="text-white">Connected</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Wallet className="w-3 h-3 text-primary-neon" />
-                <span>CAP Escrow: <strong className="text-white">Secure</strong></span>
+                <span>CAP Escrow: <strong className="text-white">Ready</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Network className="w-3 h-3 text-primary-neon" />
-                <span>CROO Ledger: <strong className="text-white">Synced</strong></span>
+                <span>CROO Sync: <strong className="text-white">Active</strong></span>
               </div>
             </div>
           </div>

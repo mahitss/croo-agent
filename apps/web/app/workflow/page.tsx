@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react';
 import Canvas from '../../components/Canvas';
 import { useNexusStore } from '../../store/nexusStore';
-import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert } from 'lucide-react';
+import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+
+const PLANNING_STAGES = [
+  { name: 'Intent Detection', desc: 'Parsing natural language semantics & intent tags' },
+  { name: 'Capability Matching', desc: 'Mapping requirements to defined CAP schemas' },
+  { name: 'Marketplace Search', desc: 'Scanning registry database for suitable nodes' },
+  { name: 'Cost Optimization', desc: 'Balancing execution rates against SLA constraints' },
+  { name: 'Parallelization', desc: 'Resolving dependency trees and async paths' },
+  { name: 'Risk Analysis', desc: 'Evaluating historical failure rates and safety scores' },
+  { name: 'Workflow Generation', desc: 'Compiling structural JSON schema DAG layout' },
+];
 
 export default function WorkflowPage() {
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
@@ -18,6 +28,10 @@ export default function WorkflowPage() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [optimizationMode, setOptimizationMode] = useState<'cost' | 'speed' | 'accuracy'>('accuracy');
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  
+  // AI thinking panel tracking states
+  const [plannerPhaseIndex, setPlannerPhaseIndex] = useState(0);
+  const [isPlanning, setIsPlanning] = useState(false);
 
   // Check URL query parameters to bind Swarm Matchmaker from Marketplace
   useEffect(() => {
@@ -33,11 +47,36 @@ export default function WorkflowPage() {
 
   const handleGenerateWorkflow = () => {
     if (!promptInput.trim()) return;
-    setShowExplanation(true);
+    setIsPlanning(true);
+    setPlannerPhaseIndex(1);
+    setSelectedNode(null);
+    setShowExplanation(false);
+    
+    let phase = 1;
+    const interval = setInterval(() => {
+      phase += 1;
+      if (phase <= 7) {
+        setPlannerPhaseIndex(phase);
+      } else {
+        clearInterval(interval);
+        setIsPlanning(false);
+        setShowExplanation(true);
+        startExecution(promptInput, 'balanced', 2.0);
+      }
+    }, 600);
   };
 
   const handleLaunchSwarm = () => {
     startExecution(promptInput, 'balanced', 2.0);
+  };
+
+  const getAlternativeAgents = (node: any) => {
+    if (!node || !node.assignedAgentId) return [];
+    const currentAgent = agents.find(a => a.id === node.assignedAgentId);
+    if (!currentAgent) return [];
+    return agents
+      .filter(a => a.id !== currentAgent.id && (a.category === currentAgent.category || a.skills.some(s => currentAgent.skills.includes(s))))
+      .slice(0, 2);
   };
 
   const assignedAgent = selectedNode 
@@ -122,7 +161,7 @@ export default function WorkflowPage() {
             <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
               <div className="flex justify-between items-center border-b border-border-dark pb-3">
                 <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                  <Terminal className="w-4 h-4 text-primary-neon" />
+                  <Terminal className="w-4 h-4 text-primary-neon animate-pulse" />
                   Node Inspector
                 </h3>
                 <button 
@@ -143,7 +182,7 @@ export default function WorkflowPage() {
                   <span className="text-[9px] text-gray-500 uppercase">Execution Status</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${
-                      selectedNode.status === 'completed' ? 'bg-primary-neon' :
+                      selectedNode.status === 'completed' ? 'bg-primary-neon shadow-[0_0_8px_#00ffcc]' :
                       selectedNode.status === 'running' ? 'bg-secondary-neon animate-ping' :
                       selectedNode.status === 'failed' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
                     }`}></span>
@@ -174,6 +213,44 @@ export default function WorkflowPage() {
                     {selectedNode.retryCount > 0 ? `${selectedNode.retryCount} Retries` : '0 Retries'}
                   </span>
                 </div>
+
+                {/* Token Usage & Cost per Node details */}
+                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-500 uppercase">Token Accounting</span>
+                    <span className="text-white font-bold">1,260 input | 540 output</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-500 uppercase">AI Trust Confidence</span>
+                    <span className="text-primary-neon font-bold">{(assignedAgent?.trustScore || 95.0)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-500 uppercase">Est. Completion Time</span>
+                    <span className="text-white">{(selectedNode.timeEstimate / 1000).toFixed(1)}s</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-500 uppercase">SLA Settlement Cost</span>
+                    <span className="text-secondary-neon font-bold">{selectedNode.costEstimate} USDC</span>
+                  </div>
+                </div>
+
+                {/* Alternative suggestions */}
+                {assignedAgent && getAlternativeAgents(selectedNode).length > 0 && (
+                  <div className="flex flex-col border-t border-border-dark pt-2.5 gap-1.5">
+                    <span className="text-[9px] text-gray-500 uppercase">Alternative Candidates Evaluated</span>
+                    <div className="flex flex-col gap-1.5">
+                      {getAlternativeAgents(selectedNode).map((alt) => (
+                        <div key={alt.id} className="bg-black/40 border border-border-dark p-2 rounded flex justify-between items-center text-[10px] hover:border-primary-neon/20 transition-all">
+                          <div>
+                            <span className="text-white block font-semibold">{alt.name}</span>
+                            <span className="text-[8px] text-gray-500">Rating: {alt.rating}⭐ | Latency: {alt.latency}ms</span>
+                          </div>
+                          <span className="text-secondary-neon font-mono font-bold text-[9px]">{alt.price.toFixed(2)} USDC</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Simulated Timeline Logs */}
                 <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
@@ -217,8 +294,47 @@ export default function WorkflowPage() {
             </div>
           ) : (
             <>
+              {/* WOW Feature: AI Thinking Panel Checklist */}
+              {isPlanning && (
+                <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-black/60 flex flex-col gap-4 text-xs font-mono transition-all duration-300">
+                  <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
+                    <Loader2 className="w-4 h-4 text-primary-neon animate-spin" />
+                    AI Planner Thinking...
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    {PLANNING_STAGES.map((stage, idx) => {
+                      const phaseNum = idx + 1;
+                      const isActive = plannerPhaseIndex === phaseNum;
+                      const isCompleted = plannerPhaseIndex > phaseNum;
+                      return (
+                        <div key={idx} className={`flex items-start gap-2.5 transition-all duration-300 ${
+                          isCompleted ? 'text-primary-neon' : isActive ? 'text-white' : 'text-gray-600'
+                        }`}>
+                          <div className="mt-0.5 shrink-0">
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary-neon" />
+                            ) : isActive ? (
+                              <span className="relative flex h-3.5 w-3.5 items-center justify-center">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary-neon opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary-neon"></span>
+                              </span>
+                            ) : (
+                              <span className="w-3.5 h-3.5 rounded-full border border-border-dark bg-black/40 flex" />
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-[10px] uppercase tracking-wider">{stage.name}</span>
+                            <span className="text-[9px] text-gray-500 mt-0.5 leading-normal">{stage.desc}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* WOW Feature: AI Planner Explanation Panel */}
-              {showExplanation && (
+              {!isPlanning && showExplanation && (
                 <div className="glass-card p-5 rounded-xl border border-primary-neon/20 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
                   <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
                     <Sparkles className="w-4 h-4 text-primary-neon" />
@@ -324,3 +440,4 @@ export default function WorkflowPage() {
     </div>
   );
 }
+

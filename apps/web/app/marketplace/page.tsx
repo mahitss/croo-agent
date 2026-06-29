@@ -18,6 +18,7 @@ export default function MarketplacePage() {
   const initialize = useNexusStore((state) => state.initialize);
   const { toast } = useToast();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [marketplaceTab, setMarketplaceTab] = useState<'all' | 'trending' | 'featured' | 'verified'>('all');
   
   // Search & Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,7 +118,17 @@ export default function MarketplacePage() {
     const matchesPrice = agent.price <= maxPrice;
     const matchesFavorites = !showOnlyFavorites || favorites.includes(agent.id);
 
-    return matchesSearch && matchesCategory && matchesVerified && matchesTrust && matchesPrice && matchesFavorites;
+    // Marketplace App-Store style tabs
+    let matchesTab = true;
+    if (marketplaceTab === 'trending') {
+      matchesTab = agent.verificationCount >= 100;
+    } else if (marketplaceTab === 'featured') {
+      matchesTab = agent.rating >= 4.8 && agent.verificationCount >= 80;
+    } else if (marketplaceTab === 'verified') {
+      matchesTab = agent.trustScore >= 96;
+    }
+
+    return matchesSearch && matchesCategory && matchesVerified && matchesTrust && matchesPrice && matchesFavorites && matchesTab;
   });
 
   // Sort Logic
@@ -373,6 +384,28 @@ export default function MarketplacePage() {
 
         {/* Agents Grid List */}
         <div className="lg:col-span-3 flex flex-col gap-4">
+          {/* App-Store tabs selector */}
+          <div className="flex flex-wrap gap-2 border-b border-border-dark pb-3">
+            {[
+              { id: 'all', label: 'All Nodes' },
+              { id: 'trending', label: '🔥 Trending Swarms' },
+              { id: 'featured', label: '💎 Featured Bids' },
+              { id: 'verified', label: '🛡️ CAP Verified' }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setMarketplaceTab(t.id as any)}
+                className={`text-xs px-4 py-2 rounded-xl font-mono border transition-all ${
+                  marketplaceTab === t.id
+                    ? 'bg-primary-neon/15 border-primary-neon/40 text-primary-neon font-bold shadow-[0_0_8px_rgba(0,255,204,0.05)]'
+                    : 'bg-white/5 border-border-dark text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex justify-between items-center text-xs text-gray-500 font-mono">
             <span>Found {sortedAgents.length} active swarm agent nodes</span>
             <span>Sorted by {sortBy}</span>
@@ -483,6 +516,12 @@ export default function MarketplacePage() {
                             <span className="text-gray-500">Completed Jobs</span>
                             <span className="text-white font-extrabold mt-0.5">{agent.verificationCount}</span>
                           </div>
+                        </div>
+
+                        {/* Creator Profile */}
+                        <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 mb-2">
+                          <span>CREATOR:</span>
+                          <span className="text-white font-bold uppercase">Orbit Labs</span>
                         </div>
 
                         {/* Pricing Footer */}

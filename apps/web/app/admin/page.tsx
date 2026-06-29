@@ -1,261 +1,365 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
 import { 
-  Users, 
-  Cpu, 
-  Layers, 
-  ShieldCheck, 
-  DollarSign, 
-  AlertTriangle,
-  ToggleLeft,
-  ToggleRight,
-  Activity,
-  CheckCircle,
-  Clock,
-  UserCheck,
-  Sliders
+  Users, Cpu, Layers, ShieldCheck, DollarSign, AlertTriangle, 
+  Activity, CheckCircle, Clock, Sliders, Play, Pause, RotateCcw, 
+  Server, Database, Wallet, Sparkles, CheckSquare, ListTodo
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useToast } from '../../components/Toast';
 
 export default function AdminPage() {
   const agents = useNexusStore((state) => state.agents);
   const userWallet = useNexusStore((state) => state.userWallet);
+  const resetDemoMode = useNexusStore((state) => state.resetDemoMode);
+  const startExecution = useNexusStore((state) => state.startExecution);
+  const setUserQuery = useNexusStore((state) => state.setUserQuery);
+  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const isRunning = useNexusStore((state) => state.isRunning);
+  const { toast } = useToast();
+  const router = useRouter();
 
-  // Users Mock Data State
-  const [users, setUsers] = useState([
-    { id: 'usr_001', name: 'Mahit', role: 'Super Admin', status: 'Active', wallet: '0x71C7...6536', lastLogin: 'Just now' },
-    { id: 'usr_002', name: 'Alice Smith', role: 'Developer', status: 'Active', wallet: '0x9965...dF45', lastLogin: '2 hours ago' },
-    { id: 'usr_003', name: 'Bob Johnson', role: 'Standard User', status: 'Active', wallet: '0x88F0...2a1B', lastLogin: '1 day ago' },
-    { id: 'usr_004', name: 'Sybil Attacker', role: 'Standard User', status: 'Suspended', wallet: '0xDEAD...BEEF', lastLogin: '3 days ago' }
-  ]);
+  // Demo Timer States
+  const [timerActive, setTimerActive] = useState(false);
+  const [demoTime, setDemoTime] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Feature Flags State
-  const [flags, setFlags] = useState([
-    { key: 'swarms_consensus', label: 'Multi-Agent Consensus Verification', active: true, rollout: '100%' },
-    { key: 'wallet_withdrawals', label: 'CROO Wallet On-chain Withdrawals', active: true, rollout: '100%' },
-    { key: 'ai_matchmaker', label: 'AI Swarm Matchmaker (Marketplace)', active: true, rollout: '100%' },
-    { key: 'async_exports', label: 'Asynchronous Excel/CSV Exports', active: false, rollout: '0%' }
-  ]);
+  // Presentation Checklist
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({
+    problem: false,
+    marketplace: false,
+    planning: false,
+    workflow: false,
+    execution: false,
+    escrow: false,
+    analytics: false
+  });
+
+  // Current step in the 8-stage demo
+  const [currentDemoStep, setCurrentDemoStep] = useState(0);
+
+  const demoSteps = [
+    '1. Problem & Pain Points',
+    '2. Marketplace Exploration',
+    '3. AI Swarm Intention Formulation',
+    '4. Capability Selection & Bidding',
+    '5. Cost & Parallelization Verification',
+    '6. Escrow Locking & Transaction',
+    '7. Live Swarm Node Graph Execution',
+    '8. Payout Settle & Analytics Audit'
+  ];
 
   // Uptime mock health checks
   const healthChecks = [
-    { name: 'API Gateway', status: 'healthy', msg: 'Uptime 99.98%' },
-    { name: 'Auth Service', status: 'healthy', msg: 'Port 5001' },
-    { name: 'Agent Service', status: 'healthy', msg: 'Port 5002' },
-    { name: 'Workflow Service', status: 'healthy', msg: 'Port 5003' },
-    { name: 'AI Planning Engine', status: 'load', msg: '85% GPU use' },
-    { name: 'Payment Escrows', status: 'healthy', msg: 'Port 5004' }
+    { name: 'API Gateway', status: 'healthy', msg: 'Uptime 99.99%', latency: '8ms' },
+    { name: 'Auth Node', status: 'healthy', msg: 'RSA Key verified', latency: '4ms' },
+    { name: 'Agent Broker', status: 'healthy', msg: '8 Active Pool Agents', latency: '12ms' },
+    { name: 'Workflow Engine', status: 'healthy', msg: 'RabbitMQ connected', latency: '15ms' },
+    { name: 'Consensus Peer', status: 'healthy', msg: '2-Node validated', latency: '24ms' },
+    { name: 'Escrow Vault', status: 'healthy', msg: 'CAP Safe Lock active', latency: '9ms' }
   ];
 
-  // Fraud detection alerts mock logs
-  const fraudAlerts = [
-    { id: 'f_01', type: 'Self-Payment', details: '0xDEAD...BEEF attempting to verify self-hosted node output', severity: 'Critical' },
-    { id: 'f_02', type: 'Velocity Anomaly', details: 'usr_003 launched 48 workflows in 2 minutes', severity: 'Warning' }
-  ];
+  useEffect(() => {
+    if (timerActive) {
+      timerRef.current = setInterval(() => {
+        setDemoTime((t) => t + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timerActive]);
 
-  const handleToggleFlag = (key: string) => {
-    setFlags(flags.map(f => f.key === key ? { ...f, active: !f.active, rollout: f.active ? '0%' : '100%' } : f));
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSuspendUser = (id: string) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Suspended' : 'Active' } : u));
+  const handleResetDemo = () => {
+    resetDemoMode();
+    setDemoTime(0);
+    setTimerActive(false);
+    setChecklist({
+      problem: false,
+      marketplace: false,
+      planning: false,
+      workflow: false,
+      execution: false,
+      escrow: false,
+      analytics: false
+    });
+    setCurrentDemoStep(0);
+    toast('Demo Environment Reset Successfully.', 'success');
+  };
+
+  const triggerOneClickWorkflow = () => {
+    resetDemoMode();
+    setUserQuery("Compile Tesla Q1 financial analysis and translate reports to Chinese");
+    setTimerActive(true);
+    setCurrentDemoStep(2); // Jump to Planner phase
+    
+    // Set some milestones as checked
+    setChecklist(prev => ({
+      ...prev,
+      problem: true,
+      marketplace: true,
+      planning: true
+    }));
+
+    router.push('/workflow');
+    toast('Launching automated Tesla Q1 workflow. Mapping DAG layout...', 'info');
+    setTimeout(() => {
+      startExecution("Compile Tesla Q1 financial analysis and translate reports to Chinese", "balanced", 2.0);
+    }, 1200);
+  };
+
+  const toggleChecklist = (key: string) => {
+    setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6 font-mono text-xs text-gray-400">
       
-      {/* Header platform status banner */}
-      <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-primary-neon animate-pulse" />
-            NEXUS Admin Console
+      {/* Header */}
+      <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,255,163,0.03),transparent_45%)]"></div>
+        <div className="relative z-10">
+          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+            <Sliders className="w-5.5 h-5.5 text-primary-neon animate-pulse" />
+            CROO Hackathon Presenter Control Center & Judge Dashboard
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Operate feature rollout flags, moderate registered agents, secure wallets, and audit server uptimes.
+            Real-time status check, sandbox reset controllers, live presentation stopwatch, and milestone checklist.
           </p>
         </div>
-        <div className="flex gap-4 text-xs font-mono text-gray-500">
-          <div className="flex flex-col border-l border-border-dark pl-3">
-            <span className="text-[10px] uppercase text-gray-600">Active Workflows</span>
-            <span className="text-white font-bold">3 Running</span>
-          </div>
-          <div className="flex flex-col border-l border-border-dark pl-3">
-            <span className="text-[10px] uppercase text-gray-600">Pending Reviews</span>
-            <span className="text-secondary-neon font-bold">0 Queue</span>
-          </div>
+        <div className="flex gap-2 shrink-0 relative z-10">
+          <button
+            onClick={handleResetDemo}
+            className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-black font-extrabold px-4 py-2 rounded-xl transition-all"
+          >
+            RESET_DEMO_ENVIRONMENT
+          </button>
         </div>
       </div>
 
-      {/* Row 1: KPI Stats + Service Health Check Indicators */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Row 1: Presentation Stop Watch, One-Click Trigger, and Wallet Escrow Info */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* KPI panel */}
-        <div className="lg:col-span-1 glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between h-[280px]">
-          <h3 className="font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-border-dark pb-2">
-            <Users className="w-4 h-4 text-accent-blue" />
-            Uptime Parameters
-          </h3>
-          <div className="flex-grow flex flex-col gap-2.5 justify-center">
-            <div className="flex justify-between">
-              <span>Running Workflows</span>
-              <span className="text-primary-neon font-bold">3 Active</span>
+        {/* Presentation stopwatch */}
+        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between h-[180px] relative overflow-hidden">
+          <div>
+            <h3 className="font-bold text-white uppercase tracking-wider mb-1 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+              <Clock className="w-4 h-4 text-accent-blue" />
+              Demo Pitch Timer (5-min target)
+            </h3>
+            <div className="flex items-baseline gap-2 mt-4">
+              <span className={`text-4xl font-extrabold font-sans tracking-tight ${demoTime > 300 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                {formatTime(demoTime)}
+              </span>
+              <span className="text-[10px] text-gray-500">/ 5:00 max</span>
             </div>
-            <div className="flex justify-between">
-              <span>Lifetime Revenue</span>
-              <span className="text-white font-bold">$1,245 USDC</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Average Uptime</span>
-              <span className="text-white font-bold">99.98%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Registered Swarms</span>
-              <span className="text-white font-bold">{agents.length} Nodes</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTimerActive(!timerActive)}
+              className={`flex-1 py-2 rounded-lg font-bold flex items-center justify-center gap-1 transition-all ${
+                timerActive 
+                  ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500 hover:text-black'
+                  : 'bg-primary-neon/10 border border-primary-neon/30 text-primary-neon hover:bg-primary-neon hover:text-black'
+              }`}
+            >
+              {timerActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {timerActive ? 'PAUSE_TIMER' : 'START_TIMER'}
+            </button>
+            <button
+              onClick={() => { setDemoTime(0); setTimerActive(false); }}
+              className="bg-white/5 border border-border-dark hover:bg-white/10 px-3 py-2 rounded-lg text-gray-400 hover:text-white"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* One click automated sample swarm run */}
+        <div className="glass-card p-5 rounded-xl border border-primary-neon/30 bg-primary-neon/5 flex flex-col justify-between h-[180px]">
+          <div>
+            <h3 className="font-bold text-white uppercase tracking-wider mb-1 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+              <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
+              One-Click Scenario Runner
+            </h3>
+            <p className="text-[10px] text-gray-400 mt-2.5 leading-relaxed">
+              Triggers the complete multi-agent Swarm sequence instantly: Intent parsing, DAG generation, CAP Escrow locking, live agent execution and escrow release settlement.
+            </p>
+          </div>
+          <button
+            onClick={triggerOneClickWorkflow}
+            className="w-full bg-gradient-to-r from-primary-neon to-accent-blue hover:brightness-110 text-black font-extrabold py-2.5 rounded-lg text-center flex items-center justify-center gap-1.5 transition-all text-xs"
+          >
+            <Play className="w-3.5 h-3.5 fill-black" />
+            TRIGGER_SAMPLE_WORKFLOW
+          </button>
+        </div>
+
+        {/* Real-time Wallet Escrow audit parameters */}
+        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between h-[180px]">
+          <div>
+            <h3 className="font-bold text-white uppercase tracking-wider mb-1 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+              <Wallet className="w-4 h-4 text-secondary-neon" />
+              On-Chain Escrow ledger Audit
+            </h3>
+            <div className="flex flex-col gap-2 mt-3.5">
+              <div className="flex justify-between items-center">
+                <span>Presenter Balance:</span>
+                <span className="text-white font-bold">{userWallet.balance.toFixed(2)} USDC</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Locked in Escrow:</span>
+                <span className="text-secondary-neon font-bold">{userWallet.escrowBalance.toFixed(2)} USDC</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Agent Settlement Address:</span>
+                <span className="text-gray-500 font-bold truncate max-w-[120px]">0xUserWalletAddress789c</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Uptime Health Check Status Grid */}
-        <div className="lg:col-span-3 glass-card p-5 rounded-xl border border-border-dark flex flex-col h-[280px]">
-          <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
+      </div>
+
+      {/* Row 2: Cluster Microservices health & Database Status Indicators */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Cluster Microservice status parameters */}
+        <div className="lg:col-span-2 glass-card p-5 rounded-xl border border-border-dark">
+          <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
             <Activity className="w-4 h-4 text-primary-neon animate-pulse" />
-            Cluster Microservices Status
+            Core Infrastructure Nodes & Microservices Status
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {healthChecks.map((service, idx) => (
-              <div key={idx} className="border border-border-dark p-3 rounded-lg flex items-center justify-between bg-black/10">
+              <div key={idx} className="border border-border-dark p-3 rounded-lg flex items-center justify-between bg-black/30 hover:border-white/10 transition-all">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-bold text-white text-[11px]">{service.name}</span>
-                  <span className="text-[10px] text-gray-500">{service.msg}</span>
+                  <span className="font-bold text-white text-[10px]">{service.name}</span>
+                  <span className="text-[9px] text-gray-500">{service.msg}</span>
                 </div>
-                <span className={`w-2.5 h-2.5 rounded-full ${
-                  service.status === 'healthy' ? 'bg-primary-neon shadow-[0_0_8px_rgba(0,255,204,0.4)]' : 'bg-yellow-500 animate-pulse'
-                }`}></span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-gray-500">{service.latency}</span>
+                  <span className="w-2 h-2 rounded-full bg-primary-neon bg-opacity-80 shadow-[0_0_8px_rgba(0,255,204,0.6)] animate-pulse"></span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Database & Provider latency status cards */}
+        <div className="lg:col-span-1 flex flex-col gap-4">
+          
+          <div className="glass-card p-4 rounded-xl border border-border-dark bg-black/40 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-accent-blue" />
+              <div>
+                <h4 className="font-bold text-white text-[10px] uppercase">Neon Postgres DB</h4>
+                <p className="text-[9px] text-gray-500 mt-0.5">Serverless pooling instance</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-primary-neon font-bold block text-[10px]">CONNECTED</span>
+              <span className="text-[9px] text-gray-500 font-mono">Ping: 12ms</span>
+            </div>
+          </div>
+
+          <div className="glass-card p-4 rounded-xl border border-border-dark bg-black/40 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-primary-neon animate-spin-slow" />
+              <div>
+                <h4 className="font-bold text-white text-[10px] uppercase">LLM AI Provider Connection</h4>
+                <p className="text-[9px] text-gray-500 mt-0.5">Gemini 1.5 Pro endpoint</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-primary-neon font-bold block text-[10px]">ACTIVE</span>
+              <span className="text-[9px] text-gray-500 font-mono">Ping: 240ms</span>
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
-      {/* Row 2: User management + Agent Moderation approvals */}
+      {/* Row 3: Presentation Progress Stepper & Pitch Milestone Checklist */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* User suspension table */}
+        {/* Presentation progress stepper */}
+        <div className="lg:col-span-1 glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-3">
+          <h3 className="font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+            <Layers className="w-4 h-4 text-secondary-neon" />
+            Presentation Progress Stepper
+          </h3>
+          <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1">
+            {demoSteps.map((step, idx) => {
+              const isPassed = currentDemoStep > idx;
+              const isCurrent = currentDemoStep === idx;
+              return (
+                <div 
+                  key={idx} 
+                  onClick={() => setCurrentDemoStep(idx)}
+                  className={`border p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                    isCurrent 
+                      ? 'border-primary-neon bg-primary-neon/5 text-white font-bold'
+                      : isPassed 
+                        ? 'border-border-dark/65 bg-black/10 text-gray-500' 
+                        : 'border-border-dark bg-black/40 text-gray-600'
+                  }`}
+                >
+                  <span className="text-[10px]">{step}</span>
+                  {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-primary-neon animate-ping"></span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Demo milestones checklist */}
         <div className="lg:col-span-2 glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
-              <Users className="w-4 h-4 text-accent-blue" />
-              Platform Identity Directories
+            <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+              <ListTodo className="w-4 h-4 text-primary-neon animate-pulse" />
+              Demo Pitch Milestone Checklist
             </h3>
-            <div className="overflow-x-auto text-[10px]">
-              <table className="w-full text-left">
-                <thead className="bg-white/2 text-[9px] text-gray-500 uppercase border-b border-border-dark">
-                  <tr>
-                    <th className="py-2 px-3">User</th>
-                    <th className="py-2 px-3">Role</th>
-                    <th className="py-2 px-3">Wallet</th>
-                    <th className="py-2 px-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-dark">
-                  {users.map((usr) => (
-                    <tr key={usr.id} className="hover:bg-white/1 transition-colors">
-                      <td className="py-2.5 px-3 font-bold text-white flex flex-col">
-                        <span>{usr.name}</span>
-                        <span className="text-[9px] text-gray-500 font-normal">{usr.id}</span>
-                      </td>
-                      <td className="py-2.5 px-3">{usr.role}</td>
-                      <td className="py-2.5 px-3 text-gray-500">{usr.wallet}</td>
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          onClick={() => handleSuspendUser(usr.id)}
-                          className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all ${
-                            usr.status === 'Active'
-                              ? 'bg-primary-neon/10 border border-primary-neon/20 text-primary-neon hover:bg-red-500/20 hover:border-red-500/30 hover:text-red-400'
-                              : 'bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-primary-neon/20 hover:border-primary-neon/30 hover:text-primary-neon'
-                          }`}
-                        >
-                          {usr.status}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Agent moderation reviews queue */}
-        <div className="lg:col-span-1 glass-card p-5 rounded-xl border border-border-dark flex flex-col h-[280px]">
-          <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
-            <Cpu className="w-4 h-4 text-secondary-neon" />
-            Moderation Queue
-          </h3>
-          <div className="flex-grow flex flex-col justify-center items-center gap-3 text-center text-gray-500 italic">
-            <CheckCircle className="w-10 h-10 text-primary-neon/50 mb-1" />
-            <span className="font-bold text-white not-italic text-xs">No pending agent reviews</span>
-            <span className="text-[10px]">All registered swarm nodes are successfully validated and verified.</span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Row 3: Feature Toggles + Fraud Alert Logs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Feature flags rollout panel */}
-        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
-              <Sliders className="w-4 h-4 text-accent-blue" />
-              Dynamic Feature Flags
-            </h3>
-            <div className="flex flex-col gap-3">
-              {flags.map((flag) => (
-                <div key={flag.key} className="flex justify-between items-center bg-black/10 p-2.5 rounded border border-border-dark">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-white text-[11px]">{flag.label}</span>
-                    <span className="text-[9px] text-gray-500">Rollout target: {flag.rollout}</span>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFlag(flag.key)}
-                    className="text-gray-500 hover:text-white transition-colors"
-                  >
-                    {flag.active ? (
-                      <ToggleRight className="w-8 h-8 text-primary-neon" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {[
+                { key: 'problem', label: '1. Describe the SLA & Payment Pain Points', desc: 'Detail manual API integration fragility.' },
+                { key: 'marketplace', label: '2. Show Marketplace Discovery', desc: 'Browse verified nodes, reviews, and trust scores.' },
+                { key: 'planning', label: '3. Explain AI Planning & Thinking', desc: 'Explain capability mapping and optimization routes.' },
+                { key: 'workflow', label: '4. Highlight Workflow DAG Canvas', desc: 'Explore nodes layout and parallel branches execution.' },
+                { key: 'execution', label: '5. Demonstrate Swarm Live Execution', desc: 'Watch real-time execution state shifts.' },
+                { key: 'escrow', label: '6. Settle On-Chain Payments', desc: 'Verify escrow release, ledger history logs, and payouts.' },
+                { key: 'analytics', label: '7. Audit Swarm Performance Analytics', desc: 'Audit system SLA metrics and success statistics.' }
+              ].map((item) => (
+                <div 
+                  key={item.key}
+                  onClick={() => toggleChecklist(item.key)}
+                  className={`border p-3 rounded-lg flex gap-3 cursor-pointer select-none transition-all ${
+                    checklist[item.key] 
+                      ? 'border-primary-neon/40 bg-primary-neon/5 text-white' 
+                      : 'border-border-dark bg-black/30 hover:border-white/10 text-gray-400'
+                  }`}
+                >
+                  <div className="mt-0.5">
+                    {checklist[item.key] ? (
+                      <CheckCircle className="w-4 h-4 text-primary-neon shrink-0" />
                     ) : (
-                      <ToggleLeft className="w-8 h-8 text-gray-600" />
+                      <div className="w-4 h-4 rounded border border-border-dark bg-black/40 flex shrink-0" />
                     )}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Fraud Indicator alert monitors */}
-        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-500 animate-bounce" />
-              Fraud Security Logs
-            </h3>
-            <div className="flex flex-col gap-3">
-              {fraudAlerts.map((alert) => (
-                <div key={alert.id} className="border border-border-dark p-3 rounded-lg flex items-start gap-2.5 bg-black/10">
-                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
-                    alert.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                  }`}>
-                    {alert.severity}
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-white text-[11px]">{alert.type}</span>
-                    <span className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{alert.details}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-[10px]">{item.label}</span>
+                    <span className="text-[9px] text-gray-500 leading-normal">{item.desc}</span>
                   </div>
                 </div>
               ))}
@@ -263,27 +367,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-      </div>
-
-      {/* Row 4: Immutable Administrative Audit Logs timeline */}
-      <div className="glass-card p-5 rounded-xl border border-border-dark">
-        <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 border-b border-border-dark pb-2">
-          <Clock className="w-4 h-4 text-primary-neon" />
-          Immutable Operations Audit Log
-        </h3>
-        <div className="flex flex-col gap-3.5 pl-1.5">
-          {[
-            { time: '10:22:45', action: 'Feature Flag Configured', detail: 'swarms_consensus rollout changed to 100% by usr_001' },
-            { time: '10:15:30', action: 'Agent Node Approved', detail: 'Swarm Translation Helper v1.2.0 approved and indexed by usr_001' },
-            { time: '09:44:12', action: 'Identity Suspension Lifted', detail: 'usr_002 restored to active developers list' }
-          ].map((log, idx) => (
-            <div key={idx} className="flex gap-4 items-start text-xs">
-              <span className="text-gray-500 shrink-0 font-bold">{log.time}</span>
-              <span className="text-primary-neon font-bold shrink-0 w-[160px]">{log.action}</span>
-              <span className="text-gray-400 font-mono leading-relaxed">{log.detail}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
     </div>
