@@ -22,6 +22,7 @@ interface NexusState {
   depositUserWallet: (amount: number) => void;
   withdrawUserWallet: (amount: number) => void;
   initialize: () => Promise<void>;
+  resetDemoMode: () => void;
 }
 
 const seedAgents: Agent[] = [
@@ -549,6 +550,33 @@ export const useNexusStore = create<NexusState>((set, get) => {
       } catch (err) {
         console.warn('API Gateway offline. Running in sandbox mode.', err);
       }
+    },
+
+    resetDemoMode: () => {
+      const initialAgentWallets: Record<string, WalletState> = {};
+      seedAgents.forEach(agent => {
+        initialAgentWallets[agent.id] = {
+          address: agent.walletAddress,
+          balance: 15.0,
+          escrowBalance: 0.0,
+          history: []
+        };
+      });
+      set({
+        agents: seedAgents,
+        activeWorkflow: null,
+        executionLogs: [],
+        userWallet: {
+          address: '0xUserWalletAddress789c',
+          balance: 100.0,
+          escrowBalance: 0.0,
+          history: []
+        },
+        agentWallets: initialAgentWallets,
+        isRunning: false,
+        currentPhaseIndex: 0,
+        userQuery: '',
+      });
     },
   };
 });
