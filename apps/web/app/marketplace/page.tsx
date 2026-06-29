@@ -6,10 +6,14 @@ import { Agent } from '@nexus-ai/types';
 import AgentDetailModal from '../../components/AgentDetailModal';
 import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '../../components/Toast';
+import { SkeletonCard } from '../../components/Skeleton';
 
 export default function MarketplacePage() {
   const agents = useNexusStore((state) => state.agents);
   const initialize = useNexusStore((state) => state.initialize);
+  const { toast } = useToast();
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   // Search & Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,15 +57,21 @@ export default function MarketplacePage() {
         setSearchTerm(urlQuery);
       }
     }
+    const timer = setTimeout(() => setIsInitialLoading(false), 800);
+    return () => clearTimeout(timer);
   }, [initialize]);
 
   const toggleFavorite = (agentId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     let updated = [...favorites];
+    const match = agents.find(a => a.id === agentId);
+    const name = match ? match.name : 'Agent';
     if (favorites.includes(agentId)) {
       updated = updated.filter(id => id !== agentId);
+      toast(`Removed ${name} from favorites`, 'info');
     } else {
       updated.push(agentId);
+      toast(`Added ${name} to favorites!`, 'success');
     }
     setFavorites(updated);
     if (typeof window !== 'undefined') {
@@ -349,7 +359,13 @@ export default function MarketplacePage() {
             <span>Sorted by {sortBy}</span>
           </div>
 
-          {sortedAgents.length === 0 ? (
+          {isInitialLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : sortedAgents.length === 0 ? (
             <div className="glass-card py-20 text-center text-gray-500 italic rounded-2xl border border-border-dark flex flex-col items-center gap-2">
               <span className="text-sm">No agents match your active search filters.</span>
               <button 

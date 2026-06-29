@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "../components/Navbar";
 import CommandPalette from "../components/CommandPalette";
 import AiAssistant from "../components/AiAssistant";
+import { ToastProvider } from "../components/Toast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,12 +24,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased min-h-screen flex flex-col font-sans`}>
-        <Navbar />
-        <main className="flex-1 flex flex-col">
-          {children}
-        </main>
-        <CommandPalette />
-        <AiAssistant />
+        <ToastProvider>
+          <Navbar />
+          <main className="flex-1 flex flex-col">
+            {children}
+          </main>
+          <CommandPalette />
+          <AiAssistant />
+        </ToastProvider>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNexusStore } from '../store/nexusStore';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { 
   Cpu, 
   Layers, 
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function Navbar() {
+  useKeyboardShortcuts();
   const pathname = usePathname();
   const userWallet = useNexusStore((state) => state.userWallet);
   const isRunning = useNexusStore((state) => state.isRunning);
