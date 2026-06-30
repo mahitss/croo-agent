@@ -1,16 +1,17 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
 import { CAPAgentService } from '../services/cap-agent.service';
+import { RedisService } from '../services/redis.service';
+
 
 @Controller('api/v1')
 export class AgentController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly capAgent: CAPAgentService,
+    private readonly redis: RedisService,
   ) {}
 
-  private agentsCache: any = null;
-  private cacheExpiry = 0;
 
   @Post('agents')
   @HttpCode(HttpStatus.CREATED)
@@ -26,6 +27,8 @@ export class AgentController {
       },
     });
 
+    await this.redis.del('marketplace:agents');
+
     return {
       success: true,
       message: 'Agent profile metadata saved successfully',
@@ -35,12 +38,16 @@ export class AgentController {
 
   @Get('agents')
   async getAgents() {
-    const now = Date.now();
-    if (this.agentsCache && now < this.cacheExpiry) {
-      return {
-        success: true,
-        data: this.agentsCache,
-      };
+    const cached = await this.redis.get('marketplace:agents');
+    if (cached) {
+      try {
+        return {
+          success: true,
+          data: JSON.parse(cached),
+        };
+      } catch (err) {
+        // Safe fallback
+      }
     }
 
     const agents = await this.prisma.agent.findMany({
@@ -76,8 +83,7 @@ export class AgentController {
       };
     });
 
-    this.agentsCache = mapped;
-    this.cacheExpiry = now + 10000; // cache for 10 seconds
+    await this.redis.set('marketplace:agents', JSON.stringify(mapped), 60);
 
     return {
       success: true,
@@ -187,6 +193,8 @@ export class AgentController {
       },
     });
 
+    await this.redis.del('marketplace:agents');
+
     return {
       success: true,
       message: 'Agent updated successfully',
@@ -201,6 +209,8 @@ export class AgentController {
       data: { deletedAt: new Date() },
     });
 
+    await this.redis.del('marketplace:agents');
+
     return {
       success: true,
       message: `Agent ${id} status set to archived`,
@@ -212,6 +222,8 @@ export class AgentController {
   async publishAgent(@Param('id') id: string) {
     // Publish includes CAP registration
     const registration = await this.capAgent.registerAgent(id);
+
+    await this.redis.del('marketplace:agents');
 
     return {
       success: true,
@@ -232,6 +244,8 @@ export class AgentController {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    await this.redis.del('marketplace:agents');
 
     return {
       success: true,
@@ -262,6 +276,8 @@ export class AgentController {
         comment: body.comment || '',
       },
     });
+
+    await this.redis.del('marketplace:agents');
 
     return {
       success: true,

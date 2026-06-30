@@ -2,8 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
-  '@nestjs/core': set this to true or false
-  '@prisma/client': set this to true or false
-  '@prisma/engines': set this to true or false
-  prisma: set this to true or false
-  sharp: set this to true or false
+  '@nestjs/core': false
+  '@prisma/client': true
+  '@prisma/engines': true
+  core-js: false
+  prisma: true
+  sharp: true
+

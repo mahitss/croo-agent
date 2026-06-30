@@ -1,8 +1,33 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as express from 'express';
+import * as Sentry from '@sentry/node';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
 async function bootstrap() {
+  // Load environment configurations
+  const localEnv = dotenv.config();
+  const parentEnv = dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+  
+  console.log('[SENTRY_DEBUG] process.cwd() is:', process.cwd());
+  console.log('[SENTRY_DEBUG] localEnv parsed:', localEnv.parsed ? 'yes' : 'no');
+  console.log('[SENTRY_DEBUG] parentEnv parsed:', parentEnv.parsed ? 'yes' : 'no');
+  console.log('[SENTRY_DEBUG] process.env.SENTRY_DSN:', process.env.SENTRY_DSN);
+
+  // Initialize Sentry if DSN is configured
+  const sentryDsn = process.env.SENTRY_DSN;
+  if (sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: 1.0,
+    });
+    console.log('[SENTRY] Sentry initialized successfully.');
+  } else {
+    console.log('[SENTRY] No SENTRY_DSN found, Sentry tracking is disabled.');
+  }
+
   const app = await NestFactory.create(AppModule);
 
   // Apply strict CORS options

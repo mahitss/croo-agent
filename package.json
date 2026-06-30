@@ -15,10 +15,10 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sharp"
-    ]
-  },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "dependencies": {
+    "@nestjs/websockets": "^10.4.22",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.3"
+  }
 }

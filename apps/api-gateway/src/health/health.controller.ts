@@ -1,6 +1,6 @@
 import { Controller, Get, HttpCode, HttpStatus, Header } from '@nestjs/common';
 
-@Controller()
+@Controller('api/v1')
 export class HealthController {
   private startTime = Date.now();
 
@@ -35,7 +35,7 @@ export class HealthController {
            `nexus_api_uptime_seconds ${uptime}\n` +
            `# HELP nexus_api_http_requests_total Total number of HTTP requests processed\n` +
            `# TYPE nexus_api_http_requests_total counter\n` +
-           `nexus_api_http_requests_total{method="GET",path="/health",status="200"} 42\n` +
+           `nexus_api_http_requests_total{method="GET",path="/api/v1/health",status="200"} 42\n` +
            `nexus_api_http_requests_total{method="POST",path="/api/v1/workflows",status="201"} 14\n`;
   }
 
@@ -63,7 +63,7 @@ export class HealthController {
   <script>
     window.onload = () => {
       window.ui = SwaggerUIBundle({
-        url: '/api/openapi.json',
+        url: '/api/v1/openapi.json',
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
@@ -79,7 +79,12 @@ export class HealthController {
     `;
   }
 
-  @Get('api/openapi.json')
+  @Get('admin/debug-error')
+  triggerDebugError() {
+    throw new Error('[SENTRY_TEST] This is a simulated 500 error for Sentry verification.');
+  }
+
+  @Get('openapi.json')
   getOpenApiSchema() {
     return {
       openapi: '3.0.0',

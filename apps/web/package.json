@@ -16,6 +16,7 @@
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.469.0",
     "next": "^15.1.0",
+    "posthog-js": "^1.395.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.1",
@@ -25,13 +26,13 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.14.9",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0",
     "typescript": "^5.4.5"
   }
 }

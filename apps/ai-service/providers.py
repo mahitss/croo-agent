@@ -52,7 +52,8 @@ class BaseLLMProvider(ABC):
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         pass
 
@@ -67,7 +68,8 @@ class OpenAIProvider(BaseLLMProvider):
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         start_time = time.time()
         headers = {
@@ -80,9 +82,12 @@ class OpenAIProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        target_model = model or self.model_name
         data: Dict[str, Any] = {
-            "model": self.model_name,
-            "messages": messages
+            "model": target_model,
+            "messages": messages,
+            "temperature": float(os.environ.get("MODEL_TEMPERATURE", "0.2")),
+            "max_tokens": int(os.environ.get("MAX_TOKENS", "8192"))
         }
         if json_mode:
             data["response_format"] = {"type": "json_object"}
@@ -109,7 +114,7 @@ class OpenAIProvider(BaseLLMProvider):
                 return LLMResult(
                     content=content,
                     provider="openai",
-                    model=self.model_name,
+                    model=target_model,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     latency_ms=latency_ms,
@@ -122,7 +127,7 @@ class OpenAIProvider(BaseLLMProvider):
             return LLMResult(
                 content="",
                 provider="openai",
-                model=self.model_name,
+                model=target_model,
                 latency_ms=latency_ms,
                 success=False,
                 error_message=str(e)
@@ -139,7 +144,8 @@ class AnthropicProvider(BaseLLMProvider):
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         start_time = time.time()
         headers = {
@@ -149,10 +155,12 @@ class AnthropicProvider(BaseLLMProvider):
         }
         
         # Claude expects prompt + system separately
+        target_model = model or self.model_name
         data: Dict[str, Any] = {
-            "model": self.model_name,
-            "max_tokens": 4096,
-            "messages": [{"role": "user", "content": prompt}]
+            "model": target_model,
+            "max_tokens": int(os.environ.get("MAX_TOKENS", "8192")),
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": float(os.environ.get("MODEL_TEMPERATURE", "0.2"))
         }
         if system_prompt:
             data["system"] = system_prompt
@@ -183,7 +191,7 @@ class AnthropicProvider(BaseLLMProvider):
                 return LLMResult(
                     content=content,
                     provider="anthropic",
-                    model=self.model_name,
+                    model=target_model,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     latency_ms=latency_ms,
@@ -196,7 +204,7 @@ class AnthropicProvider(BaseLLMProvider):
             return LLMResult(
                 content="",
                 provider="anthropic",
-                model=self.model_name,
+                model=target_model,
                 latency_ms=latency_ms,
                 success=False,
                 error_message=str(e)
@@ -213,7 +221,8 @@ class GeminiProvider(BaseLLMProvider):
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         start_time = time.time()
         headers = {"Content-Type": "application/json"}
@@ -223,16 +232,25 @@ class GeminiProvider(BaseLLMProvider):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\nUser Query: {prompt}"
 
+        target_model = model or self.model_name
+        # Build URL dynamically if model parameter changes
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={self.api_key}"
+        
         data: Dict[str, Any] = {
             "contents": [{"parts": [{"text": full_prompt}]}]
         }
         
+        generation_config: Dict[str, Any] = {
+            "temperature": float(os.environ.get("MODEL_TEMPERATURE", "0.2")),
+            "maxOutputTokens": int(os.environ.get("MAX_TOKENS", "8192"))
+        }
         if json_mode:
-            data["generationConfig"] = {"responseMimeType": "application/json"}
+            generation_config["responseMimeType"] = "application/json"
+        data["generationConfig"] = generation_config
 
         try:
             req = urllib.request.Request(
-                self.url,
+                url,
                 data=json.dumps(data).encode("utf-8"),
                 headers=headers,
                 method="POST"
@@ -252,7 +270,7 @@ class GeminiProvider(BaseLLMProvider):
                 return LLMResult(
                     content=content,
                     provider="gemini",
-                    model=self.model_name,
+                    model=target_model,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     latency_ms=latency_ms,
@@ -265,7 +283,83 @@ class GeminiProvider(BaseLLMProvider):
             return LLMResult(
                 content="",
                 provider="gemini",
-                model=self.model_name,
+                model=target_model,
+                latency_ms=latency_ms,
+                success=False,
+                error_message=str(e)
+            )
+
+class OpenRouterProvider(BaseLLMProvider):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.model_name = os.environ.get("FALLBACK_MODEL", "google/gemini-flash-1.5")
+        self.url = "https://openrouter.ai/api/v1/chat/completions"
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_mode: bool = False,
+        timeout: int = 15
+    ) -> LLMResult:
+        start_time = time.time()
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+            "HTTP-Referer": "https://github.com/mahitss/croo-agent",
+            "X-Title": "Orbit AI"
+        }
+        
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        target_model = model or self.model_name
+        data: Dict[str, Any] = {
+            "model": target_model,
+            "messages": messages,
+            "temperature": float(os.environ.get("MODEL_TEMPERATURE", "0.2")),
+            "max_tokens": int(os.environ.get("MAX_TOKENS", "8192"))
+        }
+        if json_mode:
+            data["response_format"] = {"type": "json_object"}
+
+        try:
+            req = urllib.request.Request(
+                self.url,
+                data=json.dumps(data).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                latency_ms = int((time.time() - start_time) * 1000)
+                res_data = json.loads(response.read().decode("utf-8"))
+                
+                content = res_data["choices"][0]["message"]["content"]
+                usage = res_data.get("usage", {})
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                
+                cost = (prompt_tokens * 0.000000075) + (completion_tokens * 0.00000030)
+
+                return LLMResult(
+                    content=content,
+                    provider="openrouter",
+                    model=target_model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    latency_ms=latency_ms,
+                    cost=round(cost, 6),
+                    success=True
+                )
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            logger.error(f"OpenRouter provider call failed: {e}")
+            return LLMResult(
+                content="",
+                provider="openrouter",
+                model=target_model,
                 latency_ms=latency_ms,
                 success=False,
                 error_message=str(e)
@@ -277,7 +371,8 @@ class LLMProviderManager:
         self.metrics = {
             "openai": {"calls": 0, "failures": 0, "total_latency": 0, "total_tokens": 0, "total_cost": 0.0},
             "anthropic": {"calls": 0, "failures": 0, "total_latency": 0, "total_tokens": 0, "total_cost": 0.0},
-            "gemini": {"calls": 0, "failures": 0, "total_latency": 0, "total_tokens": 0, "total_cost": 0.0}
+            "gemini": {"calls": 0, "failures": 0, "total_latency": 0, "total_tokens": 0, "total_cost": 0.0},
+            "openrouter": {"calls": 0, "failures": 0, "total_latency": 0, "total_tokens": 0, "total_cost": 0.0}
         }
         self.initialize_providers()
 
@@ -285,6 +380,7 @@ class LLMProviderManager:
         openai_key = os.environ.get("OPENAI_API_KEY")
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
         gemini_key = os.environ.get("GEMINI_API_KEY")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
 
         if openai_key:
             self.providers["openai"] = OpenAIProvider(openai_key)
@@ -295,6 +391,9 @@ class LLMProviderManager:
         if gemini_key:
             self.providers["gemini"] = GeminiProvider(gemini_key)
             logger.info("Gemini LLM provider loaded.")
+        if openrouter_key:
+            self.providers["openrouter"] = OpenRouterProvider(openrouter_key)
+            logger.info("OpenRouter LLM provider loaded.")
 
     def get_active_providers(self) -> List[str]:
         return list(self.providers.keys())
@@ -309,11 +408,20 @@ class LLMProviderManager:
         json_mode: bool = False,
         primary_provider: Optional[str] = None,
         max_retries: int = 3,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         # Determine execution chain
         env_default = os.environ.get("DEFAULT_LLM_PROVIDER", "openai").lower()
         preferred = primary_provider or env_default
+        
+        # Calculate request timeout
+        env_timeout_ms = os.environ.get("REQUEST_TIMEOUT")
+        if env_timeout_ms:
+            timeout_sec = max(1, int(int(env_timeout_ms) / 1000))
+        else:
+            timeout_sec = timeout
+
         
         # Build fallback list beginning with preferred provider
         active_list = self.get_active_providers()
@@ -348,8 +456,10 @@ class LLMProviderManager:
                     prompt=prompt,
                     system_prompt=system_prompt,
                     json_mode=json_mode,
-                    timeout=timeout
+                    timeout=timeout_sec,
+                    model=model
                 )
+
                 
                 if result.success:
                     # Update metrics

@@ -1,9 +1,15 @@
+import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+except ImportError:
+    pass
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import time
-import os
 import json
 import yaml
 import logging
@@ -199,6 +205,52 @@ def clean_json_response(content: str) -> str:
         cleaned = cleaned.split("```")[1].split("```")[0].strip()
     return cleaned
 
+def get_redis_cache(key: str) -> Optional[str]:
+    rest_url = os.environ.get("UPSTASH_REDIS_REST_URL")
+    rest_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if not rest_url or not rest_token:
+        return None
+    try:
+        headers = {
+            "Authorization": f"Bearer {rest_token}",
+            "Content-Type": "application/json"
+        }
+        data = json.dumps(["GET", key]).encode("utf-8")
+        req = urllib.request.Request(
+            rest_url,
+            data=data,
+            headers=headers,
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return res_data.get("result")
+    except Exception as e:
+        logger.error(f"Failed to fetch cache from Upstash Redis: {e}")
+    return None
+
+def set_redis_cache(key: str, value: str, ttl_seconds: int = 300) -> None:
+    rest_url = os.environ.get("UPSTASH_REDIS_REST_URL")
+    rest_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if not rest_url or not rest_token:
+        return
+    try:
+        headers = {
+            "Authorization": f"Bearer {rest_token}",
+            "Content-Type": "application/json"
+        }
+        data = json.dumps(["SET", key, value, "EX", str(ttl_seconds)]).encode("utf-8")
+        req = urllib.request.Request(
+            rest_url,
+            data=data,
+            headers=headers,
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            pass
+    except Exception as e:
+        logger.error(f"Failed to save cache to Upstash Redis: {e}")
+
 @app.get("/")
 def get_root():
     return {"status": "healthy", "engine": "NEXUS AI Orchestrator Core"}
@@ -255,6 +307,21 @@ def plan_workflow(req: PlanRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query prompt cannot be empty.")
     
+    # Normalize query for key
+    query_slug = req.query.lower().strip().replace(" ", "-")
+    cache_key = f"planner:{query_slug}"
+    
+    # Try fetching from Redis cache
+    cached_plan = get_redis_cache(cache_key)
+    if cached_plan:
+        try:
+            parsed = json.loads(cached_plan)
+            logger.info(f"Cache HIT for key: {cache_key}")
+            return PlanResponse(**parsed)
+        except Exception as e:
+            logger.error(f"Failed to parse cached plan: {e}")
+
+    
     # Load system prompt and planner template
     system_prompt = get_prompt_template("system", "system_v1.yaml")
     planner_template = get_prompt_template("planner", "planner_v3.yaml")
@@ -274,10 +341,12 @@ def plan_workflow(req: PlanRequest):
     prompt = prompt.replace("{{ budget }}", str(req.budget))
     prompt = prompt.replace("{{ routing_mode }}", req.routing_mode or "balanced")
 
+    planner_model = os.environ.get("PLANNER_MODEL", "google/gemini-flash-1.5")
     result = provider_manager.execute_with_retry_and_fallback(
         prompt=prompt,
         system_prompt=system_prompt,
-        json_mode=True
+        json_mode=True,
+        model=planner_model
     )
     
     if result.success and result.content:
@@ -302,6 +371,9 @@ def plan_workflow(req: PlanRequest):
                 estimated_duration_seconds=int(parsed.get("estimated_duration_seconds") or 65),
                 confidence=float(parsed.get("confidence") or 0.95)
             )
+            
+            # Store in cache
+            set_redis_cache(cache_key, json.dumps(plan.dict()), 300)
             return plan
         except Exception as e:
             logger.error(f"Error parsing LLM response for /plan: {e}. Falling back to local structured orchestrator.")
@@ -333,12 +405,14 @@ def plan_workflow(req: PlanRequest):
             TaskNodeResponse(id="node-2", capability="verify", dependencies=["node-1"])
         ]
         
-    return PlanResponse(
+    fallback_plan = PlanResponse(
         workflow=workflow_dag,
         estimated_cost=1.25,
         estimated_duration_seconds=65,
         confidence=0.94
     )
+    set_redis_cache(cache_key, json.dumps(fallback_plan.dict()), 300)
+    return fallback_plan
 
 @app.post("/estimate", response_model=EstimateResponse)
 def estimate_workflow(req: EstimateRequest):
@@ -349,7 +423,12 @@ def estimate_workflow(req: EstimateRequest):
         f"Return strict JSON matching: {{\"success\": true, \"estimated_cost\": 1.25, \"estimated_duration_seconds\": 65}}"
     )
     
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    planner_model = os.environ.get("PLANNER_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=planner_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -383,7 +462,12 @@ def verify_output(req: VerifyRequest):
         "Return strict JSON format: {\"success\": true, \"score\": 95, \"passed\": true, \"citations_count\": 4}"
     )
 
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    validator_model = os.environ.get("VALIDATOR_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=validator_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -407,7 +491,12 @@ def summarize_content(req: SummarizeRequest):
         f"Provide a summary of this content:\n{req.content}\n\n"
         f"Return strict JSON format: {{\"success\": true, \"summary\": \"(Summary text)\"}}"
     )
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=chat_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -427,7 +516,12 @@ def translate_text(req: TranslateRequest):
         f"Translate the following text into target language '{req.target_language}':\n{req.text}\n\n"
         f"Return strict JSON format: {{\"success\": true, \"translated_text\": \"(translated result)\"}}"
     )
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=chat_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -447,7 +541,12 @@ def classify_text(req: ClassifyRequest):
         f"Categorize the following text:\n{req.text}\n\n"
         f"Return strict JSON format: {{\"success\": true, \"category\": \"(market_analysis/legal/finance/etc)\"}}"
     )
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=chat_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -468,7 +567,12 @@ def consensus_check(req: ConsensusRequest):
         f"Outputs: {json.dumps(req.outputs)}\n\n"
         f"Return strict JSON format: {{\"success\": true, \"consensus_achieved\": true, \"merged_output\": \"(Merged consensus data)\"}}"
     )
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    validator_model = os.environ.get("VALIDATOR_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=validator_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -493,7 +597,12 @@ def explain_workflow(req: ExplainRequest):
         f"Explain the execution pathway and layout of workflow ID: {req.workflow_id}\n\n"
         f"Return strict JSON format: {{\"success\": true, \"explanation\": \"(Explanation of DAG)\"}}"
     )
-    result = provider_manager.execute_with_retry_and_fallback(prompt=prompt, json_mode=True)
+    chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
+    result = provider_manager.execute_with_retry_and_fallback(
+        prompt=prompt,
+        json_mode=True,
+        model=chat_model
+    )
     if result.success and result.content:
         try:
             cleaned = clean_json_response(result.content)
@@ -564,10 +673,12 @@ def stream_response(req: StreamRequest):
                 logger.error(f"OpenAI stream failed: {e}. Falling back to chunked full generation.")
                 
         # Generic fallback chunk generator
+        chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
         result = provider_manager.execute_with_retry_and_fallback(
             prompt=req.prompt,
             system_prompt=req.system_prompt,
-            json_mode=False
+            json_mode=False,
+            model=chat_model
         )
         if result.success and result.content:
             content = result.content
