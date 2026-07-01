@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as express from 'express';
 import * as Sentry from '@sentry/node';
@@ -30,12 +31,34 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Apply strict CORS options
+  // Enable trust proxy for correct IP rate-limiting behind Render/Vercel load balancers
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  // Resolve allowed CORS origins dynamically
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'https://croo-agent-web.vercel.app',
+    'https://orbitai.dev'
+  ];
+  const envOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : [];
+  const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
+  // Apply dynamic CORS options
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://orbitai.dev'],
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
+
+  // Enable global validation pipeline for secure requests
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }));
+
 
   // Limit request payload sizes to 10MB to avoid buffer overflows (P13 Security)
   app.use(express.json({ limit: '10mb' }));

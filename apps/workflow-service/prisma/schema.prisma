@@ -44,6 +44,7 @@ model Workflow {
   edges         WorkflowEdge[]
   executions    WorkflowExecution[]
 
+  @@index([userId])
   @@map("workflows")
 }
 
@@ -58,6 +59,7 @@ model WorkflowNode {
 
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
+  @@index([workflowId])
   @@map("workflow_nodes")
 }
 
@@ -69,6 +71,7 @@ model WorkflowEdge {
 
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
+  @@index([workflowId])
   @@map("workflow_edges")
 }
 
@@ -82,6 +85,7 @@ model WorkflowExecution {
   workflow    Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   tasks       Task[]
 
+  @@index([workflowId])
   @@map("workflow_executions")
 }
 
@@ -100,6 +104,7 @@ model Task {
   execution       WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
   logs            TaskLog[]
 
+  @@index([executionId])
   @@map("tasks")
 }
 
@@ -113,5 +118,6 @@ model TaskLog {
 
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
+  @@index([taskId])
   @@map("task_logs")
 }

@@ -79,7 +79,7 @@ async function main() {
   }
 
   results.push(await runTest("Login Auth Endpoint", `${BASE_URL}/auth/login`, 'POST', {
-    email: testEmail,
+    usernameOrEmail: testEmail,
     password: 'SecureAuditPassword123!'
   }));
 
