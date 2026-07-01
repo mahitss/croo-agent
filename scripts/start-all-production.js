@@ -9,49 +9,49 @@ const services = [
     dir: 'apps/auth-service',
     port: 5001,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'agent-service',
     dir: 'apps/agent-service',
     port: 5002,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'workflow-service',
     dir: 'apps/workflow-service',
     port: 5003,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'payment-service',
     dir: 'apps/payment-service',
     port: 5004,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'wallet-service',
     dir: 'apps/wallet-service',
     port: 5005,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'notification-service',
     dir: 'apps/notification-service',
     port: 5006,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'analytics-service',
     dir: 'apps/analytics-service',
     port: 5007,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'ai-service',
@@ -65,7 +65,7 @@ const services = [
     dir: 'apps/api-gateway',
     port: process.env.PORT || 10000,
     cmd: 'node',
-    args: ['dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   }
 ];
 
@@ -114,8 +114,12 @@ function startService(service) {
   children.push(child);
 }
 
-// Start all services
-services.forEach(startService);
+// Start all services with a staggered delay of 1500ms to reduce peak CPU & memory spikes during container startup
+services.forEach((service, index) => {
+  setTimeout(() => {
+    startService(service);
+  }, index * 1500);
+});
 
 // Handle process termination cleanly
 process.on('SIGTERM', () => {
