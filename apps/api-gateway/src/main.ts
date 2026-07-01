@@ -123,7 +123,8 @@ async function bootstrap() {
     console.warn(`[SECURITY_WARNING] JWT_SECRET is weak or too short (${jwtSecret.length} chars). Require secure key of at least 32 characters in production.`);
   }
 
-  await app.listen(5000);
+  const port = process.env.PORT || 5000;
+  await app.listen(port, '0.0.0.0');
   console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
 }
 bootstrap();
