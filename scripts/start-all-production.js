@@ -5,6 +5,13 @@ const fs = require('fs');
 // Services configuration
 const services = [
   {
+    name: 'api-gateway',
+    dir: 'apps/api-gateway',
+    port: process.env.PORT || 10000,
+    cmd: 'node',
+    args: ['--max-old-space-size=128', 'dist/main.js']
+  },
+  {
     name: 'auth-service',
     dir: 'apps/auth-service',
     port: 5001,
@@ -59,13 +66,6 @@ const services = [
     port: 8000,
     cmd: '/opt/venv/bin/python',
     args: ['main.py']
-  },
-  {
-    name: 'api-gateway',
-    dir: 'apps/api-gateway',
-    port: process.env.PORT || 10000,
-    cmd: 'node',
-    args: ['--max-old-space-size=128', 'dist/main.js']
   }
 ];
 

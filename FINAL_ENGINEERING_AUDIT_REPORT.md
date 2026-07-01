@@ -48,7 +48,7 @@ We applied explicit indexing on foreign lookup fields and query fields to optimi
 ---
 
 ## 6. Complete Changelog
-1.  **Orchestrator Manager**: Created `scripts/start-all-production.js` to spawn all 9 services concurrently.
+1.  **Orchestrator Manager**: Created `scripts/start-all-production.js` to spawn all 9 services with a staggered, prioritized order (starting the health-check-responding API Gateway first).
 2.  **Dockerfile Hardening**: Updated Alpine Docker layers to support Python environment setup for `ai-service`.
 3.  **FastAPI ASGI Loop**: Added `uvicorn.run` invocation to start the Python FastAPI engine.
 4.  **CORS & Proxy config**: Hardened `apps/api-gateway/src/main.ts` with `trust proxy` and dynamic origins resolving.
