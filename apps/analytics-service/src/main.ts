@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
+declare const process: any;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
@@ -11,7 +13,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.listen(5007);
+  const port = process.env.PORT || 5007;
+  await app.listen(port, '0.0.0.0');
   console.log(`Orbit Analytics Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();

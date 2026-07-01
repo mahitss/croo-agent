@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/http-exception.filter';
 import { TransformInterceptor } from './common/transform.interceptor';
 
+declare const process: any;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
@@ -25,7 +27,8 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  await app.listen(5001);
+  const port = process.env.PORT || 5001;
+  await app.listen(port, '0.0.0.0');
   console.log(`Orbit Authentication Service listening on: ${await app.getUrl()}`);
 }
 bootstrap();
