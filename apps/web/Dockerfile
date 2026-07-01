@@ -2,16 +2,19 @@ FROM node:22-alpine AS base
 WORKDIR /app
 RUN npm install -g pnpm@11.9.0
 
-# Install dependencies in root context
-COPY package.json pnpm-workspace.yaml turbo.json ./
-COPY packages/types/package.json ./packages/types/
-COPY packages/sdk/package.json ./packages/sdk/
-COPY apps/web/package.json ./apps/web/
-RUN pnpm install --ignore-scripts
+# Copy configuration files and lockfile
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
 
-# Copy code and build frontend
-COPY . .
+# Copy all workspaces
+COPY packages/ ./packages/
+COPY apps/ ./apps/
+
+# Install all workspace dependencies
+RUN pnpm install
+
+# Build NextJS web app
 RUN pnpm --filter web build
 
 EXPOSE 3000
 CMD ["pnpm", "--filter", "web", "start"]
+
