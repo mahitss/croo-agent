@@ -42,6 +42,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/nexus
       - DIRECT_URL=postgresql://postgres:postgres@postgres:5432/nexus
       - REDIS_URL=redis://redis:6379
+      - PORT=5000
     depends_on:
       postgres:
         condition: service_healthy

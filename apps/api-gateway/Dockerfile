@@ -15,6 +15,8 @@ RUN pnpm install
 # Build NestJS API gateway
 RUN pnpm --filter api-gateway build
 
-EXPOSE 5000
+ENV PORT=10000
+EXPOSE 10000
 CMD ["pnpm", "--filter", "api-gateway", "start"]
+
 
