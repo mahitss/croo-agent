@@ -90,8 +90,11 @@ function startService(service) {
 
   const child = spawn(executable, service.args, {
     cwd: serviceDir,
-    env,
-    shell: true
+    env
+  });
+
+  child.on('error', (err) => {
+    console.error(`[MANAGER] [ERROR] Failed to spawn ${service.name}:`, err.message);
   });
 
   child.stdout.on('data', (data) => {
