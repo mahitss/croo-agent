@@ -1,10 +1,12 @@
 import { Controller, Get, HttpCode, HttpStatus, Header } from '@nestjs/common';
 
-@Controller('api/v1')
+@Controller()
 export class HealthController {
   private startTime = Date.now();
 
   @Get('health')
+  @Get('api/health')
+  @Get('api/v1/health')
   getHealth() {
     return {
       status: 'healthy',
@@ -17,16 +19,19 @@ export class HealthController {
   }
 
   @Get('ready')
+  @Get('api/v1/ready')
   getReady() {
     return { status: 'ready' };
   }
 
   @Get('live')
+  @Get('api/v1/live')
   getLive() {
     return { status: 'alive' };
   }
 
   @Get('metrics')
+  @Get('api/v1/metrics')
   @HttpCode(HttpStatus.OK)
   getMetrics(): string {
     const uptime = Math.floor((Date.now() - this.startTime) / 1000);
@@ -40,6 +45,7 @@ export class HealthController {
   }
 
   @Get('docs')
+  @Get('api/v1/docs')
   @Header('Content-Type', 'text/html')
   getDocsPage(): string {
     return `
@@ -79,12 +85,13 @@ export class HealthController {
     `;
   }
 
-  @Get('admin/debug-error')
+  @Get('api/v1/admin/debug-error')
   triggerDebugError() {
     throw new Error('[SENTRY_TEST] This is a simulated 500 error for Sentry verification.');
   }
 
-  @Get('openapi.json')
+  @Get('api/openapi.json')
+  @Get('api/v1/openapi.json')
   getOpenApiSchema() {
     return {
       openapi: '3.0.0',
@@ -155,3 +162,4 @@ export class HealthController {
     };
   }
 }
+
