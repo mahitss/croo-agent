@@ -4,10 +4,7 @@ import { Controller, Get, HttpCode, HttpStatus, Header } from '@nestjs/common';
 export class HealthController {
   private startTime = Date.now();
 
-  @Get('health')
-  @Get('api/health')
-  @Get('api/v1/health')
-  getHealth() {
+  private handleHealth() {
     return {
       status: 'healthy',
       version: '1.0.0',
@@ -18,22 +15,50 @@ export class HealthController {
     };
   }
 
-  @Get('ready')
-  @Get('api/v1/ready')
-  getReady() {
+  @Get('health')
+  getHealth() {
+    return this.handleHealth();
+  }
+
+  @Get('api/health')
+  getApiHealth() {
+    return this.handleHealth();
+  }
+
+  @Get('api/v1/health')
+  getApiV1Health() {
+    return this.handleHealth();
+  }
+
+  private handleReady() {
     return { status: 'ready' };
   }
 
-  @Get('live')
-  @Get('api/v1/live')
-  getLive() {
+  @Get('ready')
+  getReady() {
+    return this.handleReady();
+  }
+
+  @Get('api/v1/ready')
+  getApiV1Ready() {
+    return this.handleReady();
+  }
+
+  private handleLive() {
     return { status: 'alive' };
   }
 
-  @Get('metrics')
-  @Get('api/v1/metrics')
-  @HttpCode(HttpStatus.OK)
-  getMetrics(): string {
+  @Get('live')
+  getLive() {
+    return this.handleLive();
+  }
+
+  @Get('api/v1/live')
+  getApiV1Live() {
+    return this.handleLive();
+  }
+
+  private handleMetrics() {
     const uptime = Math.floor((Date.now() - this.startTime) / 1000);
     return `# HELP nexus_api_uptime_seconds NEXUS API service uptime in seconds\n` +
            `# TYPE nexus_api_uptime_seconds counter\n` +
@@ -44,10 +69,19 @@ export class HealthController {
            `nexus_api_http_requests_total{method="POST",path="/api/v1/workflows",status="201"} 14\n`;
   }
 
-  @Get('docs')
-  @Get('api/v1/docs')
-  @Header('Content-Type', 'text/html')
-  getDocsPage(): string {
+  @Get('metrics')
+  @HttpCode(HttpStatus.OK)
+  getMetrics(): string {
+    return this.handleMetrics();
+  }
+
+  @Get('api/v1/metrics')
+  @HttpCode(HttpStatus.OK)
+  getApiV1Metrics(): string {
+    return this.handleMetrics();
+  }
+
+  private handleDocsPage(): string {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -85,14 +119,24 @@ export class HealthController {
     `;
   }
 
+  @Get('docs')
+  @Header('Content-Type', 'text/html')
+  getDocsPage(): string {
+    return this.handleDocsPage();
+  }
+
+  @Get('api/v1/docs')
+  @Header('Content-Type', 'text/html')
+  getApiV1DocsPage(): string {
+    return this.handleDocsPage();
+  }
+
   @Get('api/v1/admin/debug-error')
   triggerDebugError() {
     throw new Error('[SENTRY_TEST] This is a simulated 500 error for Sentry verification.');
   }
 
-  @Get('api/openapi.json')
-  @Get('api/v1/openapi.json')
-  getOpenApiSchema() {
+  private handleOpenApiSchema() {
     return {
       openapi: '3.0.0',
       info: {
@@ -160,6 +204,16 @@ export class HealthController {
         }
       }
     };
+  }
+
+  @Get('api/openapi.json')
+  getOpenApiSchema() {
+    return this.handleOpenApiSchema();
+  }
+
+  @Get('api/v1/openapi.json')
+  getApiV1OpenApiSchema() {
+    return this.handleOpenApiSchema();
   }
 }
 
