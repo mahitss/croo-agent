@@ -17,6 +17,7 @@ RUN pnpm --filter api-gateway build
 
 ENV PORT=10000
 EXPOSE 10000
-CMD ["pnpm", "--filter", "api-gateway", "start"]
+WORKDIR /app/apps/api-gateway
+CMD ["node", "dist/main.js"]
 
 
