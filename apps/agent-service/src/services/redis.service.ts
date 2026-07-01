@@ -21,6 +21,9 @@ export class RedisService implements OnModuleDestroy {
       this.logger.log(`Connecting to standard TCP Redis: ${redisUrl}`);
       try {
         this.redisClient = new Redis(redisUrl);
+        this.redisClient.on('error', (err) => {
+          this.logger.error('Redis connection error:', err);
+        });
       } catch (err) {
         this.logger.error('Failed to initialize ioredis client:', err);
       }
