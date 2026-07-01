@@ -12,7 +12,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    await this.connectWithRetry();
+    // Run database connection asynchronously to prevent blocking NestJS bootstrap health checks
+    this.connectWithRetry();
   }
 
   private async connectWithRetry(retries = 5, delay = 2000): Promise<void> {
