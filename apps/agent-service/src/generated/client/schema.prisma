@@ -60,6 +60,7 @@ model Agent {
   @@index([slug])
   @@index([category])
   @@index([status])
+  @@index([walletAddress])
   @@map("agents")
 }
 
@@ -123,5 +124,7 @@ model Review {
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  @@index([agentId])
+  @@index([userId])
   @@map("reviews")
 }

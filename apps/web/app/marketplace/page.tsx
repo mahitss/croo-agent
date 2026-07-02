@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
+import { apiClient } from '../../lib/api-client';
 import { Agent } from '@nexus-ai/types';
 import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -92,17 +93,32 @@ export default function MarketplacePage() {
     }
   };
 
-  const handleMatchmaker = () => {
+  const handleMatchmaker = async () => {
     if (!matchmakerPrompt.trim()) return;
     setIsMatching(true);
-    setTimeout(() => {
-      setIsMatching(false);
-      setMatchedStack({
-        chain: ['InsightFinder Pro', 'LexGuard', 'ConsensuVerify'],
-        cost: 0.60,
-        time: '2m 15s'
+    try {
+      const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
+        query: matchmakerPrompt,
+        routingMode: 'balanced',
+        budget: 2.0
       });
-    }, 1200);
+      if (planRes.success && planRes.data) {
+        const chainNames = planRes.data.nodes.map((node: any) => {
+          const cap = node.capability.toLowerCase();
+          const matchedAgent = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap));
+          return matchedAgent ? matchedAgent.name : node.id.toUpperCase();
+        });
+        setMatchedStack({
+          chain: chainNames,
+          cost: planRes.data.estimated_cost || 0.33,
+          time: `${planRes.data.estimated_duration_seconds || 135}s`
+        });
+      }
+    } catch (err: any) {
+      toast(`Matchmaking error: ${err.message || err}`, 'error');
+    } finally {
+      setIsMatching(false);
+    }
   };
 
   // Filter Logic

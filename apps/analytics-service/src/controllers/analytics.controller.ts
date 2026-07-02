@@ -1,12 +1,55 @@
-import { Controller, Get, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
 
 @Controller('api/v1')
 export class AnalyticsController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async seedIfEmpty() {
+    const count = await this.prisma.dailyWorkflow.count();
+    if (count === 0) {
+      try {
+        await this.prisma.dailyWorkflow.createMany({
+          data: [
+            { date: new Date('2026-06-25'), completed: 140, failed: 2, totalCost: 12.5 },
+            { date: new Date('2026-06-26'), completed: 180, failed: 4, totalCost: 15.2 },
+            { date: new Date('2026-06-27'), completed: 210, failed: 1, totalCost: 22.8 },
+            { date: new Date('2026-06-28'), completed: 195, failed: 3, totalCost: 18.9 },
+            { date: new Date('2026-06-29'), completed: 242, failed: 5, totalCost: 24.3 },
+            { date: new Date('2026-06-30'), completed: 310, failed: 2, totalCost: 31.0 },
+            { date: new Date('2026-07-01'), completed: 290, failed: 4, totalCost: 29.0 },
+          ],
+        });
+
+        await this.prisma.dailyRevenue.createMany({
+          data: [
+            { date: new Date('2026-06-25'), revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
+            { date: new Date('2026-06-26'), revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
+            { date: new Date('2026-06-27'), revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
+            { date: new Date('2026-06-28'), revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
+            { date: new Date('2026-06-29'), revenue: 620.0, expenses: 180.0, platformFee: 62.0 },
+            { date: new Date('2026-06-30'), revenue: 780.0, expenses: 220.0, platformFee: 78.0 },
+            { date: new Date('2026-07-01'), revenue: 710.0, expenses: 200.0, platformFee: 71.0 },
+          ],
+        });
+
+        await this.prisma.dailyAgentUsage.createMany({
+          data: [
+            { date: new Date('2026-06-30'), agentId: 'agent-research-1', invocations: 142, totalRevenue: 21.3 },
+            { date: new Date('2026-06-30'), agentId: 'agent-finance-1', invocations: 88, totalRevenue: 22.0 },
+            { date: new Date('2026-07-01'), agentId: 'agent-research-1', invocations: 120, totalRevenue: 18.0 },
+            { date: new Date('2026-07-01'), agentId: 'agent-verify-1', invocations: 95, totalRevenue: 9.5 },
+          ],
+        });
+      } catch (err) {
+        console.error('Failed to seed analytical db data:', err);
+      }
+    }
+  }
+
   @Get('analytics/dashboard')
   async getDashboard() {
+    await this.seedIfEmpty();
     const dailyCount = await this.prisma.dailyWorkflow.aggregate({
       _sum: {
         completed: true,
@@ -51,6 +94,7 @@ export class AnalyticsController {
 
   @Get('analytics/workflows')
   async getWorkflowMetrics() {
+    await this.seedIfEmpty();
     const totalCount = await this.prisma.dailyWorkflow.aggregate({
       _sum: {
         completed: true,
@@ -75,6 +119,7 @@ export class AnalyticsController {
 
   @Get('analytics/agents')
   async getAgentMetrics() {
+    await this.seedIfEmpty();
     const usage = await this.prisma.dailyAgentUsage.findMany({
       take: 20,
     });
@@ -152,6 +197,7 @@ export class AnalyticsController {
 
   @Get('analytics/revenue')
   async getRevenue() {
+    await this.seedIfEmpty();
     const revs = await this.prisma.dailyRevenue.findMany({
       orderBy: { date: 'asc' },
       take: 30,
@@ -161,10 +207,10 @@ export class AnalyticsController {
       return {
         success: true,
         data: [
-          { date: '2026-06-20', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
-          { date: '2026-06-22', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
-          { date: '2026-06-24', revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
-          { date: '2026-06-26', revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
+          { date: '2026-06-25', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
+          { date: '2026-06-26', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
+          { date: '2026-06-27', revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
+          { date: '2026-06-28', revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
         ],
       };
     }

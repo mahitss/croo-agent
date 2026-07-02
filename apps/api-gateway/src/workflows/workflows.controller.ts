@@ -86,6 +86,16 @@ export class WorkflowsController {
     }
   }
 
+  @Get('workflows/:id')
+  async getWorkflow(@Param('id') id: string) {
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+    }
+  }
+
   @Get('workflows/:id/logs')
   async getWorkflowLogs(@Param('id') id: string) {
     try {
@@ -130,6 +140,9 @@ export class WorkflowsController {
             source: data.workflow[idx].id,
             target: node.id,
           })),
+          prompt_tokens: data.prompt_tokens || 0,
+          completion_tokens: data.completion_tokens || 0,
+          estimated_cost: data.estimated_cost || 0,
         },
       };
     } catch (err: any) {

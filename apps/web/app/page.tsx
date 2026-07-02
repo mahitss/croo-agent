@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useNexusStore } from '../store/nexusStore';
+import { apiService } from '../services/api';
 import Canvas from '../components/Canvas';
 import ExecutionTracker from '../components/ExecutionTracker';
 import AgentDetailModal from '../components/AgentDetailModal';
@@ -500,7 +501,7 @@ const workflow = await nexus.run({
 
 // Live Activity Feed Component showing real-time agent commerce updates
 function LiveActivityFeed() {
-  const [feed, setFeed] = useState([
+  const [feed, setFeed] = useState<any[]>([
     { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
     { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
     { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' },
@@ -509,25 +510,24 @@ function LiveActivityFeed() {
   ]);
 
   useEffect(() => {
-    const feedTemplates = [
-      { type: 'Escrow Lock', desc: 'USDC funds locked in CAP escrow for task verify' },
-      { type: 'Payout Settle', desc: 'SLA payout released to InsightFinder Pro' },
-      { type: 'Consensus Check', desc: 'Validation node validated output node consensus score' },
-      { type: 'Registration', desc: 'Marketplace verified node synchronized profile rating' },
-      { type: 'Wallet Sync', desc: 'Balance synced successfully to CROO Ledger network' }
-    ];
+    let active = true;
+    const fetchFeed = async () => {
+      try {
+        const res = await apiService.getActivityFeed();
+        if (res && res.success && Array.isArray(res.data) && active) {
+          setFeed(res.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load live activity feed:', err);
+      }
+    };
 
-    const interval = setInterval(() => {
-      const template = feedTemplates[Math.floor(Math.random() * feedTemplates.length)];
-      const newEvent = {
-        type: template.type,
-        desc: template.desc,
-        time: 'Just now'
-      };
-      setFeed(prev => [newEvent, ...prev.slice(0, 4)]);
-    }, 4500);
-
-    return () => clearInterval(interval);
+    fetchFeed();
+    const interval = setInterval(fetchFeed, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (

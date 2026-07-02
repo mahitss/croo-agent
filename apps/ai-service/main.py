@@ -75,6 +75,8 @@ class PlanResponse(BaseModel):
     estimated_cost: float
     estimated_duration_seconds: int
     confidence: float
+    prompt_tokens: Optional[int] = 0
+    completion_tokens: Optional[int] = 0
 
 class EstimateResponse(BaseModel):
     success: bool
@@ -370,50 +372,26 @@ def plan_workflow(req: PlanRequest):
                 workflow=workflow_list,
                 estimated_cost=float(parsed.get("estimated_cost") or 1.25),
                 estimated_duration_seconds=int(parsed.get("estimated_duration_seconds") or 65),
-                confidence=float(parsed.get("confidence") or 0.95)
+                confidence=float(parsed.get("confidence") or 0.95),
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens
             )
             
             # Store in cache
             set_redis_cache(cache_key, json.dumps(plan.dict()), 300)
             return plan
         except Exception as e:
-            logger.error(f"Error parsing LLM response for /plan: {e}. Falling back to local structured orchestrator.")
+            logger.error(f"Error parsing LLM response for /plan: {e}.")
+            raise HTTPException(
+                status_code=502,
+                detail=f"AI planner service failed to generate a valid workflow DAG: {str(e)}"
+            )
 
-    # Local Fallback Logic
-    query_lower = req.query.lower()
-    if "tesla" in query_lower or "financial" in query_lower or "research" in query_lower:
-        workflow_dag = [
-            TaskNodeResponse(id="node-1", capability="research", dependencies=[]),
-            TaskNodeResponse(id="node-2", capability="finance", dependencies=["node-1"]),
-            TaskNodeResponse(id="node-3", capability="verify", dependencies=["node-2"]),
-            TaskNodeResponse(id="node-4", capability="translate", dependencies=["node-3"])
-        ]
-    elif "smart contract" in query_lower or "security" in query_lower or "code" in query_lower:
-        workflow_dag = [
-            TaskNodeResponse(id="node-1", capability="code", dependencies=[]),
-            TaskNodeResponse(id="node-2", capability="security", dependencies=["node-1"]),
-            TaskNodeResponse(id="node-3", capability="verify", dependencies=["node-2"])
-        ]
-    elif "legal" in query_lower or "compliance" in query_lower or "policy" in query_lower:
-        workflow_dag = [
-            TaskNodeResponse(id="node-1", capability="research", dependencies=[]),
-            TaskNodeResponse(id="node-2", capability="legal", dependencies=["node-1"]),
-            TaskNodeResponse(id="node-3", capability="verify", dependencies=["node-2"])
-        ]
-    else:
-        workflow_dag = [
-            TaskNodeResponse(id="node-1", capability="research", dependencies=[]),
-            TaskNodeResponse(id="node-2", capability="verify", dependencies=["node-1"])
-        ]
-        
-    fallback_plan = PlanResponse(
-        workflow=workflow_dag,
-        estimated_cost=1.25,
-        estimated_duration_seconds=65,
-        confidence=0.94
+    # If LLM execution failed or returned success=False
+    raise HTTPException(
+        status_code=503,
+        detail=f"AI planner service failed or was unreachable. Error: {result.error_message if not result.success else 'Empty LLM content'}"
     )
-    set_redis_cache(cache_key, json.dumps(fallback_plan.dict()), 300)
-    return fallback_plan
 
 @app.post("/estimate", response_model=EstimateResponse)
 def estimate_workflow(req: EstimateRequest):
@@ -441,8 +419,9 @@ def estimate_workflow(req: EstimateRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing estimate: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM estimate: {str(e)}")
             
-    return EstimateResponse(success=True, estimated_cost=1.25, estimated_duration_seconds=65)
+    raise HTTPException(status_code=503, detail=f"LLM estimation service failed or was unreachable: {result.error_message}")
 
 @app.post("/verify", response_model=VerifyResponse)
 def verify_output(req: VerifyRequest):
@@ -483,8 +462,9 @@ def verify_output(req: VerifyRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing verification: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM verification response: {str(e)}")
             
-    return VerifyResponse(success=True, score=96, passed=True, citations_count=4)
+    raise HTTPException(status_code=503, detail=f"LLM verification service failed or was unreachable: {result.error_message}")
 
 @app.post("/summarize", response_model=SummarizeResponse)
 def summarize_content(req: SummarizeRequest):
@@ -508,8 +488,9 @@ def summarize_content(req: SummarizeRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing summary: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM summary response: {str(e)}")
             
-    return SummarizeResponse(success=True, summary="Analyses show positive growth parameters matching target constraints.")
+    raise HTTPException(status_code=503, detail=f"LLM summary service failed or was unreachable: {result.error_message}")
 
 @app.post("/translate", response_model=TranslateResponse)
 def translate_text(req: TranslateRequest):
@@ -533,8 +514,9 @@ def translate_text(req: TranslateRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing translation: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM translation response: {str(e)}")
             
-    return TranslateResponse(success=True, translated_text=f"[Translated to {req.target_language}]: {req.text}")
+    raise HTTPException(status_code=503, detail=f"LLM translation service failed or was unreachable: {result.error_message}")
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify_text(req: ClassifyRequest):
@@ -558,8 +540,9 @@ def classify_text(req: ClassifyRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing classification: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM classification response: {str(e)}")
             
-    return ClassifyResponse(success=True, category="market_analysis")
+    raise HTTPException(status_code=503, detail=f"LLM classification service failed or was unreachable: {result.error_message}")
 
 @app.post("/consensus", response_model=ConsensusResponse)
 def consensus_check(req: ConsensusRequest):
@@ -585,12 +568,9 @@ def consensus_check(req: ConsensusRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing consensus: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM consensus response: {str(e)}")
             
-    return ConsensusResponse(
-        success=True,
-        consensus_achieved=True,
-        merged_output=req.outputs[0] if req.outputs else ""
-    )
+    raise HTTPException(status_code=503, detail=f"LLM consensus service failed or was unreachable: {result.error_message}")
 
 @app.post("/explain", response_model=ExplainResponse)
 def explain_workflow(req: ExplainRequest):
@@ -614,11 +594,9 @@ def explain_workflow(req: ExplainRequest):
             )
         except Exception as e:
             logger.error(f"Error parsing explanation: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to parse LLM explanation response: {str(e)}")
             
-    return ExplainResponse(
-        success=True,
-        explanation="This DAG executes research first, runs verification safety filters next, and outputs presentation slides."
-    )
+    raise HTTPException(status_code=503, detail=f"LLM explanation service failed or was unreachable: {result.error_message}")
 
 @app.get("/models")
 def list_models():

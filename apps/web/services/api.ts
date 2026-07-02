@@ -25,6 +25,12 @@ export const apiService = {
   getSystemMetrics() {
     return apiClient.get('/api/v1/analytics/system');
   },
+  getActivityFeed() {
+    return apiClient.get<any>('/api/v1/analytics/activity-feed');
+  },
+  getExtendedHealth() {
+    return apiClient.get<any>('/api/v1/health/extended');
+  },
   getAgentsList() {
     return apiClient.get('/api/v1/agents');
   },

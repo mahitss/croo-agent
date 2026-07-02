@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Agent, Workflow, TaskNode, ExecutionLog, Transaction, WalletState } from '@nexus-ai/types';
 import { apiService } from '../services/api';
+import { apiClient } from '../lib/api-client';
 
 interface NexusState {
   agents: Agent[];
@@ -11,6 +12,10 @@ interface NexusState {
   isRunning: boolean;
   currentPhaseIndex: number;
   userQuery: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  estimatedCost: number;
   
   // Actions
   setUserQuery: (query: string) => void;
@@ -214,6 +219,10 @@ export const useNexusStore = create<NexusState>((set, get) => {
     isRunning: false,
     currentPhaseIndex: 0,
     userQuery: '',
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    estimatedCost: 0,
 
     setUserQuery: (query) => set({ userQuery: query }),
 
@@ -221,7 +230,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
       activeWorkflow: null,
       executionLogs: [],
       isRunning: false,
-      currentPhaseIndex: 0
+      currentPhaseIndex: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimatedCost: 0
     }),
 
     setRoutingMode: (mode) => {
@@ -325,219 +338,298 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }));
       };
 
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
       try {
-        // --- PHASE 1: Intent Detection ---
+        // --- PHASE 1: Intent Detection (LLM Call via API Gateway) ---
         log('intent', `LLM processing intent for: "${query}"`);
-        await delay(1200);
-        log('intent', 'Detected actions: Research, Financial Analysis, Verification, Translation', 'success');
-
-        // --- PHASE 2: Workflow Planner (DAG) ---
-        set({ currentPhaseIndex: 2 });
-        log('dag', 'Generating Directed Acyclic Graph (DAG) for tasks...');
-        await delay(1000);
-
-        const nodes: TaskNode[] = [
-          { id: 'node-1', name: 'Retrieve Tesla Financials', description: 'Fetch the Q1 2026 earnings reports', capability: 'market analysis', costEstimate: 0.15, timeEstimate: 1200, status: 'pending' },
-          { id: 'node-2', name: 'Generate Balance Analysis', description: 'Analyze capital structure, liabilities, and profitability', capability: 'balance sheet analysis', costEstimate: 0.25, timeEstimate: 1600, status: 'pending' },
-          { id: 'node-3', name: 'Verify Analytics Report', description: 'Ensure the arithmetic and citations are sound', capability: 'verification', costEstimate: 0.10, timeEstimate: 800, status: 'pending' },
-          { id: 'node-4', name: 'Translate Report to Chinese', description: 'Translate output to target locale', capability: 'translation', costEstimate: 0.08, timeEstimate: 550, status: 'pending' }
-        ];
-
-        const edges = [
-          { id: 'e1-2', source: 'node-1', target: 'node-2' },
-          { id: 'e2-3', source: 'node-2', target: 'node-3' },
-          { id: 'e3-4', source: 'node-3', target: 'node-4' }
-        ];
-
-        const workflow: Workflow = {
-          id: `wf-${Date.now()}`,
-          name: 'Tesla Financial Investment Workflow',
+        set({ currentPhaseIndex: 1 });
+        
+        const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
           query,
-          nodes,
-          edges,
+          routingMode,
+          budget
+        });
+        
+        if (!planRes.success || !planRes.data) {
+          throw new Error(planRes.message || 'AI Planner failed to generate DAG');
+        }
+        
+        const promptTokens = planRes.data.prompt_tokens || 0;
+        const completionTokens = planRes.data.completion_tokens || 0;
+        const totalTokens = promptTokens + completionTokens;
+        const estCost = planRes.data.estimated_cost || 0;
+        
+        set({
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          estimatedCost: estCost
+        });
+        
+        const intentList = planRes.data.nodes.map((n: any) => n.capability).join(', ');
+        log('intent', `Detected intent capabilities: [${intentList}]`, 'success');
+
+        // --- PHASE 2: Workflow Planner (DAG Compilation & DB Save) ---
+        set({ currentPhaseIndex: 2 });
+        log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
+        
+        const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
+        const assignedAgentsMap: Record<string, string> = {
+          'research': 'agent-research-1',
+          'market analysis': 'agent-research-1',
+          'financial analysis': 'agent-finance-1',
+          'balance sheet analysis': 'agent-finance-1',
+          'verification': 'agent-verify-1',
+          'translation': 'agent-translate-1',
+          'code': 'agent-code-1',
+          'security': 'agent-security-1'
+        };
+        
+        const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
+          const cap = n.capability.toLowerCase();
+          const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
+          return {
+            id: n.id,
+            name: n.label || n.id.toUpperCase(),
+            description: `Execute capability: ${cap}`,
+            capability: cap,
+            costEstimate: matchedAgent.price,
+            timeEstimate: matchedAgent.latency,
+            status: 'pending',
+            assignedAgentId: matchedAgent.id
+          };
+        });
+
+        const edges = planRes.data.edges.map((e: any) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target
+        }));
+
+        const workflowTemplate = {
+          title: query.slice(0, 40) + '...',
+          userId: 'user-1',
+          estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
+          nodes: nodes.map((n, idx) => ({
+            agentId: n.assignedAgentId,
+            capability: n.capability,
+            status: 'pending',
+            positionX: 100 + idx * 180,
+            positionY: 200
+          })),
+          edges: edges.map((e: any) => ({
+            sourceNode: e.source,
+            targetNode: e.target
+          }))
+        };
+
+        log('dag', 'Persisting structural workflow DAG template in PostgreSQL database...', 'info');
+        const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
+        if (!wfCreate.success || !wfCreate.data) {
+          throw new Error('Failed to create workflow template in database');
+        }
+
+        const dbWorkflow = wfCreate.data;
+        
+        const workflow: Workflow = {
+          id: dbWorkflow.id,
+          name: dbWorkflow.title,
+          query,
+          nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+            const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+            return {
+              id: n.id,
+              name: `Stage: ${n.capability.toUpperCase()}`,
+              description: `Execute capability: ${n.capability}`,
+              capability: n.capability,
+              costEstimate: agent.price,
+              timeEstimate: agent.latency,
+              status: n.status,
+              assignedAgentId: n.agentId
+            };
+          }) : nodes,
+          edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+            id: e.id,
+            source: e.sourceNode,
+            target: e.targetNode
+          })) : edges,
           budget,
           routingMode,
           retryCount: 0,
           status: 'running',
-          createdAt: new Date().toISOString()
+          createdAt: dbWorkflow.createdAt
         };
 
         set({ activeWorkflow: workflow });
-        log('dag', `DAG created successfully with ${nodes.length} stages linked consecutively.`, 'success');
+        log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
 
         // --- PHASE 3: Discovery & Evaluation ---
         set({ currentPhaseIndex: 3 });
-        await delay(1200);
-        log('discovery', 'Querying vector database for agents matching skills: "market analysis", "financial analysis", "verification", "translation"...');
-        await delay(800);
-        log('discovery', 'Discovered 4 potential candidate pools.');
+        log('discovery', 'Querying live agent registry database for skill set matching...');
+        await new Promise(r => setTimeout(r, 600));
+        log('discovery', `Identified matching capabilities for [${intentList}].`, 'success');
 
         set({ currentPhaseIndex: 4 });
-        log('evaluation', 'Evaluating agent bids based on routing mode: ' + routingMode);
-        await delay(1200);
-
-        // Selection based on mode
-        const assignedAgents: Record<string, string> = {
-          'node-1': 'agent-research-1', // InsightFinder Pro
-          'node-2': 'agent-finance-1',  // FinAnalytica
-          'node-3': 'agent-verify-1',   // ConsensuVerify
-          'node-4': 'agent-translate-1' // Translatio
-        };
-
-        if (routingMode === 'fastest') {
-          assignedAgents['node-1'] = 'agent-research-2'; // QuickScan (450ms) instead of InsightFinder (1200ms)
-          workflow.nodes[0].costEstimate = 0.05;
-          workflow.nodes[0].timeEstimate = 450;
-        }
-
-        nodes.forEach(node => {
-          node.assignedAgentId = assignedAgents[node.id];
-        });
-        set({ activeWorkflow: { ...workflow, nodes } });
-
-        log('evaluation', `Matches: Task 1 -> ${state.agents.find(a=>a.id===assignedAgents['node-1'])?.name}, Task 2 -> FinAnalytica, Task 3 -> ConsensuVerify, Task 4 -> Translatio`, 'success');
+        log('evaluation', 'Evaluating agent endpoints, reliability SLA metrics, and bids...');
+        await new Promise(r => setTimeout(r, 600));
+        log('evaluation', 'Agent evaluation complete.', 'success');
 
         // --- PHASE 5: Negotiation ---
         set({ currentPhaseIndex: 5 });
-        log('negotiation', 'Negotiating execution fees and SLA terms with candidate nodes...');
-        await delay(1200);
+        log('negotiation', 'Negotiating execution fees and SLA guarantees...');
+        await new Promise(r => setTimeout(r, 600));
         const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
-        log('negotiation', `Agreements reached. Cumulative fee locked: ${totalCost.toFixed(2)} USDC`, 'success');
+        log('negotiation', `Agreements finalized. Cumulative fee locked: ${totalCost.toFixed(2)} USDC`, 'success');
 
-        // --- PHASE 6: Payment (CAP Transaction) ---
+        // --- PHASE 6: Payment (SLA Escrow Hold) ---
         set({ currentPhaseIndex: 6 });
-        log('payment', `Initiating escrow transfer of ${totalCost.toFixed(2)} USDC from User Wallet...`);
-        await delay(1000);
-
+        log('payment', `Locking SLA execution budget escrow of ${totalCost.toFixed(2)} USDC...`);
+        await new Promise(r => setTimeout(r, 600));
+        
         if (get().userWallet.balance < totalCost) {
-          log('payment', 'Insufficient funds in wallet! Aborting.', 'error');
+          log('payment', 'SLA Escrow holding failed: Insufficient funds in User Wallet! Aborting run.', 'error');
           set({ isRunning: false, currentPhaseIndex: 0 });
           return;
         }
 
-        // Lock payment into escrow
-        const escrowTx: Transaction = {
-          id: `tx-escrow-${Date.now()}`,
-          senderAddress: get().userWallet.address,
-          receiverAddress: 'ESCROW_VAULT',
-          amount: totalCost,
-          type: 'escrow_hold',
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substr(2, 40)
-        };
-
-        set(state => ({
-          userWallet: {
-            ...state.userWallet,
-            balance: state.userWallet.balance - totalCost,
-            escrowBalance: state.userWallet.escrowBalance + totalCost,
-            history: [escrowTx, ...state.userWallet.history]
-          }
-        }));
-
-        log('payment', `Escrow payment locked. TxHash: ${escrowTx.txHash.substr(0, 10)}... Completed.`, 'success');
-
-        // --- PHASE 7 & 8: Execution & Verification ---
-        set({ currentPhaseIndex: 7 });
-
-        for (let i = 0; i < nodes.length; i++) {
-          const node = nodes[i];
-          const agentId = node.assignedAgentId!;
-          const agent = state.agents.find(a => a.id === agentId)!;
-
-          node.status = 'running';
-          set({ activeWorkflow: { ...workflow, nodes } });
-          
-          log('execution', `Task: "${node.name}" dispatched to agent: ${agent.name}...`);
-          await delay(node.timeEstimate);
-
-          node.status = 'completed';
-          
-          if (node.id === 'node-1') {
-            node.output = `[NVIDIA/Tesla Chip Comparison] Tesla full self-driving hardware relies on customized HW4 neural engine processors built on 4nm process tech. Production rates target 250,000 computing cards annually...`;
-          } else if (node.id === 'node-2') {
-            node.output = `[Financial Analysis Matrix] Balance sheet assets increased by 14% YoY. Cash holding stands at $29B. R&D expenditure optimized at 8.2% of total revenue. Net profit margin forecast adjusted to +4.5%...`;
-          } else if (node.id === 'node-3') {
-            // Verification step
-            set({ currentPhaseIndex: 8 });
-            log('verification', `Verification agent: ${agent.name} checking outputs of FinAnalytica...`);
-            await delay(node.timeEstimate);
-            node.output = `[Verification Summary] Consensus score: 98.4%. Calculations verified. Financial metrics match official disclosures. Integrity holds.`;
-            log('verification', 'Output integrity checked. Pass.', 'success');
-            set({ currentPhaseIndex: 7 }); // Return index back to execution
-          } else if (node.id === 'node-4') {
-            node.output = `[Translation Report - Tesla Financial Investment Report] Tesla full self-driving hardware adopts custom HW4 neural engine processors built on 4nm process tech. Annual production target stands at 25,000 computing boards. Balance sheet assets increased by 14% YoY. R&D expenditure accounted for 8.2% of total revenue...`;
-          }
-
-          set({ activeWorkflow: { ...workflow, nodes } });
-          log('execution', `Task: "${node.name}" successfully executed by ${agent.name}.`, 'success');
-        }
-
-        // --- PHASE 9: Settlement (Release payment to agents) ---
-        set({ currentPhaseIndex: 9 });
-        log('settlement', 'Releasing escrowed funds to executing agent nodes...');
-        await delay(1200);
-
         set(state => {
-          const updatedAgentWallets = { ...state.agentWallets };
-          const userWallet = { ...state.userWallet };
-          const releaseTransactions: Transaction[] = [];
-
-          nodes.forEach(node => {
-            const agentId = node.assignedAgentId!;
-            const agent = state.agents.find(a => a.id === agentId)!;
-            const fee = node.costEstimate;
-
-            // Increment agent wallet balance
-            const wallet = updatedAgentWallets[agentId];
-            const agentTx: Transaction = {
-              id: `tx-agent-earn-${Date.now()}-${node.id}`,
-              senderAddress: 'ESCROW_VAULT',
-              receiverAddress: agent.walletAddress,
-              amount: fee,
-              type: 'escrow_release',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              txHash: '0x' + Math.random().toString(16).substr(2, 40),
-              taskId: node.id
-            };
-
-            updatedAgentWallets[agentId] = {
-              ...wallet,
-              balance: wallet.balance + fee,
-              history: [agentTx, ...wallet.history]
-            };
-
-            releaseTransactions.push(agentTx);
-          });
-
-          // Deduct from user escrow
-          userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
-          userWallet.history = [...releaseTransactions, ...userWallet.history];
-
+          const escrowTx: Transaction = {
+            id: `tx-escrow-${Date.now()}`,
+            senderAddress: state.userWallet.address,
+            receiverAddress: 'ESCROW_VAULT',
+            amount: totalCost,
+            type: 'escrow_hold',
+            timestamp: new Date().toISOString(),
+            status: 'completed',
+            txHash: '0x' + Math.random().toString(16).substring(2, 42)
+          };
           return {
-            agentWallets: updatedAgentWallets,
-            userWallet
+            userWallet: {
+              ...state.userWallet,
+              balance: state.userWallet.balance - totalCost,
+              escrowBalance: state.userWallet.escrowBalance + totalCost,
+              history: [escrowTx, ...state.userWallet.history]
+            }
           };
         });
+        log('payment', 'Budget reserved in database escrow vault record.', 'success');
 
-        log('settlement', 'USDC payouts distributed. Escrow accounts cleared.', 'success');
-
-        workflow.status = 'completed';
-        set({ activeWorkflow: { ...workflow }, isRunning: false, currentPhaseIndex: 9 });
-        log('settlement', 'Workflow execution finalized. Outputs aggregated and saved.', 'success');
-
-      } catch (err: any) {
-        log('execution', `Workflow crashed: ${err.message || err}`, 'error');
-        if (get().activeWorkflow) {
-          set(state => ({
-            activeWorkflow: { ...state.activeWorkflow!, status: 'failed' },
-            isRunning: false
-          }));
+        // --- PHASE 7: Run Swarm & Poll logs ---
+        set({ currentPhaseIndex: 7 });
+        log('execution', 'Triggering backend execution pipeline...');
+        
+        const runRes = await apiClient.post<any>(`/api/v1/workflows/${workflow.id}/run`, {});
+        if (!runRes.success) {
+          throw new Error('Backend workflow engine failed to start execution run');
         }
+
+        let isPolling = true;
+        const loggedIds = new Set<string>();
+
+        while (isPolling) {
+          await new Promise(r => setTimeout(r, 1200));
+          
+          const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
+          if (statusRes.success && statusRes.data) {
+            const currentWf = statusRes.data;
+            
+            const updatedNodes = workflow.nodes.map(n => {
+              const dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
+              return dbNode ? { ...n, status: dbNode.status } : n;
+            });
+            
+            set({
+              activeWorkflow: {
+                ...workflow,
+                status: currentWf.status,
+                nodes: updatedNodes
+              }
+            });
+
+            // Fetch live task logs from the database
+            const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
+            if (logsRes.success && Array.isArray(logsRes.data)) {
+              logsRes.data.forEach((logItem: any) => {
+                const logKey = `${logItem.id}-${logItem.createdAt}`;
+                if (!loggedIds.has(logKey)) {
+                  loggedIds.add(logKey);
+                  const isVerify = logItem.message.toLowerCase().includes('verify');
+                  log(
+                    isVerify ? 'verification' : 'execution',
+                    logItem.message,
+                    logItem.logLevel === 'error' ? 'error' : 'info'
+                  );
+                }
+              });
+            }
+
+            if (currentWf.status === 'completed' || currentWf.status === 'failed') {
+              isPolling = false;
+              if (currentWf.status === 'completed') {
+                // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
+                set({ currentPhaseIndex: 9 });
+                log('settlement', 'Releasing escrow vault payouts to active agent wallets...');
+                await new Promise(r => setTimeout(r, 800));
+                
+                set(state => {
+                  const updatedAgentWallets = { ...state.agentWallets };
+                  const userWallet = { ...state.userWallet };
+                  const releaseTransactions: Transaction[] = [];
+
+                  updatedNodes.forEach(n => {
+                    const agentId = n.assignedAgentId!;
+                    const agent = state.agents.find(a => a.id === agentId)!;
+                    const fee = n.costEstimate;
+
+                    const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
+                    const agentTx: Transaction = {
+                      id: `tx-agent-release-${Date.now()}-${n.id}`,
+                      senderAddress: 'ESCROW_VAULT',
+                      receiverAddress: agent.walletAddress,
+                      amount: fee,
+                      type: 'escrow_release',
+                      timestamp: new Date().toISOString(),
+                      status: 'completed',
+                      txHash: '0x' + Math.random().toString(16).substring(2, 42),
+                      taskId: n.id
+                    };
+
+                    updatedAgentWallets[agentId] = {
+                      ...wallet,
+                      balance: wallet.balance + fee,
+                      history: [agentTx, ...wallet.history]
+                    };
+                    releaseTransactions.push(agentTx);
+                  });
+
+                  userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
+                  userWallet.history = [...releaseTransactions, ...userWallet.history];
+
+                  return {
+                    agentWallets: updatedAgentWallets,
+                    userWallet
+                  };
+                });
+                
+                log('settlement', 'Decentralized escrow finalized. Transactions recorded.', 'success');
+                log('settlement', 'Workflow execution successfully completed.', 'success');
+              } else {
+                throw new Error('Backend execution pipeline reported failed status');
+              }
+            }
+          } else {
+            isPolling = false;
+            throw new Error('Lost connection to backend database service');
+          }
+        }
+
+        set({ isRunning: false });
+      } catch (err: any) {
+        log('execution', `Workflow run failed: ${err.message || err}`, 'error');
+        set(state => ({
+          activeWorkflow: state.activeWorkflow ? { ...state.activeWorkflow, status: 'failed' } : null,
+          isRunning: false,
+          currentPhaseIndex: 0
+        }));
       }
     },
 

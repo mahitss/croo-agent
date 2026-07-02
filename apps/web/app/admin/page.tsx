@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
+import { apiService } from '../../services/api';
 import { 
   Users, Cpu, Layers, ShieldCheck, DollarSign, AlertTriangle, 
   Activity, CheckCircle, Clock, Sliders, Play, Pause, RotateCcw, 
@@ -51,15 +52,39 @@ export default function AdminPage() {
     '8. Payout Settle & Analytics Audit'
   ];
 
-  // Uptime mock health checks
-  const healthChecks = [
-    { name: 'API Gateway', status: 'healthy', msg: 'Uptime 99.99%', latency: '8ms' },
-    { name: 'Auth Node', status: 'healthy', msg: 'RSA Key verified', latency: '4ms' },
-    { name: 'Agent Broker', status: 'healthy', msg: '8 Active Pool Agents', latency: '12ms' },
-    { name: 'Workflow Engine', status: 'healthy', msg: 'RabbitMQ connected', latency: '15ms' },
-    { name: 'Consensus Peer', status: 'healthy', msg: '2-Node validated', latency: '24ms' },
-    { name: 'Escrow Vault', status: 'healthy', msg: 'CAP Safe Lock active', latency: '9ms' }
-  ];
+  // Live integrations health checks
+  const [healthChecks, setHealthChecks] = useState<any[]>([
+    { name: 'API Gateway', status: 'healthy', msg: 'Checking status...', latency: '8ms' },
+    { name: 'Database', status: 'healthy', msg: 'Checking status...', latency: '12ms' },
+    { name: 'Redis Cache', status: 'healthy', msg: 'Checking status...', latency: '15ms' },
+    { name: 'OpenRouter', status: 'healthy', msg: 'Checking status...', latency: '220ms' },
+    { name: 'Cloudinary', status: 'healthy', msg: 'Checking status...', latency: '45ms' },
+    { name: 'Socket Server', status: 'healthy', msg: 'Checking status...', latency: '9ms' },
+    { name: 'PostHog', status: 'healthy', msg: 'Checking status...', latency: '5ms' },
+    { name: 'Sentry', status: 'healthy', msg: 'Checking status...', latency: '4ms' }
+  ]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchHealth = async () => {
+      try {
+        const res = await apiService.getExtendedHealth();
+        if (res && res.success && res.integrations && active) {
+          const list = Object.values(res.integrations);
+          setHealthChecks(list);
+        }
+      } catch (err) {
+        console.warn('Failed to load live extended health metrics:', err);
+      }
+    };
+    
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (timerActive) {
@@ -248,8 +273,12 @@ export default function AdminPage() {
                   <span className="text-[9px] text-gray-500">{service.msg}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-gray-500">{service.latency}</span>
-                  <span className="w-2 h-2 rounded-full bg-primary-neon bg-opacity-80 shadow-[0_0_8px_rgba(0,255,204,0.6)] animate-pulse"></span>
+                  <span className="text-[9px] text-gray-500 font-mono">{service.latency}</span>
+                  <span className={`w-2 h-2 rounded-full ${
+                    service.status === 'healthy' 
+                      ? 'bg-primary-neon shadow-[0_0_8px_#00ffcc]' 
+                      : 'bg-red-500 shadow-[0_0_8px_#ef4444]'
+                  } animate-pulse`}></span>
                 </div>
               </div>
             ))}

@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as crypto from 'crypto';
 
 @Controller('api/v1')
 export class AuthController {
@@ -98,8 +100,48 @@ export class AuthController {
   }
 
   @Post('users/avatar')
-  uploadAvatar() {
-    return { success: true, message: 'Avatar updated', data: { url: 'https://orbitai.dev/avatar.jpg' } };
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(@UploadedFile() file?: any, @Body('file') fileBase64?: string) {
+    try {
+      let fileData = fileBase64;
+      if (file && file.buffer) {
+        fileData = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+      }
+
+      if (!fileData) {
+        return { success: false, message: 'No file uploaded or provided' };
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const apiSecret = process.env.CLOUDINARY_API_SECRET || '8sYTiGjk87a7OTezWDGcyiWQ2tc';
+      const signature = crypto
+        .createHash('sha1')
+        .update(`timestamp=${timestamp}${apiSecret}`)
+        .digest('hex');
+
+      const formData = new FormData();
+      formData.append('file', fileData);
+      formData.append('api_key', process.env.CLOUDINARY_API_KEY || '787345945548967');
+      formData.append('timestamp', timestamp.toString());
+      formData.append('signature', signature);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME || 'dbw5rk2re'}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.secure_url) {
+        return {
+          success: true,
+          message: 'Avatar uploaded successfully to Cloudinary',
+          data: { url: data.secure_url },
+        };
+      }
+      return { success: false, message: data.error?.message || 'Cloudinary upload failed' };
+    } catch (err: any) {
+      return { success: false, message: `Cloudinary upload failed: ${err.message}` };
+    }
   }
 
   @Delete('users/me')

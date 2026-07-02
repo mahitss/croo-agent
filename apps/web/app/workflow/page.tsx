@@ -22,6 +22,10 @@ export default function WorkflowPage() {
   const resetExecution = useNexusStore((state) => state.resetExecution);
   const startExecution = useNexusStore((state) => state.startExecution);
   const agents = useNexusStore((state) => state.agents);
+  const promptTokens = useNexusStore((state) => state.promptTokens);
+  const completionTokens = useNexusStore((state) => state.completionTokens);
+  const totalTokens = useNexusStore((state) => state.totalTokens);
+  const estimatedCost = useNexusStore((state) => state.estimatedCost);
 
   // States
   const [promptInput, setPromptInput] = useState('');
@@ -218,7 +222,9 @@ export default function WorkflowPage() {
                 <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">Token Accounting</span>
-                    <span className="text-white font-bold">1,260 input | 540 output</span>
+                    <span className="text-white font-bold">
+                      {promptTokens > 0 ? `${promptTokens.toLocaleString()} input | ${completionTokens.toLocaleString()} output` : 'No logs yet'}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">AI Trust Confidence</span>
@@ -357,12 +363,20 @@ export default function WorkflowPage() {
                     </div>
 
                     <div className="flex justify-between items-center pt-2 border-t border-border-dark">
-                      <span className="text-gray-500">EST. BUDGET:</span>
-                      <span className="text-secondary-neon font-bold">0.60 USDC</span>
+                      <span className="text-gray-500">PROMPT TOKENS:</span>
+                      <span className="text-white font-bold">{promptTokens.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">EST. DURATION:</span>
-                      <span className="text-white font-bold">2m 15s</span>
+                      <span className="text-gray-500">COMPLETION TOKENS:</span>
+                      <span className="text-white font-bold">{completionTokens.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">TOTAL TOKENS:</span>
+                      <span className="text-primary-neon font-bold">{totalTokens.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">EST. PLANNING COST:</span>
+                      <span className="text-secondary-neon font-mono font-bold">{estimatedCost.toFixed(5)} USDC</span>
                     </div>
                   </div>
 

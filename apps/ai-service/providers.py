@@ -300,7 +300,8 @@ class OpenRouterProvider(BaseLLMProvider):
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15
+        timeout: int = 15,
+        model: Optional[str] = None
     ) -> LLMResult:
         start_time = time.time()
         headers = {
@@ -449,7 +450,14 @@ class LLMProviderManager:
             
             # Exponential Backoff Retries within provider
             for attempt in range(max_retries):
-                logger.info(f"Invoking {provider_name} (Attempt {attempt + 1}/{max_retries})...")
+                # Switch to fallback model on retry attempts if using openrouter
+                current_model = model
+                if provider_name == "openrouter" and attempt > 0:
+                    fallback = os.environ.get("FALLBACK_MODEL", "openrouter/auto")
+                    logger.info(f"Primary model failed. Falling back to model: {fallback}")
+                    current_model = fallback
+
+                logger.info(f"Invoking {provider_name} with model {current_model or 'default'} (Attempt {attempt + 1}/{max_retries})...")
                 self.metrics[provider_name]["calls"] += 1
                 
                 result = provider.generate(
@@ -457,7 +465,7 @@ class LLMProviderManager:
                     system_prompt=system_prompt,
                     json_mode=json_mode,
                     timeout=timeout_sec,
-                    model=model
+                    model=current_model
                 )
 
                 
