@@ -20,6 +20,14 @@ COPY scripts/ ./scripts/
 # Install all workspace dependencies
 RUN pnpm install
 
+# Generate Prisma clients for all microservices in the target Linux architecture
+RUN npx prisma generate --schema=apps/auth-service/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/agent-service/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/workflow-service/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/payment-service/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/wallet-service/prisma/schema.prisma
+RUN npx prisma generate --schema=apps/analytics-service/prisma/schema.prisma
+
 # Build all monorepo microservices
 RUN pnpm build
 
