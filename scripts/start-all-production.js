@@ -70,6 +70,23 @@ const services = [
 ];
 
 const children = [];
+const gatewayService = services.find(s => s.name === 'api-gateway');
+const remainingServices = services.filter(s => s.name !== 'api-gateway');
+
+let gatewayReady = false;
+let remainingStarted = false;
+let safetyTimeout;
+
+function startRemainingServices() {
+  if (remainingStarted) return;
+  remainingStarted = true;
+  console.log('[MANAGER] Starting remaining microservices sequentially with 6s staggers...');
+  remainingServices.forEach((service, index) => {
+    setTimeout(() => {
+      startService(service);
+    }, index * 6000);
+  });
+}
 
 function startService(service) {
   const serviceDir = path.resolve(__dirname, '..', service.dir);
@@ -98,7 +115,20 @@ function startService(service) {
   });
 
   child.stdout.on('data', (data) => {
-    console.log(`[${service.name}] ${data.toString().trim()}`);
+    const output = data.toString();
+    console.log(`[${service.name}] ${output.trim()}`);
+
+    // Detect when gateway has successfully completed bootstrap to trigger other services
+    if (service.name === 'api-gateway' && (output.includes('successfully started') || output.includes('listening on'))) {
+      if (!gatewayReady) {
+        gatewayReady = true;
+        if (safetyTimeout) {
+          clearTimeout(safetyTimeout);
+        }
+        console.log('[MANAGER] api-gateway is ready and listening. Triggering sequential boot of other services...');
+        setTimeout(startRemainingServices, 2000);
+      }
+    }
   });
 
   child.stderr.on('data', (data) => {
@@ -117,12 +147,16 @@ function startService(service) {
   children.push(child);
 }
 
-// Start all services with a staggered delay of 3000ms to reduce peak CPU & memory spikes during container startup
-services.forEach((service, index) => {
-  setTimeout(() => {
-    startService(service);
-  }, index * 3000);
-});
+// Start api-gateway first to respond to health checks immediately
+startService(gatewayService);
+
+// Safety fallback: if api-gateway log matching fails, launch remaining services after 20s anyway
+safetyTimeout = setTimeout(() => {
+  if (!gatewayReady) {
+    console.log('[MANAGER] Safety timeout reached before gateway reported ready. Launching remaining services...');
+    startRemainingServices();
+  }
+}, 20000);
 
 // Handle process termination cleanly
 process.on('SIGTERM', () => {
@@ -138,3 +172,4 @@ process.on('SIGINT', () => {
   children.forEach(child => child.kill());
   process.exit(0);
 });
+
