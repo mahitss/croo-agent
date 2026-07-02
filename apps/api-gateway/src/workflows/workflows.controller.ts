@@ -125,7 +125,15 @@ export class WorkflowsController {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
       });
+      
       const data = await res.json();
+      if (!res.ok || !data || !data.workflow) {
+        return {
+          success: false,
+          message: data?.detail || `AI planner service failed to return valid DAG workflow (status ${res.status})`
+        };
+      }
+      
       return {
         success: true,
         message: 'Intention plan generated successfully',

@@ -206,6 +206,12 @@ def clean_json_response(content: str) -> str:
         cleaned = cleaned.split("```json")[1].split("```")[0].strip()
     elif "```" in cleaned:
         cleaned = cleaned.split("```")[1].split("```")[0].strip()
+    
+    start_idx = cleaned.find("{")
+    end_idx = cleaned.rfind("}")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        cleaned = cleaned[start_idx:end_idx+1]
+        
     return cleaned
 
 def get_redis_cache(key: str) -> Optional[str]:
@@ -353,6 +359,7 @@ def plan_workflow(req: PlanRequest):
     )
     
     if result.success and result.content:
+        logger.info(f"Raw LLM content response: {result.content}")
         try:
             cleaned = clean_json_response(result.content)
             parsed = json.loads(cleaned)

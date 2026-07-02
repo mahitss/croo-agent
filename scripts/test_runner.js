@@ -49,7 +49,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: testEmail,
+        usernameOrEmail: testEmail,
         password: 'securePassword123'
       })
     });
