@@ -21,12 +21,12 @@ COPY scripts/ ./scripts/
 RUN pnpm install
 
 # Generate Prisma clients for all microservices in the target Linux architecture
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/auth-service/prisma/schema.prisma
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/agent-service/prisma/schema.prisma
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/workflow-service/prisma/schema.prisma
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/payment-service/prisma/schema.prisma
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/wallet-service/prisma/schema.prisma
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" npx prisma generate --schema=apps/analytics-service/prisma/schema.prisma
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter auth-service exec prisma generate
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter agent-service exec prisma generate
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter workflow-service exec prisma generate
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter payment-service exec prisma generate
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter wallet-service exec prisma generate
+RUN DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres" DIRECT_URL="postgresql://postgres:postgres@localhost:5432/postgres" pnpm --filter analytics-service exec prisma generate
 
 # Build all monorepo microservices
 RUN pnpm build
