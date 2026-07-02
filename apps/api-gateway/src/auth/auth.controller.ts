@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 
 @Controller('api/v1')
 export class AuthController {
-  private readonly authUrl = 'http://localhost:5001/api/v1';
+  private readonly authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:5001/api/v1';
 
   @Post('auth/register')
   @HttpCode(HttpStatus.CREATED)

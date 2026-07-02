@@ -295,11 +295,12 @@ export async function run() {
         where: { agentId: a.id }
       });
 
+      const apiBase = process.env.API_URL || 'https://api.orbitai.dev';
       await agentDb.agentVersion.create({
         data: {
           agentId: a.id,
           version: a.version,
-          endpoint: `http://localhost:5000/api/v1/agents/${a.id}`,
+          endpoint: `${apiBase}/api/v1/agents/${a.id}`,
           inputSchema: {},
           outputSchema: {}
         }

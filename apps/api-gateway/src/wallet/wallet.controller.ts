@@ -2,8 +2,8 @@ import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestj
 
 @Controller('api/v1')
 export class WalletController {
-  private readonly walletUrl = 'http://localhost:5005/api/v1';
-  private readonly paymentUrl = 'http://localhost:5004/api/v1';
+  private readonly walletUrl = process.env.WALLET_SERVICE_URL || 'http://localhost:5005/api/v1';
+  private readonly paymentUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:5004/api/v1';
 
   @Get('wallet')
   async getWallet() {
