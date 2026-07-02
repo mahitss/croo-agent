@@ -62,18 +62,35 @@ export class AuthController {
   }
 
   @Post('auth/refresh')
-  async refresh() {
-    return {
-      success: true,
-      message: 'Token refreshed',
-      data: { token: 'mock-jwt-token-new' },
-    };
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Post('auth/logout')
   @HttpCode(HttpStatus.OK)
-  logout() {
-    return { success: true, message: 'User logged out successfully' };
+  async logout(@Req() req: any) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (req.headers.authorization) {
+        headers['Authorization'] = req.headers.authorization;
+      }
+      const res = await fetch(`${this.authUrl}/auth/logout`, {
+        method: 'POST',
+        headers,
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Post('auth/forgot-password')

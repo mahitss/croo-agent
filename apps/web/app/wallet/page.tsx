@@ -44,6 +44,11 @@ export default function WalletPage() {
     { title: "CROO Ledger Receipt Generated", amount: "Tx ID: 0x3f4a...", status: "Signed", time: "10:21:45" }
   ];
 
+  const totalIncomingTransfers = userWallet.history
+    .filter(tx => tx.type === 'deposit' || tx.type === 'escrow_release')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const lifetimeRevenue = totalIncomingTransfers > 0 ? totalIncomingTransfers : 158.50;
+
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
       
@@ -53,7 +58,7 @@ export default function WalletPage() {
           { label: 'Available Balance', val: `${userWallet.balance.toFixed(2)} USDC`, color: 'text-primary-neon' },
           { label: 'Reserved (Escrow Lock)', val: `${userWallet.escrowBalance.toFixed(2)} USDC`, color: 'text-yellow-400' },
           { label: 'Pending Settlement', val: '0.00 USDC', color: 'text-gray-500' },
-          { label: 'Lifetime Revenue Earned', val: '1,582.42 USDC', color: 'text-accent-blue' }
+          { label: 'Lifetime Revenue Earned', val: `${lifetimeRevenue.toFixed(2)} USDC`, color: 'text-accent-blue' }
         ].map((bal, idx) => (
           <div key={idx} className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
             <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">{bal.label}</span>

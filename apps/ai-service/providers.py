@@ -428,11 +428,11 @@ class LLMProviderManager:
         active_list = self.get_active_providers()
         
         if not active_list:
-            logger.warning("No active LLM providers configured (missing API keys). Falling back to mock response.")
+            logger.warning("No active LLM providers configured (missing API keys). Returning unconfigured error.")
             return LLMResult(
                 content="",
-                provider="mock",
-                model="mock-fallback",
+                provider="none",
+                model="none-fallback",
                 success=False,
                 error_message="No configured LLM providers (missing API keys)"
             )

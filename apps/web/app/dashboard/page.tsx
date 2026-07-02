@@ -34,6 +34,8 @@ import {
 export default function DashboardPage() {
   const agents = useNexusStore((state) => state.agents);
   const agentWallets = useNexusStore((state) => state.agentWallets);
+  const userWallet = useNexusStore((state) => state.userWallet);
+  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
 
   // Mock revenue metrics over past hours
   const revenueChartData = [
@@ -59,11 +61,13 @@ export default function DashboardPage() {
     earnings: agent.earnings
   }));
 
+  const totalAgentEarnings = Object.values(agentWallets).reduce((sum, wallet) => sum + wallet.balance, 0);
+
   const metrics = [
-    { label: 'Active Workflows', value: '3 Running', icon: Layers, color: 'text-primary-neon' },
-    { label: 'Wallet Balance', value: '84.20 USDC', icon: Wallet, color: 'text-accent-blue' },
+    { label: 'Active Workflows', value: activeWorkflow ? '1 Running' : '0 Running', icon: Layers, color: 'text-primary-neon' },
+    { label: 'Wallet Balance', value: `${userWallet.balance.toFixed(2)} USDC`, icon: Wallet, color: 'text-accent-blue' },
     { label: 'Published Agents', value: `${agents.length} Nodes`, icon: Cpu, color: 'text-secondary-neon' },
-    { label: 'Platform Revenue', value: '$1,245 USDC', icon: DollarSign, color: 'text-yellow-400' },
+    { label: 'Platform Revenue', value: `${totalAgentEarnings.toFixed(2)} USDC`, icon: DollarSign, color: 'text-yellow-400' },
   ];
 
   return (
