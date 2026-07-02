@@ -9,56 +9,56 @@ const services = [
     dir: 'apps/api-gateway',
     port: process.env.PORT || 10000,
     cmd: 'node',
-    args: ['--max-old-space-size=128', 'dist/main.js']
+    args: ['--max-old-space-size=64', 'dist/main.js']
   },
   {
     name: 'auth-service',
     dir: 'apps/auth-service',
     port: 5001,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'agent-service',
     dir: 'apps/agent-service',
     port: 5002,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'workflow-service',
     dir: 'apps/workflow-service',
     port: 5003,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'payment-service',
     dir: 'apps/payment-service',
     port: 5004,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'wallet-service',
     dir: 'apps/wallet-service',
     port: 5005,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'notification-service',
     dir: 'apps/notification-service',
     port: 5006,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'analytics-service',
     dir: 'apps/analytics-service',
     port: 5007,
     cmd: 'node',
-    args: ['--max-old-space-size=96', 'dist/main.js']
+    args: ['--max-old-space-size=48', 'dist/main.js']
   },
   {
     name: 'ai-service',
@@ -117,11 +117,11 @@ function startService(service) {
   children.push(child);
 }
 
-// Start all services with a staggered delay of 1500ms to reduce peak CPU & memory spikes during container startup
+// Start all services with a staggered delay of 3000ms to reduce peak CPU & memory spikes during container startup
 services.forEach((service, index) => {
   setTimeout(() => {
     startService(service);
-  }, index * 1500);
+  }, index * 3000);
 });
 
 // Handle process termination cleanly

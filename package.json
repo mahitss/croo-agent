@@ -6,7 +6,8 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "node scripts/test_runner.js"
+    "test": "node scripts/test_runner.js",
+    "start": "node scripts/start-all-production.js"
   },
   "devDependencies": {
     "turbo": "^2.0.12",
