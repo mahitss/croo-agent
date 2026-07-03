@@ -144,7 +144,7 @@ export default function PortalPage() {
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-border-dark text-[10px] font-mono">
                     <span className="text-gray-500">Service Fee</span>
-                    <span className="text-primary-neon font-bold">{agent.price.toFixed(2)} USDC</span>
+                    <span className="text-primary-neon font-bold">{(agent.price || 0).toFixed(2)} USDC</span>
                   </div>
                 </div>
               ))}
@@ -325,7 +325,7 @@ const workflow = await nexus.run({
                       <Coins className="w-3.5 h-3.5 text-secondary-neon" />
                       Budget Optimization Cap
                     </span>
-                    <span className="text-secondary-neon">{budget.toFixed(2)} USDC</span>
+                    <span className="text-secondary-neon">{(budget || 0).toFixed(2)} USDC</span>
                   </span>
                   <input
                     type="range"
