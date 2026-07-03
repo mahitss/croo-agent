@@ -7,6 +7,8 @@
   --color-card-dark: #0f1115;
   --color-border-dark: #1b1e25;
   --color-accent-blue: #00e5ff;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 body {
