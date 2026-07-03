@@ -1,49 +1,131 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:5000"
+    : "");
 
-async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 15000) {
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 15000
+) {
+  if (!BASE_URL && typeof window !== "undefined") {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL is not defined. Please configure it in your Vercel Environment Variables."
+    );
+  }
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return res;
-  } catch (err) {
-    clearTimeout(id);
-    throw err;
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
   }
 }
 
 export const apiClient = {
-  async get<T>(url: string, retries = 3, delay = 1000): Promise<T> {
+  async get<T>(
+    url: string,
+    retries = 3,
+    delay = 1000
+  ): Promise<T> {
     try {
-      const res = await fetchWithTimeout(`${BASE_URL}${url}`, { method: 'GET' });
-      if (!res.ok) {
-        if (retries > 0 && (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 429)) {
-          console.warn(`[API_RETRY] Transient HTTP ${res.status} on GET ${url}. Retrying in ${delay}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, delay));
+      const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        if (
+          retries > 0 &&
+          [429, 502, 503, 504].includes(response.status)
+        ) {
+          console.warn(
+            `[API_RETRY] HTTP ${response.status} → ${url}. Retrying in ${delay}ms...`
+          );
+
+          await new Promise((resolve) =>
+            setTimeout(resolve, delay)
+          );
+
           return this.get<T>(url, retries - 1, delay * 2);
         }
-        throw new Error(`HTTP Error: ${res.status}`);
+
+        throw new Error(`HTTP Error: ${response.status}`);
       }
-      return res.json() as Promise<T>;
-    } catch (err: any) {
-      if (retries > 0 && err.name !== 'AbortError') {
-        console.warn(`[API_RETRY] Network failure on GET ${url}: ${err.message}. Retrying in ${delay}ms...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      if (retries > 0 && error.name !== "AbortError") {
+        console.warn(
+          `[API_RETRY] Network error → ${url}: ${error.message}. Retrying in ${delay}ms...`
+        );
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, delay)
+        );
+
         return this.get<T>(url, retries - 1, delay * 2);
       }
-      throw err;
+
+      throw error;
     }
   },
 
   async post<T>(url: string, body: any): Promise<T> {
-    const res = await fetchWithTimeout(`${BASE_URL}${url}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-    return res.json() as Promise<T>;
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  },
+
+  async put<T>(url: string, body: any): Promise<T> {
+    const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  },
+
+  async delete<T>(url: string): Promise<T> {
+    const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
   },
 };
-
