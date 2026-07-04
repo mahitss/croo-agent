@@ -248,7 +248,7 @@ export default function AdminPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span>Agent Settlement Address:</span>
-                <span className="text-gray-500 font-bold truncate max-w-[120px]">0xUserWalletAddress789c</span>
+                <span className="text-gray-500 font-bold truncate max-w-[120px]">{userWallet.address}</span>
               </div>
             </div>
           </div>

@@ -164,6 +164,10 @@ export default function MarketplacePage() {
     currentPage * itemsPerPage
   );
 
+  const avgTrustScore = agents.length > 0 
+    ? (agents.reduce((sum, a) => sum + Number(a.trustScore), 0) / agents.length).toFixed(1) 
+    : '96.3';
+
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
       
@@ -186,7 +190,7 @@ export default function MarketplacePage() {
           </div>
           <div className="flex flex-col border-l border-border-dark pl-4">
             <span className="text-[10px] uppercase text-gray-600 tracking-wider">Avg Trust Score</span>
-            <span className="text-primary-neon text-lg font-extrabold mt-1">96.3%</span>
+            <span className="text-primary-neon text-lg font-extrabold mt-1">{avgTrustScore}%</span>
           </div>
         </div>
       </div>
