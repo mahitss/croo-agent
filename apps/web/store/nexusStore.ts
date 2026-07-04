@@ -19,6 +19,7 @@ interface NexusState {
   
   // Actions
   setUserQuery: (query: string) => void;
+  generateWorkflow: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Promise<void>;
   startExecution: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Promise<void>;
   resetExecution: () => void;
   setRoutingMode: (mode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced') => void;
@@ -323,6 +324,109 @@ export const useNexusStore = create<NexusState>((set, get) => {
       };
     }),
 
+    generateWorkflow: async (query, routingMode, budget) => {
+      const state = get();
+      const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
+
+      const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
+        query,
+        routingMode,
+        budget
+      });
+
+      if (!planRes.success || !planRes.data) {
+        throw new Error(planRes.message || 'AI Planner failed to generate DAG');
+      }
+
+      const promptTokens = planRes.data.prompt_tokens || 0;
+      const completionTokens = planRes.data.completion_tokens || 0;
+      const totalTokens = promptTokens + completionTokens;
+      const estCost = planRes.data.estimated_cost || 0;
+
+      set({
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCost: estCost
+      });
+
+      const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
+        const cap = n.capability.toLowerCase();
+        const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
+        return {
+          id: n.id,
+          name: n.label || n.id.toUpperCase(),
+          description: `Execute capability: ${cap}`,
+          capability: cap,
+          costEstimate: matchedAgent.price,
+          timeEstimate: matchedAgent.latency,
+          status: 'pending',
+          assignedAgentId: matchedAgent.id
+        };
+      });
+
+      const edges = planRes.data.edges.map((e: any) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target
+      }));
+
+      const workflowTemplate = {
+        title: query.slice(0, 40) + '...',
+        userId: 'user-1',
+        estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
+        nodes: nodes.map((n, idx) => ({
+          agentId: n.assignedAgentId,
+          capability: n.capability,
+          status: 'pending',
+          positionX: 100 + idx * 180,
+          positionY: 200
+        })),
+        edges: edges.map((e: any) => ({
+          sourceNode: e.source,
+          targetNode: e.target
+        }))
+      };
+
+      const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
+      if (!wfCreate.success || !wfCreate.data) {
+        throw new Error(wfCreate.message || 'Failed to create workflow template in database');
+      }
+
+      const dbWorkflow = wfCreate.data;
+
+      const workflow: Workflow = {
+        id: dbWorkflow.id,
+        name: dbWorkflow.title,
+        query,
+        nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+          const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+          return {
+            id: n.id,
+            name: `Stage: ${n.capability.toUpperCase()}`,
+            description: `Execute capability: ${n.capability}`,
+            capability: n.capability,
+            costEstimate: agent.price,
+            timeEstimate: agent.latency,
+            status: n.status,
+            assignedAgentId: n.agentId
+          };
+        }) : nodes,
+        edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+          id: e.id,
+          source: e.sourceNode,
+          target: e.targetNode
+        })) : edges,
+        budget,
+        routingMode,
+        retryCount: 0,
+        status: 'pending',
+        createdAt: dbWorkflow.createdAt
+      };
+
+      set({ activeWorkflow: workflow, userQuery: query });
+    },
+
     startExecution: async (query, routingMode, budget) => {
       const state = get();
       if (state.isRunning) return;
@@ -339,128 +443,131 @@ export const useNexusStore = create<NexusState>((set, get) => {
       };
 
       try {
-        // --- PHASE 1: Intent Detection (LLM Call via API Gateway) ---
-        log('intent', `LLM processing intent for: "${query}"`);
-        set({ currentPhaseIndex: 1 });
-        
-        const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
-          query,
-          routingMode,
-          budget
-        });
-        
-        if (!planRes.success || !planRes.data) {
-          throw new Error(planRes.message || 'AI Planner failed to generate DAG');
-        }
-        
-        const promptTokens = planRes.data.prompt_tokens || 0;
-        const completionTokens = planRes.data.completion_tokens || 0;
-        const totalTokens = promptTokens + completionTokens;
-        const estCost = planRes.data.estimated_cost || 0;
-        
-        set({
-          promptTokens,
-          completionTokens,
-          totalTokens,
-          estimatedCost: estCost
-        });
-        
-        const intentList = planRes.data.nodes.map((n: any) => n.capability).join(', ');
-        log('intent', `Detected intent capabilities: [${intentList}]`, 'success');
-
-        // --- PHASE 2: Workflow Planner (DAG Compilation & DB Save) ---
-        set({ currentPhaseIndex: 2 });
-        log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
-        
+        let workflow = state.activeWorkflow;
         const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
-        const assignedAgentsMap: Record<string, string> = {
-          'research': 'agent-research-1',
-          'market analysis': 'agent-research-1',
-          'financial analysis': 'agent-finance-1',
-          'balance sheet analysis': 'agent-finance-1',
-          'verification': 'agent-verify-1',
-          'translation': 'agent-translate-1',
-          'code': 'agent-code-1',
-          'security': 'agent-security-1'
-        };
         
-        const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
-          const cap = n.capability.toLowerCase();
-          const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
-          return {
-            id: n.id,
-            name: n.label || n.id.toUpperCase(),
-            description: `Execute capability: ${cap}`,
-            capability: cap,
-            costEstimate: matchedAgent.price,
-            timeEstimate: matchedAgent.latency,
-            status: 'pending',
-            assignedAgentId: matchedAgent.id
-          };
-        });
+        if (!workflow || workflow.query !== query) {
+          // --- PHASE 1: Intent Detection (LLM Call via API Gateway) ---
+          log('intent', `LLM processing intent for: "${query}"`);
+          set({ currentPhaseIndex: 1 });
+          
+          const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
+            query,
+            routingMode,
+            budget
+          });
+          
+          if (!planRes.success || !planRes.data) {
+            throw new Error(planRes.message || 'AI Planner failed to generate DAG');
+          }
+          
+          const promptTokens = planRes.data.prompt_tokens || 0;
+          const completionTokens = planRes.data.completion_tokens || 0;
+          const totalTokens = promptTokens + completionTokens;
+          const estCost = planRes.data.estimated_cost || 0;
+          
+          set({
+            promptTokens,
+            completionTokens,
+            totalTokens,
+            estimatedCost: estCost
+          });
+          
+          const intentList = planRes.data.nodes.map((n: any) => n.capability).join(', ');
+          log('intent', `Detected intent capabilities: [${intentList}]`, 'success');
 
-        const edges = planRes.data.edges.map((e: any) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target
-        }));
-
-        const workflowTemplate = {
-          title: query.slice(0, 40) + '...',
-          userId: 'user-1',
-          estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
-          nodes: nodes.map((n, idx) => ({
-            agentId: n.assignedAgentId,
-            capability: n.capability,
-            status: 'pending',
-            positionX: 100 + idx * 180,
-            positionY: 200
-          })),
-          edges: edges.map((e: any) => ({
-            sourceNode: e.source,
-            targetNode: e.target
-          }))
-        };
-
-        log('dag', 'Persisting structural workflow DAG template in PostgreSQL database...', 'info');
-        const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
-        if (!wfCreate.success || !wfCreate.data) {
-          throw new Error('Failed to create workflow template in database');
-        }
-
-        const dbWorkflow = wfCreate.data;
-        
-        const workflow: Workflow = {
-          id: dbWorkflow.id,
-          name: dbWorkflow.title,
-          query,
-          nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
-            const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+          // --- PHASE 2: Workflow Planner (DAG Compilation & DB Save) ---
+          set({ currentPhaseIndex: 2 });
+          log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
+          
+          const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
+            const cap = n.capability.toLowerCase();
+            const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
             return {
               id: n.id,
-              name: `Stage: ${n.capability.toUpperCase()}`,
-              description: `Execute capability: ${n.capability}`,
-              capability: n.capability,
-              costEstimate: agent.price,
-              timeEstimate: agent.latency,
-              status: n.status,
-              assignedAgentId: n.agentId
+              name: n.label || n.id.toUpperCase(),
+              description: `Execute capability: ${cap}`,
+              capability: cap,
+              costEstimate: matchedAgent.price,
+              timeEstimate: matchedAgent.latency,
+              status: 'pending',
+              assignedAgentId: matchedAgent.id
             };
-          }) : nodes,
-          edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-            id: e.id,
-            source: e.sourceNode,
-            target: e.targetNode
-          })) : edges,
-          budget,
-          routingMode,
-          retryCount: 0,
-          status: 'running',
-          createdAt: dbWorkflow.createdAt
-        };
+          });
 
-        set({ activeWorkflow: workflow });
-        log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
+          const edges = planRes.data.edges.map((e: any) => ({
+            id: e.id,
+            source: e.source,
+            target: e.target
+          }));
+
+          const workflowTemplate = {
+            title: query.slice(0, 40) + '...',
+            userId: 'user-1',
+            estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
+            nodes: nodes.map((n, idx) => ({
+              agentId: n.assignedAgentId,
+              capability: n.capability,
+              status: 'pending',
+              positionX: 100 + idx * 180,
+              positionY: 200
+            })),
+            edges: edges.map((e: any) => ({
+              sourceNode: e.source,
+              targetNode: e.target
+            }))
+          };
+
+          log('dag', 'Persisting structural workflow DAG template in PostgreSQL database...', 'info');
+          const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
+          if (!wfCreate.success || !wfCreate.data) {
+            throw new Error('Failed to create workflow template in database');
+          }
+
+          const dbWorkflow = wfCreate.data;
+          
+          workflow = {
+            id: dbWorkflow.id,
+            name: dbWorkflow.title,
+            query,
+            nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+              const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+              return {
+                id: n.id,
+                name: `Stage: ${n.capability.toUpperCase()}`,
+                description: `Execute capability: ${n.capability}`,
+                capability: n.capability,
+                costEstimate: agent.price,
+                timeEstimate: agent.latency,
+                status: n.status,
+                assignedAgentId: n.agentId
+              };
+            }) : nodes,
+            edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+              id: e.id,
+              source: e.sourceNode,
+              target: e.targetNode
+            })) : edges,
+            budget,
+            routingMode,
+            retryCount: 0,
+            status: 'running',
+            createdAt: dbWorkflow.createdAt
+          };
+
+          set({ activeWorkflow: workflow });
+          log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
+        } else {
+          // Pre-generated workflow is active in builder: transition it to running
+          workflow = {
+            ...workflow,
+            status: 'running'
+          };
+          set({ activeWorkflow: workflow });
+          log('intent', `Executing pre-generated workflow: "${workflow.name}"`, 'success');
+        }
+
+        const intentList = workflow.nodes.map((n: any) => n.capability).join(', ');
 
         // --- PHASE 3: Discovery & Evaluation ---
         set({ currentPhaseIndex: 3 });

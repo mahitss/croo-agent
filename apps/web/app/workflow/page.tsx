@@ -5,6 +5,7 @@ import Canvas from '../../components/Canvas';
 import { useNexusStore } from '../../store/nexusStore';
 import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '../../components/Toast';
 
 const PLANNING_STAGES = [
   { name: 'Intent Detection', desc: 'Parsing natural language semantics & intent tags' },
@@ -20,6 +21,7 @@ export default function WorkflowPage() {
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
   const isRunning = useNexusStore((state) => state.isRunning);
   const resetExecution = useNexusStore((state) => state.resetExecution);
+  const generateWorkflow = useNexusStore((state) => state.generateWorkflow);
   const startExecution = useNexusStore((state) => state.startExecution);
   const agents = useNexusStore((state) => state.agents);
   const promptTokens = useNexusStore((state) => state.promptTokens);
@@ -27,15 +29,16 @@ export default function WorkflowPage() {
   const totalTokens = useNexusStore((state) => state.totalTokens);
   const estimatedCost = useNexusStore((state) => state.estimatedCost);
 
+  const { toast } = useToast();
+
   // States
   const [promptInput, setPromptInput] = useState('');
   const [showExplanation, setShowExplanation] = useState(false);
   const [optimizationMode, setOptimizationMode] = useState<'cost' | 'speed' | 'accuracy'>('accuracy');
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
   
-  // AI thinking panel tracking states
-  const [plannerPhaseIndex, setPlannerPhaseIndex] = useState(0);
   const [isPlanning, setIsPlanning] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Check URL query parameters to bind Swarm Matchmaker from Marketplace
   useEffect(() => {
@@ -49,25 +52,24 @@ export default function WorkflowPage() {
     }
   }, []);
 
-  const handleGenerateWorkflow = () => {
+  const handleGenerateWorkflow = async () => {
     if (!promptInput.trim()) return;
     setIsPlanning(true);
-    setPlannerPhaseIndex(1);
     setSelectedNode(null);
     setShowExplanation(false);
+    setErrorMsg(null);
     
-    let phase = 1;
-    const interval = setInterval(() => {
-      phase += 1;
-      if (phase <= 7) {
-        setPlannerPhaseIndex(phase);
-      } else {
-        clearInterval(interval);
-        setIsPlanning(false);
-        setShowExplanation(true);
-        startExecution(promptInput, 'balanced', 2.0);
-      }
-    }, 600);
+    try {
+      await generateWorkflow(promptInput, 'balanced', 2.0);
+      setShowExplanation(true);
+      toast('Workflow DAG generated successfully from backend!', 'success');
+    } catch (err: any) {
+      const msg = err.message || err || 'Failed to connect to backend AI services';
+      setErrorMsg(msg);
+      toast(`Generation failed: ${msg}`, 'error');
+    } finally {
+      setIsPlanning(false);
+    }
   };
 
   const handleLaunchSwarm = () => {
@@ -300,107 +302,64 @@ export default function WorkflowPage() {
             </div>
           ) : (
             <>
-              {/* WOW Feature: AI Thinking Panel Checklist */}
+              {/* AI Thinking Loader */}
               {isPlanning && (
-                <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-black/60 flex flex-col gap-4 text-xs font-mono transition-all duration-300">
-                  <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
-                    <Loader2 className="w-4 h-4 text-primary-neon animate-spin" />
-                    AI Planner Thinking...
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {PLANNING_STAGES.map((stage, idx) => {
-                      const phaseNum = idx + 1;
-                      const isActive = plannerPhaseIndex === phaseNum;
-                      const isCompleted = plannerPhaseIndex > phaseNum;
-                      return (
-                        <div key={idx} className={`flex items-start gap-2.5 transition-all duration-300 ${
-                          isCompleted ? 'text-primary-neon' : isActive ? 'text-white' : 'text-gray-600'
-                        }`}>
-                          <div className="mt-0.5 shrink-0">
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-primary-neon" />
-                            ) : isActive ? (
-                              <span className="relative flex h-3.5 w-3.5 items-center justify-center">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary-neon opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary-neon"></span>
-                              </span>
-                            ) : (
-                              <span className="w-3.5 h-3.5 rounded-full border border-border-dark bg-black/40 flex" />
-                            )}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-[10px] uppercase tracking-wider">{stage.name}</span>
-                            <span className="text-[9px] text-gray-500 mt-0.5 leading-normal">{stage.desc}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-black/60 flex flex-col items-center justify-center py-10 gap-3 text-xs font-mono text-center">
+                  <Loader2 className="w-8 h-8 text-primary-neon animate-spin" />
+                  <span className="text-white font-bold uppercase tracking-wider">AI Swarm Planner</span>
+                  <span className="text-gray-500">Querying OpenRouter LLM, evaluating candidate bids, and generating optimal DAG template in real-time...</span>
                 </div>
               )}
 
-              {/* WOW Feature: AI Planner Explanation Panel */}
-              {!isPlanning && showExplanation && (
+              {/* Dynamic Planning Failure Alert */}
+              {errorMsg && (
+                <div className="glass-card p-5 rounded-xl border border-red-500/40 bg-red-500/5 flex flex-col gap-3 text-xs font-mono">
+                  <div className="flex items-center gap-1.5 text-red-400 font-bold border-b border-red-500/20 pb-2.5">
+                    <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
+                    PLANNING FAILURE
+                  </div>
+                  <p className="text-gray-400 leading-relaxed">
+                    {errorMsg}
+                  </p>
+                </div>
+              )}
+
+              {/* Dynamic Swarm Explanation Details */}
+              {!isPlanning && !errorMsg && showExplanation && activeWorkflow && (
                 <div className="glass-card p-5 rounded-xl border border-primary-neon/20 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
                   <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
-                    <Sparkles className="w-4 h-4 text-primary-neon" />
+                    <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
                     AI Swarm Planner Logic
                   </h3>
 
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] text-gray-500 uppercase">✓ Selected Research Node</span>
-                      <p className="text-gray-300 text-[10px] leading-relaxed">
-                        Selected <strong className="text-white">InsightFinder Pro</strong>: Lowest cost with 95% success rate SLA rating.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] text-gray-500 uppercase">✓ Selected Verify Node</span>
-                      <p className="text-gray-300 text-[10px] leading-relaxed">
-                        Selected <strong className="text-white">ConsensuVerify</strong>: Highest trust coefficient for independent verification.
-                      </p>
-                    </div>
+                    {activeWorkflow.nodes.map((node) => {
+                      const agent = agents.find(a => a.id === node.assignedAgentId);
+                      return (
+                        <div key={node.id} className="flex flex-col gap-1 border-b border-border-dark/30 pb-2 last:border-0 last:pb-0">
+                          <span className="text-[10px] text-primary-neon font-bold uppercase">✓ {node.name}</span>
+                          <p className="text-gray-300 text-[10px] leading-relaxed mt-0.5">
+                            Routed capability <strong className="text-white">{node.capability}</strong> to agent <strong className="text-white">{agent?.name || node.assignedAgentId}</strong>.
+                          </p>
+                        </div>
+                      );
+                    })}
 
                     <div className="flex justify-between items-center pt-2 border-t border-border-dark">
-                      <span className="text-gray-500">PROMPT TOKENS:</span>
+                      <span className="text-gray-500 uppercase">PROMPT TOKENS:</span>
                       <span className="text-white font-bold">{promptTokens.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">COMPLETION TOKENS:</span>
+                      <span className="text-gray-500 uppercase">COMPLETION TOKENS:</span>
                       <span className="text-white font-bold">{completionTokens.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">TOTAL TOKENS:</span>
+                      <span className="text-gray-500 uppercase">TOTAL TOKENS:</span>
                       <span className="text-primary-neon font-bold">{totalTokens.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">EST. PLANNING COST:</span>
-                      <span className="text-secondary-neon font-mono font-bold">{estimatedCost.toFixed(5)} USDC</span>
-                    </div>
-                  </div>
-
-                  {/* Optimization Controllers */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-border-dark">
-                    <span className="text-[9px] text-gray-500 uppercase">Regenerate Objectives:</span>
-                    <div className="flex flex-col gap-1">
-                      {[
-                        { mode: 'cost', label: 'Optimize for Lower Cost' },
-                        { mode: 'speed', label: 'Optimize for Faster Execution' },
-                        { mode: 'accuracy', label: 'Optimize for Higher Accuracy' }
-                      ].map((opt) => (
-                        <button
-                          key={opt.mode}
-                          onClick={() => setOptimizationMode(opt.mode as any)}
-                          className={`text-[9px] text-left px-2 py-1.5 rounded border transition-all uppercase font-bold ${
-                            optimizationMode === opt.mode
-                              ? 'border-primary-neon text-primary-neon bg-primary-neon/5'
-                              : 'border-border-dark text-gray-400 hover:text-white bg-black/20'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                      <span className="text-gray-500 uppercase">EST. PLANNING COST:</span>
+                      <span className="text-secondary-neon font-mono font-bold">{(estimatedCost || 0).toFixed(5)} USDC</span>
                     </div>
                   </div>
                 </div>

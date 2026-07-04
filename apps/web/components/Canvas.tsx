@@ -29,41 +29,8 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
   // Sync state from Zustand activeWorkflow
   useEffect(() => {
     if (!activeWorkflow) {
-      // Setup a default skeleton when idle
-      const defaultNodes = [
-        {
-          id: 'def-1',
-          type: 'agentNode',
-          position: { x: 150, y: 30 },
-          data: { id: 'def-1', name: 'Identify Capabilities', capability: 'intent', status: 'idle', costEstimate: 0.00, retryCount: 0 }
-        },
-        {
-          id: 'def-2',
-          type: 'agentNode',
-          position: { x: 30, y: 180 },
-          data: { id: 'def-2', name: 'Execute Task Nodes (A)', capability: 'research', status: 'idle', costEstimate: 0.00, retryCount: 0 }
-        },
-        {
-          id: 'def-3',
-          type: 'agentNode',
-          position: { x: 270, y: 180 },
-          data: { id: 'def-3', name: 'Execute Task Nodes (B)', capability: 'finance', status: 'idle', costEstimate: 0.00, retryCount: 0 }
-        },
-        {
-          id: 'def-4',
-          type: 'agentNode',
-          position: { x: 150, y: 330 },
-          data: { id: 'def-4', name: 'Aggregate & Verify', capability: 'verify', status: 'idle', costEstimate: 0.00, retryCount: 0 }
-        }
-      ];
-      const defaultEdges = [
-        { id: 'de-1', source: 'def-1', target: 'def-2', animated: true, style: { stroke: '#1b1e25' } },
-        { id: 'de-2', source: 'def-1', target: 'def-3', animated: true, style: { stroke: '#1b1e25' } },
-        { id: 'de-3', source: 'def-2', target: 'def-4', animated: true, style: { stroke: '#1b1e25' } },
-        { id: 'de-4', source: 'def-3', target: 'def-4', animated: true, style: { stroke: '#1b1e25' } }
-      ];
-      setNodes(defaultNodes);
-      setEdges(defaultEdges);
+      setNodes([]);
+      setEdges([]);
       return;
     }
 
@@ -189,6 +156,13 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
           WORKFLOW_CANVAS_ACTIVE
         </span>
       </div>
+
+      {!activeWorkflow && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 font-mono text-xs text-gray-400 gap-2">
+          <span>No active workflow.</span>
+          <span>Describe a task above and click "Generate Workflow" to begin.</span>
+        </div>
+      )}
 
       <ReactFlow
         nodes={nodes}
