@@ -195,28 +195,17 @@ const seedAgents: Agent[] = [
 ];
 
 export const useNexusStore = create<NexusState>((set, get) => {
-  // Initialize wallets
-  const initialAgentWallets: Record<string, WalletState> = {};
-  seedAgents.forEach(agent => {
-    initialAgentWallets[agent.id] = {
-      address: agent.walletAddress,
-      balance: 15.0,
-      escrowBalance: 0.0,
-      history: []
-    };
-  });
-
   return {
-    agents: seedAgents,
+    agents: [],
     activeWorkflow: null,
     executionLogs: [],
     userWallet: {
-      address: '0xUserWalletAddress789c',
-      balance: 100.0,
+      address: '0x0000000000000000000000000000000000000000',
+      balance: 0.0,
       escrowBalance: 0.0,
       history: []
     },
-    agentWallets: initialAgentWallets,
+    agentWallets: {},
     isRunning: false,
     currentPhaseIndex: 0,
     userQuery: '',
@@ -812,6 +801,25 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
       } catch (err) {
         console.warn('API Gateway offline. Running in sandbox mode.', err);
+        const initialAgentWallets: Record<string, WalletState> = {};
+        seedAgents.forEach(agent => {
+          initialAgentWallets[agent.id] = {
+            address: agent.walletAddress,
+            balance: 15.0,
+            escrowBalance: 0.0,
+            history: []
+          };
+        });
+        set({
+          agents: seedAgents,
+          userWallet: {
+            address: '0xUserWalletAddress789c',
+            balance: 100.0,
+            escrowBalance: 0.0,
+            history: []
+          },
+          agentWallets: initialAgentWallets
+        });
       }
     },
 
