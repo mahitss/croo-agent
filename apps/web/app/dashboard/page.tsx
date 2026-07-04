@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
+import { apiService } from '../../services/api';
 import Link from 'next/link';
 import { 
   TrendingUp, 
@@ -36,6 +38,23 @@ export default function DashboardPage() {
   const agentWallets = useNexusStore((state) => state.agentWallets);
   const userWallet = useNexusStore((state) => state.userWallet);
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const initialize = useNexusStore((state) => state.initialize);
+
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+
+  useEffect(() => {
+    initialize();
+    
+    apiService.getActivityFeed()
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data)) {
+          setActivityFeed(res.data);
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to load live activity feed:', err);
+      });
+  }, [initialize]);
 
   // Mock revenue metrics over past hours
   const revenueChartData = [
@@ -80,7 +99,7 @@ export default function DashboardPage() {
             👋 Welcome back, Mahit
           </h1>
           <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
-            You have 3 active workflows, 12 published agents, and $84.20 USDC available in your wallet.
+            You have {activeWorkflow ? 1 : 0} active workflows, {agents.length} published agents, and ${userWallet.balance.toFixed(2)} USDC available in your wallet.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -133,25 +152,27 @@ export default function DashboardPage() {
             Active Swarm Workflows
           </h3>
           <div className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1">
-            {[
-              { name: "Research Tesla Q1", progress: 72, cost: 1.25, time: "2m remaining" },
-              { name: "Verify Legal SLA", progress: 35, cost: 0.85, time: "5m remaining" },
-              { name: "Translate Slide Deck", progress: 90, cost: 0.40, time: "30s remaining" }
-            ].map((wf, idx) => (
-              <div key={idx} className="border border-border-dark p-3 rounded-lg flex flex-col gap-2 bg-black/10">
+            {activeWorkflow ? (
+              <div className="border border-border-dark p-3 rounded-lg flex flex-col gap-2 bg-black/10">
                 <div className="flex justify-between text-xs font-bold text-white">
-                  <span>{wf.name}</span>
-                  <span className="text-primary-neon font-mono">{wf.progress}%</span>
+                  <span className="truncate">{activeWorkflow.name}</span>
+                  <span className="text-primary-neon font-mono">
+                    {activeWorkflow.status === 'completed' ? 100 : activeWorkflow.status === 'failed' ? 0 : 50}%
+                  </span>
                 </div>
                 <div className="w-full bg-border-dark h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-primary-neon h-full transition-all" style={{ width: `${wf.progress}%` }}></div>
+                  <div className={`h-full transition-all ${activeWorkflow.status === 'failed' ? 'bg-red-500' : 'bg-primary-neon'}`} style={{ width: activeWorkflow.status === 'completed' ? '100%' : activeWorkflow.status === 'failed' ? '100%' : '50%' }}></div>
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                  <span>{wf.time}</span>
-                  <span className="text-white">{wf.cost.toFixed(2)} USDC</span>
+                  <span className="uppercase">{activeWorkflow.status}</span>
+                  <span className="text-white">{(activeWorkflow.nodes?.reduce((sum, n) => sum + n.costEstimate, 0) || 1.25).toFixed(2)} USDC</span>
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-12 text-gray-500 italic text-xs font-mono">
+                No active workflows currently running.
+              </div>
+            )}
           </div>
         </div>
 
@@ -164,11 +185,11 @@ export default function DashboardPage() {
           <div className="my-4 flex flex-col gap-2">
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Available Balance</span>
-              <span className="text-white font-mono font-bold">84.20 USDC</span>
+              <span className="text-white font-mono font-bold">{userWallet.balance.toFixed(2)} USDC</span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Reserved (Escrow Lock)</span>
-              <span className="text-yellow-400 font-mono font-bold">12.50 USDC</span>
+              <span className="text-yellow-400 font-mono font-bold">{userWallet.escrowBalance.toFixed(2)} USDC</span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Pending Approvals</span>
@@ -229,25 +250,24 @@ export default function DashboardPage() {
             Recent Platform Activity
           </h3>
           <div className="flex-grow flex flex-col gap-4 overflow-y-auto text-xs pr-1">
-            {[
-              { time: "10:31", title: "Workflow completed", desc: "Tesla Q1 research DAG verify passes", icon: CheckCircle, color: "text-primary-neon" },
-              { time: "10:29", title: "Payment settled", desc: "1.25 USDC released to escrow nodes", icon: DollarSign, color: "text-accent-blue" },
-              { time: "10:25", title: "Agent published", desc: "InsightFinder Pro indexed on-chain", icon: Cpu, color: "text-secondary-neon" }
-            ].map((act, idx) => {
-              const Icon = act.icon;
-              return (
-                <div key={idx} className="flex gap-3 items-start">
+            {activityFeed.length > 0 ? (
+              activityFeed.map((act, idx) => (
+                <div key={idx} className="flex gap-3 items-start border-b border-border-dark/10 pb-2 last:border-0 last:pb-0">
                   <span className="text-[10px] text-gray-500 font-mono py-0.5">{act.time}</span>
-                  <div className={`p-1.5 rounded bg-white/2 ${act.color}`}>
-                    <Icon className="w-3.5 h-3.5" />
+                  <div className="p-1.5 rounded bg-white/2 text-primary-neon">
+                    <Activity className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-bold text-white">{act.title}</span>
+                    <span className="font-bold text-white">{act.type}</span>
                     <span className="text-[10px] text-gray-400 font-mono">{act.desc}</span>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <div className="text-center py-12 text-gray-500 italic text-xs font-mono">
+                No recent platform activity recorded.
+              </div>
+            )}
           </div>
         </div>
 

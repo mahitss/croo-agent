@@ -24,9 +24,9 @@ interface NexusState {
   resetExecution: () => void;
   setRoutingMode: (mode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced') => void;
   setBudget: (budget: number) => void;
-  registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => void;
-  depositUserWallet: (amount: number) => void;
-  withdrawUserWallet: (amount: number) => void;
+  registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => Promise<void>;
+  depositUserWallet: (amount: number) => Promise<void>;
+  withdrawUserWallet: (amount: number) => Promise<void>;
   initialize: () => Promise<void>;
   resetDemoMode: () => void;
 }
@@ -252,77 +252,114 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
     },
 
-    registerAgent: (agent) => {
-      const newAgent: Agent = {
-        ...agent,
-        id: `agent-custom-${Date.now()}`,
-        rating: 5.0,
-        reviewsCount: 0,
-        trustScore: 100,
-        verificationCount: 0,
-        failureRate: 0,
-        walletAddress: `0x${Math.random().toString(16).substr(2, 8).toUpperCase()}...${Math.random().toString(16).substr(2, 4)}`,
-        status: 'active'
-      };
+    registerAgent: async (agent) => {
+      try {
+        const res = await apiClient.post<any>('/api/v1/agents', agent);
+        if (res.success && res.data) {
+          await get().initialize();
+        } else {
+          throw new Error(res.message || 'Failed to register agent in backend');
+        }
+      } catch (err: any) {
+        console.error('Failed to register agent in database, falling back locally:', err);
+        const newAgent: Agent = {
+          ...agent,
+          id: `agent-custom-${Date.now()}`,
+          rating: 5.0,
+          reviewsCount: 0,
+          trustScore: 100,
+          verificationCount: 0,
+          failureRate: 0,
+          walletAddress: `0x${Math.random().toString(16).substring(2, 10).toUpperCase()}...${Math.random().toString(16).substring(2, 6)}`,
+          status: 'active'
+        };
 
-      set((state) => {
-        const updatedAgents = [...state.agents, newAgent];
-        const updatedWallets = { ...state.agentWallets };
-        updatedWallets[newAgent.id] = {
-          address: newAgent.walletAddress,
-          balance: 0.0,
-          escrowBalance: 0.0,
-          history: []
-        };
-        return {
-          agents: updatedAgents,
-          agentWallets: updatedWallets
-        };
-      });
+        set((state) => {
+          const updatedAgents = [...state.agents, newAgent];
+          const updatedWallets = { ...state.agentWallets };
+          updatedWallets[newAgent.id] = {
+            address: newAgent.walletAddress,
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
+          };
+          return {
+            agents: updatedAgents,
+            agentWallets: updatedWallets
+          };
+        });
+      }
     },
 
-    depositUserWallet: (amount) => set((state) => {
-      const tx: Transaction = {
-        id: `tx-deposit-${Date.now()}`,
-        senderAddress: 'EXTERNAL_BANK',
-        receiverAddress: state.userWallet.address,
-        amount,
-        type: 'deposit',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        txHash: '0x' + Math.random().toString(16).substr(2, 40)
-      };
-
-      return {
-        userWallet: {
-          ...state.userWallet,
-          balance: state.userWallet.balance + amount,
-          history: [tx, ...state.userWallet.history]
+    depositUserWallet: async (amount) => {
+      const state = get();
+      try {
+        const res = await apiClient.post<any>('/api/v1/wallet/connect', {
+          amount,
+          userId: 'user-1',
+          address: state.userWallet.address
+        });
+        if (res.success) {
+          await get().initialize();
         }
-      };
-    }),
+      } catch (err) {
+        console.error('Failed to process wallet deposit, updating client state locally:', err);
+        const tx: Transaction = {
+          id: `tx-deposit-${Date.now()}`,
+          senderAddress: 'EXTERNAL_BANK',
+          receiverAddress: state.userWallet.address,
+          amount,
+          type: 'deposit',
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+        };
 
-    withdrawUserWallet: (amount) => set((state) => {
-      if (state.userWallet.balance < amount) return {};
-      const tx: Transaction = {
-        id: `tx-withdraw-${Date.now()}`,
-        senderAddress: state.userWallet.address,
-        receiverAddress: 'EXTERNAL_BANK',
-        amount,
-        type: 'withdrawal',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        txHash: '0x' + Math.random().toString(16).substr(2, 40)
-      };
+        set({
+          userWallet: {
+            ...state.userWallet,
+            balance: state.userWallet.balance + amount,
+            history: [tx, ...state.userWallet.history]
+          }
+        });
+      }
+    },
 
-      return {
-        userWallet: {
-          ...state.userWallet,
-          balance: state.userWallet.balance - amount,
-          history: [tx, ...state.userWallet.history]
+    withdrawUserWallet: async (amount) => {
+      const state = get();
+      if (state.userWallet.balance < amount) return;
+      
+      try {
+        const res = await apiClient.post<any>('/api/v1/wallet/withdraw', {
+          amount,
+          recipientAddress: 'EXTERNAL_BANK'
+        });
+        if (res.success) {
+          await get().initialize();
+        } else {
+          throw new Error(res.message || 'Failed to request withdrawal from backend');
         }
-      };
-    }),
+      } catch (err) {
+        console.error('Failed to register withdrawal in database, falling back locally:', err);
+        const tx: Transaction = {
+          id: `tx-withdraw-${Date.now()}`,
+          senderAddress: state.userWallet.address,
+          receiverAddress: 'EXTERNAL_BANK',
+          amount,
+          type: 'withdrawal',
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+        };
+        set({
+          userWallet: {
+            ...state.userWallet,
+            balance: state.userWallet.balance - amount,
+            history: [tx, ...state.userWallet.history]
+          }
+        });
+      }
+    },
 
     generateWorkflow: async (query, routingMode, budget) => {
       const state = get();
@@ -745,6 +782,33 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const data = await apiService.getAgentsList() as any;
         if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
           set({ agents: data.data });
+        }
+
+        const walletRes = await apiClient.get<any>('/api/v1/wallet');
+        const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
+        const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
+
+        if (walletRes?.success && walletRes.data) {
+          const balanceData = balanceRes?.success && balanceRes.data ? balanceRes.data : { available: 100.0, reserved: 0.0 };
+          const txsList = txsRes?.success && Array.isArray(txsRes.data) ? txsRes.data.map((tx: any) => ({
+            id: tx.id,
+            senderAddress: tx.senderAddress || walletRes.data.address,
+            receiverAddress: tx.receiverAddress || tx.reference || 'EXTERNAL',
+            amount: Number(tx.amount),
+            type: tx.type === 'deposit' ? 'deposit' : tx.type === 'withdraw' ? 'withdrawal' : tx.type === 'escrow_hold' ? 'escrow_hold' : 'escrow_release',
+            timestamp: tx.createdAt,
+            status: tx.status === 'completed' ? 'completed' : 'pending',
+            txHash: tx.txHash || '0x' + Math.random().toString(16).substring(2, 42)
+          })) : [];
+
+          set({
+            userWallet: {
+              address: walletRes.data.address,
+              balance: Number(balanceData.available),
+              escrowBalance: Number(balanceData.reserved),
+              history: txsList
+            }
+          });
         }
       } catch (err) {
         console.warn('API Gateway offline. Running in sandbox mode.', err);

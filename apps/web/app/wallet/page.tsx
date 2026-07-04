@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
 import { Wallet, ArrowDownLeft, ArrowUpRight, ShieldCheck, History, ExternalLink, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 
@@ -8,6 +8,11 @@ export default function WalletPage() {
   const userWallet = useNexusStore((state) => state.userWallet);
   const depositUserWallet = useNexusStore((state) => state.depositUserWallet);
   const withdrawUserWallet = useNexusStore((state) => state.withdrawUserWallet);
+  const initialize = useNexusStore((state) => state.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -35,19 +40,40 @@ export default function WalletPage() {
   };
 
   // Mock flow steps for the WOW Feature
-  const commerceFlowSteps = [
-    { title: "User Wallet Balance Check", amount: "84.20 USDC", status: "Checked", time: "10:20:01" },
-    { title: "SLA Escrow Reserve Lock", amount: "1.42 USDC", status: "Locked", time: "10:20:05" },
-    { title: "Research Agent Execution Release", amount: "0.80 USDC", status: "Disbursed", time: "10:20:30" },
-    { title: "Verify Agent SLA Payout", amount: "0.40 USDC", status: "Disbursed", time: "10:21:10" },
-    { title: "Platform Handling Escrow Clearance", amount: "0.22 USDC", status: "Settled", time: "10:21:40" },
-    { title: "CROO Ledger Receipt Generated", amount: "Tx ID: 0x3f4a...", status: "Signed", time: "10:21:45" }
-  ];
+  const commerceFlowSteps = userWallet.history.length > 0
+    ? userWallet.history.slice(0, 6).map((tx) => {
+        let title = "Transaction Record";
+        let status = "Completed";
+        if (tx.type === 'deposit') {
+          title = "User Wallet Balance Check";
+          status = "Checked";
+        } else if (tx.type === 'escrow_hold') {
+          title = "SLA Escrow Reserve Lock";
+          status = "Locked";
+        } else if (tx.type === 'escrow_release') {
+          title = "Agent SLA Payout Released";
+          status = "Disbursed";
+        } else if (tx.type === 'withdrawal') {
+          title = "On-Chain Withdrawal Release";
+          status = "Settled";
+        }
+        
+        return {
+          title,
+          amount: `${tx.amount.toFixed(2)} USDC`,
+          status,
+          time: new Date(tx.timestamp).toLocaleTimeString()
+        };
+      })
+    : [
+        { title: "User Wallet Balance Check", amount: `${userWallet.balance.toFixed(2)} USDC`, status: "Checked", time: "Idle" },
+        { title: "Escrow Reserve Ready", amount: "0.00 USDC", status: "Awaiting", time: "Idle" }
+      ];
 
   const totalIncomingTransfers = userWallet.history
     .filter(tx => tx.type === 'deposit' || tx.type === 'escrow_release')
     .reduce((sum, tx) => sum + tx.amount, 0);
-  const lifetimeRevenue = totalIncomingTransfers > 0 ? totalIncomingTransfers : 158.50;
+  const lifetimeRevenue = totalIncomingTransfers > 0 ? totalIncomingTransfers : 0.00;
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">

@@ -24,15 +24,44 @@ export class AgentController {
         name: body.name || 'Unnamed Agent',
         description: body.description || '',
         logoUrl: body.logoUrl,
+        category: body.category || 'Research',
+        skills: body.skills || [],
+        tags: body.tags || [],
+        price: body.price !== undefined ? Number(body.price) : 0.10,
+        latency: body.latency !== undefined ? Number(body.latency) : 1000,
+        accuracy: body.accuracy !== undefined ? Number(body.accuracy) : 95.0,
+        status: body.status || 'active',
+        walletAddress: body.walletAddress || `0x${Math.random().toString(16).substring(2, 10).toUpperCase()}...${Math.random().toString(16).substring(2, 6)}`,
       },
     });
 
+    if (body.version || body.endpoint) {
+      await this.prisma.agentVersion.create({
+        data: {
+          agentId: agent.id,
+          version: body.version || '1.0.0',
+          endpoint: body.endpoint || '',
+          inputSchema: {},
+          outputSchema: {},
+        }
+      });
+    }
+
     await this.redis.del('marketplace:agents');
+
+    const returnData = {
+      ...agent,
+      rating: Number(agent.averageRating),
+      reviewsCount: agent.verificationCount * 3 + 12,
+      trustScore: Number(agent.trustScore),
+      version: body.version || '1.0.0',
+      endpoint: body.endpoint || '',
+    };
 
     return {
       success: true,
       message: 'Agent profile metadata saved successfully',
-      data: agent,
+      data: returnData,
     };
   }
 
