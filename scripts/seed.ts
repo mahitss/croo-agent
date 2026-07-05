@@ -1,6 +1,6 @@
-import { PrismaClient as AgentPrismaClient } from '../apps/agent-service/src/generated/client';
-import { PrismaClient as AuthPrismaClient } from '../apps/auth-service/src/generated/client';
-import { PrismaClient as WalletPrismaClient } from '../apps/wallet-service/src/generated/client';
+import { PrismaClient as AgentPrismaClient } from '../apps/agent-service/node_modules/@prisma/client-agent';
+import { PrismaClient as AuthPrismaClient } from '../apps/auth-service/node_modules/@prisma/client-auth';
+import { PrismaClient as WalletPrismaClient } from '../apps/wallet-service/node_modules/@prisma/client-wallet';
 
 const seedAgents = [
   {
