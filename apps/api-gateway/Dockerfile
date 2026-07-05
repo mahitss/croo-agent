@@ -2,8 +2,8 @@ FROM node:22-alpine AS base
 WORKDIR /app
 RUN npm install -g pnpm@11.9.0
 
-# Install Python3 and compile utilities
-RUN apk add --no-cache python3 py3-pip py3-virtualenv build-base
+# Install Python3, compile utilities, and OpenSSL compatibility libraries
+RUN apk add --no-cache python3 py3-pip py3-virtualenv build-base openssl openssl1.1-compat ca-certificates || apk add --no-cache python3 py3-pip py3-virtualenv build-base openssl ca-certificates
 
 # Copy configuration files and lockfile
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
