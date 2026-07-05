@@ -168,7 +168,7 @@ const seedAgents = [
 export async function run() {
   console.log('Starting seed script execution...');
 
-  const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_xNPUq8RdbgM3@ep-flat-fog-aohnirvo-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require&pgbouncer=true";
+  const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_vtNFKoZ0CQ9L@ep-flat-fog-aohnirvo-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require&pgbouncer=true";
   
   // Route connection strings to their exact target schemas
   const authUrl = connectionString.includes('schema=') 
