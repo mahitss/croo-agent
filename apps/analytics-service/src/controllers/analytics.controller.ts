@@ -49,21 +49,33 @@ export class AnalyticsController {
 
   @Get('analytics/dashboard')
   async getDashboard() {
-    await this.seedIfEmpty();
-    const dailyCount = await this.prisma.dailyWorkflow.aggregate({
-      _sum: {
-        completed: true,
-      },
-    });
-    
-    return {
-      success: true,
-      data: {
-        activeUsers: 840,
-        totalWorkflowsRun: dailyCount._sum?.completed || 1420,
-        systemHealth: '99.98%',
-      },
-    };
+    try {
+      await this.seedIfEmpty();
+      const dailyCount = await this.prisma.dailyWorkflow.aggregate({
+        _sum: {
+          completed: true,
+        },
+      });
+      
+      return {
+        success: true,
+        data: {
+          activeUsers: 840,
+          totalWorkflowsRun: dailyCount._sum?.completed || 1420,
+          systemHealth: '99.98%',
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Database error in dashboard analytics: ${error.message}`,
+        data: {
+          activeUsers: 840,
+          totalWorkflowsRun: 1420,
+          systemHealth: '99.98%',
+        }
+      };
+    }
   }
 
   @Get('analytics/platform')
@@ -94,54 +106,78 @@ export class AnalyticsController {
 
   @Get('analytics/workflows')
   async getWorkflowMetrics() {
-    await this.seedIfEmpty();
-    const totalCount = await this.prisma.dailyWorkflow.aggregate({
-      _sum: {
-        completed: true,
-        failed: true,
-      },
-    });
-
-    const completed = totalCount._sum?.completed || 1402;
-    const failed = totalCount._sum?.failed || 18;
-
-    return {
-      success: true,
-      data: {
-        created: completed + failed,
-        completed,
-        failed,
-        retryRate: 1.25,
-        avgDurationMs: 45231,
-      },
-    };
+    try {
+      await this.seedIfEmpty();
+      const totalCount = await this.prisma.dailyWorkflow.aggregate({
+        _sum: {
+          completed: true,
+          failed: true,
+        },
+      });
+  
+      const completed = totalCount._sum?.completed || 1402;
+      const failed = totalCount._sum?.failed || 18;
+  
+      return {
+        success: true,
+        data: {
+          created: completed + failed,
+          completed,
+          failed,
+          retryRate: 1.25,
+          avgDurationMs: 45231,
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Database error fetching workflow metrics: ${error.message}`,
+        data: {
+          created: 1420,
+          completed: 1402,
+          failed: 18,
+          retryRate: 1.25,
+          avgDurationMs: 45231,
+        }
+      };
+    }
   }
 
   @Get('analytics/agents')
   async getAgentMetrics() {
-    await this.seedIfEmpty();
-    const usage = await this.prisma.dailyAgentUsage.findMany({
-      take: 20,
-    });
-
-    if (usage.length === 0) {
+    try {
+      await this.seedIfEmpty();
+      const usage = await this.prisma.dailyAgentUsage.findMany({
+        take: 20,
+      });
+  
+      if (usage.length === 0) {
+        return {
+          success: true,
+          data: [
+            { agentId: 'agent-research-1', revenueUsdc: 210.50, invocations: 1402, avgLatencyMs: 820 },
+          ],
+        };
+      }
+  
       return {
         success: true,
+        data: usage.map(u => ({
+          agentId: u.agentId,
+          revenueUsdc: Number(u.totalRevenue),
+          invocations: u.invocations,
+          avgLatencyMs: 820,
+        })),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Database error fetching agent metrics: ${error.message}`,
         data: [
           { agentId: 'agent-research-1', revenueUsdc: 210.50, invocations: 1402, avgLatencyMs: 820 },
         ],
       };
     }
-
-    return {
-      success: true,
-      data: usage.map(u => ({
-        agentId: u.agentId,
-        revenueUsdc: Number(u.totalRevenue),
-        invocations: u.invocations,
-        avgLatencyMs: 820,
-      })),
-    };
   }
 
   @Get('analytics/payments')
@@ -197,15 +233,38 @@ export class AnalyticsController {
 
   @Get('analytics/revenue')
   async getRevenue() {
-    await this.seedIfEmpty();
-    const revs = await this.prisma.dailyRevenue.findMany({
-      orderBy: { date: 'asc' },
-      take: 30,
-    });
-
-    if (revs.length === 0) {
+    try {
+      await this.seedIfEmpty();
+      const revs = await this.prisma.dailyRevenue.findMany({
+        orderBy: { date: 'asc' },
+        take: 30,
+      });
+  
+      if (revs.length === 0) {
+        return {
+          success: true,
+          data: [
+            { date: '2026-06-25', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
+            { date: '2026-06-26', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
+            { date: '2026-06-27', revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
+            { date: '2026-06-28', revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
+          ],
+        };
+      }
+  
       return {
         success: true,
+        data: revs.map(r => ({
+          date: r.date.toISOString().split('T')[0],
+          revenue: Number(r.revenue),
+          expenses: Number(r.expenses),
+          platformFee: Number(r.platformFee),
+        })),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Database error fetching revenue metrics: ${error.message}`,
         data: [
           { date: '2026-06-25', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
           { date: '2026-06-26', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
@@ -214,15 +273,5 @@ export class AnalyticsController {
         ],
       };
     }
-
-    return {
-      success: true,
-      data: revs.map(r => ({
-        date: r.date.toISOString().split('T')[0],
-        revenue: Number(r.revenue),
-        expenses: Number(r.expenses),
-        platformFee: Number(r.platformFee),
-      })),
-    };
   }
 }

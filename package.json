@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "postinstall": "pnpm --recursive exec prisma generate",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

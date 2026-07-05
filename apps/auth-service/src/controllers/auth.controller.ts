@@ -10,62 +10,112 @@ export class AuthController {
   @Post('auth/register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    try {
+      return await this.authService.register(dto);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Registration database error: ${error.message}` };
+    }
   }
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+    try {
+      return await this.authService.login(dto);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Login database error: ${error.message}` };
+    }
   }
 
   @Post('auth/logout')
   @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: any) {
-    return this.authService.logout(req.user.sub);
+    try {
+      return await this.authService.logout(req.user.sub);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Logout database error: ${error.message}` };
+    }
   }
 
   @Post('auth/refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refresh(refreshToken);
+    try {
+      return await this.authService.refresh(refreshToken);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Session refresh database error: ${error.message}` };
+    }
   }
 
   @Post('auth/wallet/login')
   @HttpCode(HttpStatus.OK)
   async walletLogin(@Body() dto: WalletLoginDto) {
-    return this.authService.walletLogin(dto);
+    try {
+      return await this.authService.walletLogin(dto);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Wallet login database error: ${error.message}` };
+    }
   }
 
   @Post('auth/apikeys')
   @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createApiKey(@Req() req: any, @Body() dto: CreateApiKeyDto) {
-    return this.authService.createApiKey(req.user.sub, dto);
+    try {
+      return await this.authService.createApiKey(req.user.sub, dto);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `API key creation database error: ${error.message}` };
+    }
   }
 
   @Get('auth/apikeys')
   @UseGuards(AuthGuard)
   async getApiKeys(@Req() req: any) {
-    return this.authService.getApiKeys(req.user.sub);
+    try {
+      return await this.authService.getApiKeys(req.user.sub);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `API keys fetch database error: ${error.message}` };
+    }
   }
 
   @Delete('auth/apikeys/:id')
   @UseGuards(AuthGuard)
   async deleteApiKey(@Req() req: any, @Param('id') id: string) {
-    return this.authService.deleteApiKey(req.user.sub, id);
+    try {
+      return await this.authService.deleteApiKey(req.user.sub, id);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `API key deletion database error: ${error.message}` };
+    }
   }
 
   @Get('auth/me')
   @UseGuards(AuthGuard)
   async getMe(@Req() req: any) {
-    return this.authService.getProfile(req.user.sub);
+    try {
+      return await this.authService.getProfile(req.user.sub);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Profile fetch database error: ${error.message}` };
+    }
   }
 
   @Patch('auth/profile')
   @UseGuards(AuthGuard)
   async updateProfile(@Req() req: any, @Body() dto: UpdateProfileDto) {
-    return this.authService.updateProfile(req.user.sub, dto);
+    try {
+      return await this.authService.updateProfile(req.user.sub, dto);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Profile update database error: ${error.message}` };
+    }
   }
 }
