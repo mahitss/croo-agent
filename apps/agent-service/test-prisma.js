@@ -1,6 +1,10 @@
 const { PrismaClient } = require('./node_modules/@prisma/client-agent');
 
-const directUrl = "postgresql://neondb_owner:npg_vtNFKoZ0CQ9L@ep-flat-fog-aohnirvo.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&schema=agents";
+const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+
+if (!directUrl) {
+  throw new Error("DIRECT_URL or DATABASE_URL environment variable is missing.");
+}
 
 const prisma = new PrismaClient({
   datasources: {

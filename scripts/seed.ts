@@ -168,8 +168,15 @@ const seedAgents = [
 export async function run() {
   console.log('Starting seed script execution...');
 
-  const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_vtNFKoZ0CQ9L@ep-flat-fog-aohnirvo-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require&pgbouncer=true";
-  
+console.log("Starting seed script execution...");
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL environment variable is missing. Configure it before running the seed script."
+  );
+}  
   // Route connection strings to their exact target schemas
   const authUrl = connectionString.includes('schema=') 
     ? connectionString.replace(/schema=[^&]*/, 'schema=auth') 
