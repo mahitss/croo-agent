@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "pnpm --recursive exec prisma generate",
+    "postinstall": "pnpm --filter auth-service --filter agent-service --filter workflow-service --filter payment-service --filter wallet-service --filter analytics-service --filter notification-service exec prisma generate || exit 0",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
