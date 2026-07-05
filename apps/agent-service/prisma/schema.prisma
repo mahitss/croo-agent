@@ -5,8 +5,9 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/@prisma/client-agent"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/@prisma/client-agent"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 enum VerificationStatus {
