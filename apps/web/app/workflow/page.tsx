@@ -28,6 +28,7 @@ export default function WorkflowPage() {
   const completionTokens = useNexusStore((state) => state.completionTokens);
   const totalTokens = useNexusStore((state) => state.totalTokens);
   const estimatedCost = useNexusStore((state) => state.estimatedCost);
+  const initialize = useNexusStore((state) => state.initialize);
 
   const { toast } = useToast();
 
@@ -40,8 +41,10 @@ export default function WorkflowPage() {
   const [isPlanning, setIsPlanning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Check URL query parameters to bind Swarm Matchmaker from Marketplace
+  // Check URL query parameters and initialize store
   useEffect(() => {
+    initialize();
+
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlPrompt = params.get('prompt');

@@ -402,6 +402,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         userId: 'user-1',
         estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
         nodes: nodes.map((n, idx) => ({
+          id: n.id,
           agentId: n.assignedAgentId,
           capability: n.capability,
           status: 'pending',
@@ -420,6 +421,24 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
 
       const dbWorkflow = wfCreate.data;
+
+      // Cache metadata in localStorage
+      localStorage.setItem(`orbit_workflow_metadata_${dbWorkflow.id}`, JSON.stringify({
+        query,
+        routingMode,
+        budget,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCost: estCost
+      }));
+      localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
+      
+      // Update URL query parameters without forcing page reload
+      if (typeof window !== 'undefined') {
+        const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${dbWorkflow.id}`;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+      }
 
       const workflow: Workflow = {
         id: dbWorkflow.id,
@@ -798,6 +817,84 @@ export const useNexusStore = create<NexusState>((set, get) => {
               history: txsList
             }
           });
+        }
+
+        // Reconstruct workflow if ID is in URL or localStorage
+        let workflowId = '';
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          workflowId = params.get('workflowId') || '';
+        }
+        if (!workflowId && typeof window !== 'undefined') {
+          workflowId = localStorage.getItem('orbit_last_workflow_id') || '';
+          if (workflowId) {
+            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+          }
+        }
+
+        if (workflowId) {
+          try {
+            const wfRes = await apiClient.get<any>(`/api/v1/workflows/${workflowId}`);
+            if (wfRes?.success && wfRes.data) {
+              const dbWorkflow = wfRes.data;
+              const dbAgents = get().agents.length > 0 ? get().agents : seedAgents;
+              
+              let meta = {
+                query: dbWorkflow.title,
+                routingMode: 'balanced',
+                budget: Number(dbWorkflow.estimatedCost),
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                estimatedCost: Number(dbWorkflow.estimatedCost)
+              };
+              const storedMeta = localStorage.getItem(`orbit_workflow_metadata_${workflowId}`);
+              if (storedMeta) {
+                meta = { ...meta, ...JSON.parse(storedMeta) };
+              }
+
+              const workflow: Workflow = {
+                id: dbWorkflow.id,
+                name: dbWorkflow.title,
+                query: meta.query,
+                nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+                  const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+                  return {
+                    id: n.id,
+                    name: `Stage: ${n.capability.toUpperCase()}`,
+                    description: `Execute capability: ${n.capability}`,
+                    capability: n.capability,
+                    costEstimate: agent.price,
+                    timeEstimate: agent.latency,
+                    status: n.status,
+                    assignedAgentId: n.agentId
+                  };
+                }) : [],
+                edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+                  id: e.id,
+                  source: e.sourceNode,
+                  target: e.targetNode
+                })) : [],
+                budget: Number(meta.budget),
+                routingMode: meta.routingMode as any,
+                retryCount: 0,
+                status: dbWorkflow.status,
+                createdAt: dbWorkflow.createdAt
+              };
+
+              set({
+                activeWorkflow: workflow,
+                userQuery: meta.query,
+                promptTokens: meta.promptTokens,
+                completionTokens: meta.completionTokens,
+                totalTokens: meta.totalTokens,
+                estimatedCost: meta.estimatedCost
+              });
+            }
+          } catch (wfErr) {
+            console.warn('Failed to restore active workflow session', wfErr);
+          }
         }
       } catch (err) {
         console.warn('API Gateway offline. Running in sandbox mode.', err);

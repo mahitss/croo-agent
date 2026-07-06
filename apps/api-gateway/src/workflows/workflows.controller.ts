@@ -143,11 +143,22 @@ export class WorkflowsController {
             capability: node.capability,
             label: node.id.toUpperCase(),
           })),
-          edges: data.workflow.slice(1).map((node: any, idx: number) => ({
-            id: `edge-${idx}`,
-            source: data.workflow[idx].id,
-            target: node.id,
-          })),
+          edges: (() => {
+            const list: any[] = [];
+            let edgeIdx = 0;
+            data.workflow.forEach((node: any) => {
+              if (node.dependencies && Array.isArray(node.dependencies)) {
+                node.dependencies.forEach((dep: string) => {
+                  list.push({
+                    id: `edge-${edgeIdx++}`,
+                    source: dep,
+                    target: node.id,
+                  });
+                });
+              }
+            });
+            return list;
+          })(),
           prompt_tokens: data.prompt_tokens || 0,
           completion_tokens: data.completion_tokens || 0,
           estimated_cost: data.estimated_cost || 0,

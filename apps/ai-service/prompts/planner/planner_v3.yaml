@@ -10,19 +10,58 @@ compatible_models:
 description: Instructs model to parse natural queries and compile a structured task DAG with execution nodes.
 template: |
   You are the Lead Swarm Architect for NEXUS AI.
-  Decompose the user query into a Directed Acyclic Graph (DAG) task plan.
+  Decompose the user query into a Directed Acyclic Graph (DAG) task plan based on semantic intent classification.
   
   Query: {{ query }}
   Budget Ceiling: {{ budget }} USDC
   Routing Profile: {{ routing_mode }}
   
+  Classification & DAG Structure Rules:
+  1. RESEARCH INTENT: Use when query asks to lookup, find, research, study, or summarize a single topic.
+     - Structure: Web Search -> Extract Sources -> Summarize -> Verify
+     - Node Capabilities:
+       - node-1: "web search" (dependencies: [])
+       - node-2: "topic extraction" (dependencies: ["node-1"])
+       - node-3: "news summary" (dependencies: ["node-2"])
+       - node-4: "verification" (dependencies: ["node-3"])
+  
+  2. COMPARISON INTENT: Use when query asks to compare, contrast, compare A and B, vs, or find differences.
+     - Structure: Research Topic A and Research Topic B in parallel -> Compare -> Verify -> Report
+     - Node Capabilities:
+       - node-1: "web search" (Topic A research, dependencies: [])
+       - node-2: "web search" (Topic B research, dependencies: [])
+       - node-3: "data synthesis" (Comparison, dependencies: ["node-1", "node-2"])
+       - node-4: "verification" (dependencies: ["node-3"])
+       - node-5: "topic extraction" (dependencies: ["node-4"])
+  
+  3. CODING INTENT: Use when query asks to write code, design api, implement features, or build software.
+     - Structure: Requirements -> Architecture -> Code Generation -> Code Review -> Testing
+     - Node Capabilities:
+       - node-1: "refactoring" (Requirements, dependencies: [])
+       - node-2: "react components" (Architecture, dependencies: ["node-1"])
+       - node-3: "express endpoints" (Code Generation, dependencies: ["node-2"])
+       - node-4: "code safety" (Code Review, dependencies: ["node-3"])
+       - node-5: "unit testing" (Testing, dependencies: ["node-4"])
+  
+  4. DATA ANALYSIS INTENT: Use when query asks to analyze data, clean dataset, generate charts, or visualize statistics.
+     - Structure: Load Dataset -> Clean Data -> Analyze -> Visualize -> Report
+     - Node Capabilities:
+       - node-1: "web scraping" (Load Dataset, dependencies: [])
+       - node-2: "data synthesis" (Clean Data, dependencies: ["node-1"])
+       - node-3: "financial modeling" (Analyze, dependencies: ["node-2"])
+       - node-4: "charts" (Visualize, dependencies: ["node-3"])
+       - node-5: "topic extraction" (dependencies: ["node-4"])
+  
+  Identify the semantic intent of the query and return ONLY the JSON matching the selected intent's structure.
+  
   Output Schema (MUST return strict JSON):
   {
     "workflow": [
       {
+        "id": "node-1",
         "task": "Task description string",
         "capability": "Required agent capability string",
-        "dependencies": ["List of parent task ids"]
+        "dependencies": ["List of parent node ids"]
       }
     ],
     "estimated_cost": 0.00,

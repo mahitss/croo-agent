@@ -19,9 +19,11 @@ export class WorkflowController {
         },
       });
   
+      const nodeMapping = new Map<string, string>();
+
       if (body.nodes && Array.isArray(body.nodes)) {
         for (const node of body.nodes) {
-          await this.prisma.workflowNode.create({
+          const dbNode = await this.prisma.workflowNode.create({
             data: {
               workflowId: workflow.id,
               agentId: node.agentId || 'agent-research-1',
@@ -31,16 +33,21 @@ export class WorkflowController {
               positionY: node.positionY || 0,
             },
           });
+          if (node.id) {
+            nodeMapping.set(node.id, dbNode.id);
+          }
         }
       }
   
       if (body.edges && Array.isArray(body.edges)) {
         for (const edge of body.edges) {
+          const sourceUuid = nodeMapping.get(edge.sourceNode) || edge.sourceNode || '';
+          const targetUuid = nodeMapping.get(edge.targetNode) || edge.targetNode || '';
           await this.prisma.workflowEdge.create({
             data: {
               workflowId: workflow.id,
-              sourceNode: edge.sourceNode || '',
-              targetNode: edge.targetNode || '',
+              sourceNode: sourceUuid,
+              targetNode: targetUuid,
             },
           });
         }
