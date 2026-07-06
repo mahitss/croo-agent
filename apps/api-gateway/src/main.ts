@@ -37,42 +37,57 @@ async function bootstrap() {
 
   // Resolve allowed CORS origins dynamically
   const defaultOrigins = [
-    'http://localhost:3000',
-    'https://croo-agent-web.vercel.app',
-    'https://orbitai.dev'
+    "http://localhost:3000",
+    "https://croo-agent-web.vercel.app",
+    "https://orbitai.dev",
   ];
-  const envOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [];
-  const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
-  // Apply dynamic CORS options with preview URL matching support
+  const envOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+    : [];
+
+  const allowedOrigins = [...defaultOrigins, ...envOrigins];
+
   app.enableCors({
     origin: (origin, callback) => {
+      // Allow server-to-server requests
       if (!origin) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
-      try {
-        const parsedUrl = new URL(origin);
-        const hostname = parsedUrl.hostname;
-        const isAllowed = allowedOrigins.includes(origin) ||
-                          hostname === 'croo-agent-web.vercel.app' ||
-                          hostname.endsWith('.vercel.app') ||
-                          hostname === 'localhost' ||
-                          hostname === '127.0.0.1';
-        if (isAllowed) {
-          callback(null, true);
-        } else {
-          console.warn(`[CORS_BLOCKED] Origin: ${origin} (hostname: ${hostname}) was blocked.`);
-          callback(null, false);
-        }
-      } catch (err) {
-        callback(null, false);
+
+      // Exact matches
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
       }
+
+      // Allow ALL Vercel preview deployments
+      if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
     },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+
     credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
+
+    optionsSuccessStatus: 204,
   });
 
   // Enable global validation pipeline for secure requests
