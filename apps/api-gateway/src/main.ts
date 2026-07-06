@@ -46,9 +46,31 @@ async function bootstrap() {
     : [];
   const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
-  // Apply dynamic CORS options
+  // Apply dynamic CORS options with preview URL matching support
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      try {
+        const parsedUrl = new URL(origin);
+        const hostname = parsedUrl.hostname;
+        const isAllowed = allowedOrigins.includes(origin) ||
+                          hostname === 'croo-agent-web.vercel.app' ||
+                          hostname.endsWith('.vercel.app') ||
+                          hostname === 'localhost' ||
+                          hostname === '127.0.0.1';
+        if (isAllowed) {
+          callback(null, true);
+        } else {
+          console.warn(`[CORS_BLOCKED] Origin: ${origin} (hostname: ${hostname}) was blocked.`);
+          callback(null, false);
+        }
+      } catch (err) {
+        callback(null, false);
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
