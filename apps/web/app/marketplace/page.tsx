@@ -40,7 +40,7 @@ export default function MarketplacePage() {
   const [matchmakerPrompt, setMatchmakerPrompt] = useState('');
   const [isMatching, setIsMatching] = useState(false);
   const [matchedStack, setMatchedStack] = useState<{
-    chain: string[];
+    chain: { name: string; reason: string }[];
     cost: number;
     time: string;
   } | null>(null);
@@ -103,15 +103,81 @@ export default function MarketplacePage() {
         budget: 2.0
       });
       if (planRes.success && planRes.data) {
-        const chainNames = planRes.data.nodes.map((node: any) => {
+        const assignedIds: string[] = [];
+        const chainItems = planRes.data.nodes.map((node: any) => {
           const cap = node.capability.toLowerCase();
-          const matchedAgent = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap));
-          return matchedAgent ? matchedAgent.name : node.id.toUpperCase();
+          
+          let candidates = agents.filter(a => 
+            a.skills.some(s => s.toLowerCase().includes(cap)) || 
+            a.category.toLowerCase().includes(cap)
+          );
+          if (candidates.length === 0) candidates = agents;
+          
+          const prices = candidates.map(c => c.price);
+          const latencies = candidates.map(c => c.latency);
+          const maxPrice = Math.max(...prices, 0.5);
+          const maxLatency = Math.max(...latencies, 3000);
+          
+          let bestAgent = candidates[0] || agents[0];
+          let bestScore = -1;
+          let bestReason = 'Optimal selection';
+          
+          candidates.forEach(agent => {
+            const costScore = 1 - (agent.price / maxPrice);
+            const trustScore = agent.trustScore / 100;
+            const latencyScore = 1 - (agent.latency / maxLatency);
+            const accuracyScore = agent.accuracy / 100;
+            const successScore = (100 - agent.failureRate) / 100;
+            
+            let score = (costScore * 0.2) + (trustScore * 0.25) + (latencyScore * 0.15) + (accuracyScore * 0.2) + (successScore * 0.2);
+            
+            // Diversity penalty
+            const duplicateCount = assignedIds.filter(id => id === agent.id).length;
+            if (duplicateCount > 0) {
+              score -= (0.35 * duplicateCount);
+            }
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestAgent = agent;
+              
+              const reasons: string[] = [];
+              const isCheapest = agent.price === Math.min(...prices);
+              const isFastest = agent.latency === Math.min(...latencies);
+              const isHighTrust = agent.trustScore >= 95;
+              
+              if (isFastest) reasons.push('Fastest');
+              if (isCheapest) reasons.push('Lowest cost');
+              if (isHighTrust) reasons.push(`${agent.trustScore}% trust success`);
+              if (agent.accuracy >= 95) reasons.push('Highest accuracy');
+              
+              bestReason = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'Optimal selection';
+            }
+          });
+          
+          assignedIds.push(bestAgent.id);
+          return {
+            name: bestAgent.name,
+            reason: bestReason
+          };
         });
+
+        // Compute dynamic estimated budget and latency based on selected agents
+        const totalCost = planRes.data.nodes.reduce((sum: number, n: any) => {
+          const cap = n.capability.toLowerCase();
+          const matched = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || agents[0];
+          return sum + matched.price;
+        }, 0);
+        const maxLatencyVal = Math.max(...planRes.data.nodes.map((n: any) => {
+          const cap = n.capability.toLowerCase();
+          const matched = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || agents[0];
+          return matched.latency;
+        }));
+
         setMatchedStack({
-          chain: chainNames,
-          cost: planRes.data.estimated_cost || 0.33,
-          time: `${planRes.data.estimated_duration_seconds || 135}s`
+          chain: chainItems,
+          cost: totalCost || planRes.data.estimated_cost || 0.33,
+          time: `${Math.round(maxLatencyVal / 1000) || 5}s`
         });
       }
     } catch (err: any) {
@@ -232,12 +298,13 @@ export default function MarketplacePage() {
           <div className="border border-border-dark bg-black/80 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-2 transition-all relative z-10">
             <div className="flex flex-col gap-2">
               <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Recommended Swarm Execution Flow:</span>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-white font-mono">
+              <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-white font-mono">
                 {matchedStack.chain.map((step, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span className="bg-white/5 border border-border-dark px-3 py-1.5 rounded-lg text-primary-neon font-bold">
-                      {step}
-                    </span>
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="bg-white/5 border border-border-dark px-3 py-2 rounded-xl flex flex-col items-start gap-1">
+                      <span className="text-primary-neon font-bold">{step.name}</span>
+                      <span className="text-[9px] text-gray-400 font-mono font-normal">Selected: {step.reason}</span>
+                    </div>
                     {idx < matchedStack.chain.length - 1 && <ArrowRight className="w-4 h-4 text-gray-600" />}
                   </div>
                 ))}

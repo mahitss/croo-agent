@@ -141,7 +141,7 @@ export class WorkflowsController {
           nodes: data.workflow.map((node: any) => ({
             id: node.id,
             capability: node.capability,
-            label: node.id.toUpperCase(),
+            label: node.task || node.id.toUpperCase(),
           })),
           edges: (() => {
             const list: any[] = [];

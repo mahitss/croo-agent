@@ -194,6 +194,66 @@ const seedAgents: Agent[] = [
   }
 ];
 
+function selectBestAgent(capability: string, assignedIds: string[], dbAgents: Agent[]): { agent: Agent; reason: string } {
+  const cap = capability.toLowerCase();
+  
+  let candidates = dbAgents.filter(a => 
+    a.skills.some(s => s.toLowerCase().includes(cap)) || 
+    a.category.toLowerCase().includes(cap)
+  );
+  
+  if (candidates.length === 0) {
+    candidates = dbAgents;
+  }
+  
+  const prices = candidates.map(c => c.price);
+  const latencies = candidates.map(c => c.latency);
+  const maxPrice = Math.max(...prices, 0.5);
+  const maxLatency = Math.max(...latencies, 3000);
+  
+  let bestAgent = candidates[0] || dbAgents[0];
+  let bestScore = -1;
+  let bestReason = 'Optimal selection';
+  
+  candidates.forEach(agent => {
+    const costScore = 1 - (agent.price / maxPrice);
+    const trustScore = agent.trustScore / 100;
+    const latencyScore = 1 - (agent.latency / maxLatency);
+    const accuracyScore = agent.accuracy / 100;
+    const successScore = (100 - agent.failureRate) / 100;
+    
+    let score = (costScore * 0.2) + (trustScore * 0.25) + (latencyScore * 0.15) + (accuracyScore * 0.2) + (successScore * 0.2);
+    
+    const duplicateCount = assignedIds.filter(id => id === agent.id).length;
+    if (duplicateCount > 0) {
+      score -= (0.35 * duplicateCount); // diversity penalty
+    }
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestAgent = agent;
+      
+      const reasons: string[] = [];
+      const isCheapest = agent.price === Math.min(...prices);
+      const isFastest = agent.latency === Math.min(...latencies);
+      const isHighTrust = agent.trustScore >= 95;
+      
+      if (isFastest) reasons.push('Fastest');
+      if (isCheapest) reasons.push('Lowest cost');
+      if (isHighTrust) reasons.push(`${agent.trustScore}% trust success`);
+      if (agent.accuracy >= 95) reasons.push('Highest accuracy');
+      
+      if (reasons.length > 0) {
+        bestReason = reasons.slice(0, 3).join(', ');
+      } else {
+        bestReason = 'Optimal selection';
+      }
+    }
+  });
+  
+  return { agent: bestAgent, reason: bestReason };
+}
+
 export const useNexusStore = create<NexusState>((set, get) => {
   return {
     agents: [],
@@ -376,18 +436,28 @@ export const useNexusStore = create<NexusState>((set, get) => {
         estimatedCost: estCost
       });
 
+      const assignedIds: string[] = [];
+      const nodeTitles: Record<string, string> = {};
+      const agentSelectionReasons: Record<string, string> = {};
+
       const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
         const cap = n.capability.toLowerCase();
-        const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
+        const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
+        assignedIds.push(agent.id);
+
+        const nodeTitle = n.label || n.id.toUpperCase();
+        nodeTitles[n.id] = nodeTitle;
+        agentSelectionReasons[n.id] = reason;
+
         return {
           id: n.id,
-          name: n.label || n.id.toUpperCase(),
-          description: `Execute capability: ${cap}`,
+          name: nodeTitle,
+          description: `Execute capability: ${cap}. Selected because: ${reason}`,
           capability: cap,
-          costEstimate: matchedAgent.price,
-          timeEstimate: matchedAgent.latency,
+          costEstimate: agent.price,
+          timeEstimate: agent.latency,
           status: 'pending',
-          assignedAgentId: matchedAgent.id
+          assignedAgentId: agent.id
         };
       });
 
@@ -430,7 +500,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
         promptTokens,
         completionTokens,
         totalTokens,
-        estimatedCost: estCost
+        estimatedCost: estCost,
+        nodeTitles,
+        agentSelectionReasons
       }));
       localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
       
@@ -448,8 +520,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
           const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
           return {
             id: n.id,
-            name: `Stage: ${n.capability.toUpperCase()}`,
-            description: `Execute capability: ${n.capability}`,
+            name: nodeTitles[n.id] || `Stage: ${n.capability.toUpperCase()}`,
+            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || 'Optimal selection'}`,
             capability: n.capability,
             costEstimate: agent.price,
             timeEstimate: agent.latency,
@@ -685,7 +757,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             const currentWf = statusRes.data;
             
             const updatedNodes = workflow.nodes.map(n => {
-              const dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
+              const dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
               return dbNode ? { ...n, status: dbNode.status } : n;
             });
             
@@ -847,7 +919,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 promptTokens: 0,
                 completionTokens: 0,
                 totalTokens: 0,
-                estimatedCost: Number(dbWorkflow.estimatedCost)
+                estimatedCost: Number(dbWorkflow.estimatedCost),
+                nodeTitles: {} as Record<string, string>,
+                agentSelectionReasons: {} as Record<string, string>
               };
               const storedMeta = localStorage.getItem(`orbit_workflow_metadata_${workflowId}`);
               if (storedMeta) {
@@ -862,8 +936,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
                   const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
                   return {
                     id: n.id,
-                    name: `Stage: ${n.capability.toUpperCase()}`,
-                    description: `Execute capability: ${n.capability}`,
+                    name: meta.nodeTitles?.[n.id] || `Stage: ${n.capability.toUpperCase()}`,
+                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || 'Optimal selection'}`,
                     capability: n.capability,
                     costEstimate: agent.price,
                     timeEstimate: agent.latency,
