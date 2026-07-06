@@ -61,12 +61,12 @@ export const apiClient = {
           return this.get<T>(url, retries - 1, delay * 2);
         }
 
-        throw new Error(`HTTP Error: ${response.status}`);
+        throw { name: "HttpError", status: response.status, message: `HTTP Error: ${response.status}` };
       }
 
       return response.json() as Promise<T>;
     } catch (error: any) {
-      if (retries > 0 && error.name !== "AbortError") {
+      if (retries > 0 && error.name !== "AbortError" && error.name !== "HttpError") {
         console.warn(
           `[API_RETRY] Network error → ${url}: ${error.message}. Retrying in ${delay}ms...`
         );

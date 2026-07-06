@@ -90,6 +90,36 @@ export class AnalyticsController {
     }
   }
 
+  @Get('analytics/platform')
+  async getPlatformMetrics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/platform`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
+  }
+
+  @Get('analytics/workflows')
+  async getWorkflowMetrics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/workflows`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
+  }
+
+  @Get('analytics/agents')
+  async getAgentMetrics() {
+    try {
+      const res = await fetch(`${this.analyticsUrl}/analytics/agents`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Analytics service unreachable: ${err.message}` };
+    }
+  }
+
   // --- ADMIN PANEL ---
   @Get('admin/users')
   @UseGuards(GatewayAuthGuard, RolesGuard)
