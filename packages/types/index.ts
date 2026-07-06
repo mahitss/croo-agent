@@ -30,6 +30,7 @@ export interface TaskNode {
   assignedAgentId?: string;
   output?: string;
   error?: string;
+  retryCount?: number;
 }
 
 export interface WorkflowEdge {

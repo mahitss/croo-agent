@@ -6,6 +6,8 @@ import CommandPalette from "../components/CommandPalette";
 import AiAssistant from "../components/AiAssistant";
 import { ToastProvider } from "../components/Toast";
 import DemoBanner from "../components/DemoBanner";
+import AuthModal from "../components/AuthModal";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,13 +28,16 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased min-h-screen flex flex-col font-sans`}>
         <ToastProvider>
-          <DemoBanner />
-          <Navbar />
-          <main className="flex-1 flex flex-col">
-            {children}
-          </main>
-          <CommandPalette />
-          <AiAssistant />
+          <ErrorBoundary>
+            <DemoBanner />
+            <Navbar />
+            <main className="flex-1 flex flex-col">
+              {children}
+            </main>
+            <CommandPalette />
+            <AiAssistant />
+            <AuthModal />
+          </ErrorBoundary>
         </ToastProvider>
       </body>
     </html>

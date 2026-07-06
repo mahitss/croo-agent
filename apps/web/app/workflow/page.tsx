@@ -29,6 +29,12 @@ export default function WorkflowPage() {
   const totalTokens = useNexusStore((state) => state.totalTokens);
   const estimatedCost = useNexusStore((state) => state.estimatedCost);
   const initialize = useNexusStore((state) => state.initialize);
+  
+  // Custom Node Operations
+  const renameNode = useNexusStore((state) => state.renameNode);
+  const deleteNode = useNexusStore((state) => state.deleteNode);
+  const retryNode = useNexusStore((state) => state.retryNode);
+  const cancelWorkflow = useNexusStore((state) => state.cancelWorkflow);
 
   const { toast } = useToast();
 
@@ -40,6 +46,8 @@ export default function WorkflowPage() {
   
   const [isPlanning, setIsPlanning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [nodeNameInput, setNodeNameInput] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Check URL query parameters and initialize store
   useEffect(() => {
@@ -54,6 +62,12 @@ export default function WorkflowPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (selectedNode) {
+      setNodeNameInput(selectedNode.name);
+    }
+  }, [selectedNode]);
 
   const handleGenerateWorkflow = async () => {
     if (!promptInput.trim()) return;
@@ -182,9 +196,17 @@ export default function WorkflowPage() {
               </div>
 
               <div className="flex flex-col gap-3">
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-1">
                   <span className="text-[9px] text-gray-500 uppercase">Step Name</span>
-                  <span className="text-white font-bold text-[11px] mt-0.5">{selectedNode.name}</span>
+                  <input
+                    type="text"
+                    value={nodeNameInput}
+                    onChange={(e) => {
+                      setNodeNameInput(e.target.value);
+                      renameNode(selectedNode.id, e.target.value);
+                    }}
+                    className="bg-black/60 border border-border-dark focus:border-primary-neon/40 px-2 py-1 rounded text-white outline-none"
+                  />
                 </div>
 
                 <div className="flex flex-col">
@@ -221,6 +243,65 @@ export default function WorkflowPage() {
                   <span className="text-white font-bold mt-0.5">
                     {selectedNode.retryCount > 0 ? `${selectedNode.retryCount} Retries` : '0 Retries'}
                   </span>
+                </div>
+
+                {/* Operations & Expand Panel */}
+                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="text-left text-[10px] text-primary-neon font-bold tracking-wider hover:underline"
+                  >
+                    {isExpanded ? '[-] Hide Details' : '[+] Expand Details'}
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="bg-black/30 p-2 rounded border border-border-dark/50 flex flex-col gap-1.5 text-[10px] animate-in slide-in-from-top duration-100">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Capability:</span>
+                        <span className="text-gray-300">{selectedNode.capability}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Endpoint:</span>
+                        <span className="text-gray-400 font-mono truncate max-w-[120px]" title={assignedAgent?.endpoint}>{assignedAgent?.endpoint || 'Local'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Accuracy:</span>
+                        <span className="text-gray-300">{assignedAgent?.accuracy || 95}%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Node Operations */}
+                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
+                  <span className="text-[9px] text-gray-500 uppercase">Operations</span>
+                  <div className="flex gap-2">
+                    {selectedNode.status === 'failed' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          retryNode(selectedNode.id);
+                          toast(`Retrying node execution: ${selectedNode.name}`, 'info');
+                          setSelectedNode((prev: any) => ({ ...prev, status: 'pending', retryCount: (prev.retryCount || 0) + 1 }));
+                        }}
+                        className="bg-yellow-400 text-black text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all flex-1 text-center"
+                      >
+                        Retry Node
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteNode(selectedNode.id);
+                        toast(`Removed node from DAG: ${selectedNode.name}`, 'success');
+                        setSelectedNode(null);
+                      }}
+                      className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-all flex-grow text-center"
+                    >
+                      Delete Node
+                    </button>
+                  </div>
                 </div>
 
                 {/* Token Usage & Cost per Node details */}

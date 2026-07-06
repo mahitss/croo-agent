@@ -284,4 +284,68 @@ export class WalletController {
       data: result,
     };
   }
+
+  @Post('wallet/deposit-credits')
+  @HttpCode(HttpStatus.OK)
+  async depositCredits(@Body() body: { address?: string; userId?: string; amount: number }) {
+    try {
+      const address = body.address || '0x3a4b...e9c2';
+      let wallet = await this.prisma.wallet.findFirst({
+        where: { address }
+      });
+      if (!wallet && body.userId) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { userId: body.userId }
+        });
+      }
+      if (!wallet) {
+        wallet = await this.prisma.wallet.create({
+          data: {
+            userId: body.userId || 'user-1',
+            address,
+            network: 'CAP',
+            verified: true,
+          }
+        });
+      }
+      let balance = await this.prisma.balance.findFirst({
+        where: { walletId: wallet.id }
+      });
+      if (!balance) {
+        balance = await this.prisma.balance.create({
+          data: {
+            walletId: wallet.id,
+            available: Number(body.amount),
+            reserved: 0.0,
+            pending: 0.0,
+          }
+        });
+      } else {
+        balance = await this.prisma.balance.update({
+          where: { walletId: wallet.id },
+          data: {
+            available: Number(balance.available) + Number(body.amount)
+          }
+        });
+      }
+      
+      await this.prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'deposit',
+          amount: body.amount,
+          status: 'completed',
+          reference: 'Razorpay Deposit',
+        }
+      });
+      
+      return {
+        success: true,
+        message: 'Credits deposited successfully',
+        data: { balance: Number(balance.available) }
+      };
+    } catch (error: any) {
+      return { success: false, message: `Database error depositing credits: ${error.message}` };
+    }
+  }
 }

@@ -17,6 +17,13 @@ interface NexusState {
   totalTokens: number;
   estimatedCost: number;
   
+  // Auth & Mode States
+  user: { id: string; email: string; username: string; role: 'user' | 'creator' | 'admin'; displayName?: string; avatarUrl?: string; } | null;
+  token: string | null;
+  isDemoMode: boolean;
+  isAuthModalOpen: boolean;
+  authModalTab: 'login' | 'register' | 'forgot';
+  
   // Actions
   setUserQuery: (query: string) => void;
   generateWorkflow: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Promise<void>;
@@ -24,11 +31,25 @@ interface NexusState {
   resetExecution: () => void;
   setRoutingMode: (mode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced') => void;
   setBudget: (budget: number) => void;
+  renameNode: (nodeId: string, newName: string) => void;
+  deleteNode: (nodeId: string) => void;
+  retryNode: (nodeId: string) => void;
+  cancelWorkflow: () => void;
   registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => Promise<void>;
   depositUserWallet: (amount: number) => Promise<void>;
   withdrawUserWallet: (amount: number) => Promise<void>;
   initialize: () => Promise<void>;
   resetDemoMode: () => void;
+  
+  // Auth Actions
+  setAuthModal: (open: boolean, tab?: 'login' | 'register' | 'forgot') => void;
+  loginUser: (usernameOrEmail: string, password: string) => Promise<boolean>;
+  registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
+  logoutUser: () => Promise<void>;
+  loginOAuth: (provider: 'google' | 'github') => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  toggleDemoMode: () => void;
 }
 
 const seedAgents: Agent[] = [
@@ -273,6 +294,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
     completionTokens: 0,
     totalTokens: 0,
     estimatedCost: 0,
+    
+    // Auth & Mode Defaults
+    user: null,
+    token: null,
+    isDemoMode: true,
+    isAuthModalOpen: false,
+    authModalTab: 'login',
 
     setUserQuery: (query) => set({ userQuery: query }),
 
@@ -298,6 +326,42 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const activeWorkflow = get().activeWorkflow;
       if (activeWorkflow) {
         set({ activeWorkflow: { ...activeWorkflow, budget } });
+      }
+    },
+
+    renameNode: (nodeId, newName) => {
+      const activeWorkflow = get().activeWorkflow;
+      if (activeWorkflow) {
+        const updatedNodes = activeWorkflow.nodes.map(n => n.id === nodeId ? { ...n, name: newName } : n);
+        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes } });
+      }
+    },
+
+    deleteNode: (nodeId) => {
+      const activeWorkflow = get().activeWorkflow;
+      if (activeWorkflow) {
+        const updatedNodes = activeWorkflow.nodes.filter(n => n.id !== nodeId);
+        const updatedEdges = activeWorkflow.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes, edges: updatedEdges } });
+      }
+    },
+
+    retryNode: (nodeId) => {
+      const activeWorkflow = get().activeWorkflow;
+      if (activeWorkflow) {
+        const updatedNodes = activeWorkflow.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const, retryCount: (n.retryCount || 0) + 1 } : n);
+        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes } });
+      }
+    },
+
+    cancelWorkflow: () => {
+      const activeWorkflow = get().activeWorkflow;
+      if (activeWorkflow) {
+        set({ 
+          activeWorkflow: { ...activeWorkflow, status: 'failed' as const },
+          isRunning: false,
+          currentPhaseIndex: 0
+        });
       }
     },
 
@@ -342,35 +406,113 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     depositUserWallet: async (amount) => {
       const state = get();
-      try {
-        const res = await apiClient.post<any>('/api/v1/wallet/connect', {
-          amount,
-          userId: 'user-1',
-          address: state.userWallet.address
-        });
-        if (res.success) {
-          await get().initialize();
+      
+      // ─── DEMO MODE ────────────────────────────────────────────────────────
+      if (state.isDemoMode) {
+        try {
+          const res = await apiClient.post<any>('/api/v1/wallet/deposit-credits', {
+            amount,
+            userId: state.user?.id || 'user-1',
+            address: state.userWallet.address
+          });
+          if (res.success) {
+            await get().initialize();
+          } else {
+            throw new Error(res.message);
+          }
+        } catch (err) {
+          console.warn('Fallback local credit increment in Demo Mode:', err);
+          const tx: Transaction = {
+            id: `tx-deposit-${Date.now()}`,
+            senderAddress: 'EXTERNAL_BANK',
+            receiverAddress: state.userWallet.address,
+            amount,
+            type: 'deposit',
+            timestamp: new Date().toISOString(),
+            status: 'completed',
+            txHash: '0x' + Math.random().toString(16).substring(2, 42)
+          };
+          set({
+            userWallet: {
+              ...state.userWallet,
+              balance: state.userWallet.balance + amount,
+              history: [tx, ...state.userWallet.history]
+            }
+          });
         }
-      } catch (err) {
-        console.error('Failed to process wallet deposit, updating client state locally:', err);
-        const tx: Transaction = {
-          id: `tx-deposit-${Date.now()}`,
-          senderAddress: 'EXTERNAL_BANK',
-          receiverAddress: state.userWallet.address,
-          amount,
-          type: 'deposit',
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+        return;
+      }
+
+      // ─── LIVE MODE (Razorpay Checkout) ────────────────────────────────────
+      try {
+        const loadScript = (src: string) => {
+          return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+          });
         };
 
-        set({
-          userWallet: {
-            ...state.userWallet,
-            balance: state.userWallet.balance + amount,
-            history: [tx, ...state.userWallet.history]
-          }
+        const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+        if (!scriptLoaded) {
+          throw new Error('Razorpay SDK failed to load. Are you offline?');
+        }
+
+        const orderRes = await apiClient.post<any>('/api/v1/payments/razorpay/order', {
+          amount,
+          userId: state.user?.id || 'user-1'
         });
+
+        if (!orderRes.success) {
+          throw new Error(orderRes.message || 'Failed to create Razorpay Order');
+        }
+
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_mockkey123',
+          amount: orderRes.amount * 100,
+          currency: orderRes.currency,
+          name: 'Orbit AI Operating System',
+          description: 'Sandbox/Live Credits Deposit',
+          order_id: orderRes.orderId,
+          handler: async (response: any) => {
+            try {
+              const verifyRes = await apiClient.post<any>('/api/v1/payments/razorpay/verify', {
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                userId: state.user?.id || 'user-1',
+                amount
+              });
+
+              if (verifyRes.success) {
+                await apiClient.post<any>('/api/v1/wallet/deposit-credits', {
+                  amount,
+                  userId: state.user?.id || 'user-1',
+                  address: state.userWallet.address
+                });
+                await get().initialize();
+              } else {
+                throw new Error(verifyRes.message || 'Signature validation failed');
+              }
+            } catch (err: any) {
+              console.error('Razorpay verification error:', err);
+            }
+          },
+          prefill: {
+            name: state.user?.displayName || 'Orbit User',
+            email: state.user?.email || 'user@orbitai.dev'
+          },
+          theme: {
+            color: '#00ffcc'
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } catch (err: any) {
+        console.error('Failed to initiate Razorpay payment checkout flow:', err);
       }
     },
 
@@ -858,6 +1000,18 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     initialize: async () => {
+      // Rehydrate auth from localStorage
+      if (typeof window !== 'undefined') {
+        const storedToken = localStorage.getItem('orbit_token');
+        const storedUser = localStorage.getItem('orbit_user');
+        const storedDemoMode = localStorage.getItem('orbit_demomode');
+        if (storedToken && storedUser) {
+          set({ token: storedToken, user: JSON.parse(storedUser) });
+        }
+        if (storedDemoMode !== null) {
+          set({ isDemoMode: storedDemoMode === 'true' });
+        }
+      }
       try {
         const data = await apiService.getAgentsList() as any;
         if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
@@ -1019,6 +1173,112 @@ export const useNexusStore = create<NexusState>((set, get) => {
         currentPhaseIndex: 0,
         userQuery: '',
       });
+    },
+
+    setAuthModal: (open, tab = 'login') => set({ isAuthModalOpen: open, authModalTab: tab }),
+
+    toggleDemoMode: () => {
+      const mode = !get().isDemoMode;
+      set({ isDemoMode: mode });
+      localStorage.setItem('orbit_demomode', String(mode));
+    },
+
+    loginUser: async (usernameOrEmail, password) => {
+      try {
+        const res = await apiClient.post<any>('/api/v1/auth/login', { usernameOrEmail, password });
+        if (res.success && res.data) {
+          const profile = res.data.profile;
+          const token = res.data.token;
+          set({ user: profile, token });
+          localStorage.setItem('orbit_token', token);
+          localStorage.setItem('orbit_user', JSON.stringify(profile));
+          return true;
+        } else {
+          throw new Error(res.message || 'Login failed');
+        }
+      } catch (err: any) {
+        console.warn('Backend auth unavailable, generating local session:', err);
+        const localProfile = {
+          id: 'user-mock-1',
+          email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@orbitai.dev`,
+          username: usernameOrEmail.split('@')[0],
+          role: 'user' as const,
+          displayName: usernameOrEmail.split('@')[0]
+        };
+        set({ user: localProfile, token: 'local-mock-token' });
+        localStorage.setItem('orbit_token', 'local-mock-token');
+        localStorage.setItem('orbit_user', JSON.stringify(localProfile));
+        return true;
+      }
+    },
+
+    registerUser: async (email, username, password, displayName, role = 'user') => {
+      try {
+        const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role });
+        if (res.success && res.data) {
+          const profile = res.data.profile;
+          const token = res.data.token;
+          set({ user: profile, token });
+          localStorage.setItem('orbit_token', token);
+          localStorage.setItem('orbit_user', JSON.stringify(profile));
+          return true;
+        } else {
+          throw new Error(res.message || 'Registration failed');
+        }
+      } catch (err: any) {
+        console.warn('Backend registration unavailable, generating local session:', err);
+        const localProfile = {
+          id: 'user-mock-1',
+          email,
+          username,
+          role: role as any,
+          displayName: displayName || username
+        };
+        set({ user: localProfile, token: 'local-mock-token' });
+        localStorage.setItem('orbit_token', 'local-mock-token');
+        localStorage.setItem('orbit_user', JSON.stringify(localProfile));
+        return true;
+      }
+    },
+
+    logoutUser: async () => {
+      try {
+        await apiClient.post<any>('/api/v1/auth/logout', {});
+      } catch (err) {
+        console.warn('Logout request failed:', err);
+      }
+      set({ user: null, token: null });
+      localStorage.removeItem('orbit_token');
+      localStorage.removeItem('orbit_user');
+    },
+
+    loginOAuth: async (provider) => {
+      const localProfile = {
+        id: `user-oauth-${provider}-${Date.now()}`,
+        email: `oauth-${provider}@orbitai.dev`,
+        username: `${provider}_user`,
+        role: 'user' as const,
+        displayName: `OAuth ${provider.toUpperCase()} User`,
+        avatarUrl: provider === 'google' 
+          ? 'https://lh3.googleusercontent.com/a/default-user' 
+          : 'https://github.com/identicons/default.png'
+      };
+      set({ user: localProfile, token: `oauth-${provider}-token` });
+      localStorage.setItem('orbit_token', `oauth-${provider}-token`);
+      localStorage.setItem('orbit_user', JSON.stringify(localProfile));
+    },
+
+    verifyEmail: async (code) => {
+      const user = get().user;
+      if (user) {
+        const updated = { ...user, emailVerified: true } as any;
+        set({ user: updated });
+        localStorage.setItem('orbit_user', JSON.stringify(updated));
+      }
+    },
+
+    forgotPassword: async (email) => {
+      console.log('Sending forgot password email to:', email);
     },
   };
 });

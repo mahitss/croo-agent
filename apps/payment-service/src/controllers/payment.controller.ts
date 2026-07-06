@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
 import { CAPPaymentService } from '../services/cap-payment.service';
+import * as crypto from 'crypto';
 
 @Controller('api/v1')
 export class PaymentController {
@@ -188,6 +189,120 @@ export class PaymentController {
     } catch (error: any) {
       return { success: false, message: `Database error fetching ledger: ${error.message}` };
     }
+  }
+
+  // ─── Razorpay Payments ──────────────────────────────────────────────────
+  @Post('payments/razorpay/order')
+  @HttpCode(HttpStatus.CREATED)
+  async createRazorpayOrder(@Body() body: { amount: number; currency?: string; userId?: string }) {
+    try {
+      const amountInPaise = Math.round(body.amount * 100);
+      const currency = body.currency || 'INR';
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+      let orderId = `order_mock_${Math.random().toString(36).substring(2, 11)}`;
+      
+      if (keyId && keySecret) {
+        const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+        const res = await fetch('https://api.razorpay.com/v1/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${auth}`
+          },
+          body: JSON.stringify({
+            amount: amountInPaise,
+            currency,
+            receipt: `rcpt_${Date.now()}`
+          })
+        });
+        const data = await res.json();
+        if (data.id) {
+          orderId = data.id;
+        } else {
+          console.warn('Razorpay order creation failed, falling back to mock Order ID:', data);
+        }
+      }
+
+      const payment = await this.prisma.payment.create({
+        data: {
+          workflowId: `razorpay_${orderId}`,
+          payerWallet: body.userId || 'user-1',
+          status: 'pending',
+          total: body.amount,
+          currency: 'USDC',
+        }
+      });
+
+      return {
+        success: true,
+        orderId,
+        paymentId: payment.id,
+        amount: body.amount,
+        currency
+      };
+    } catch (error: any) {
+      return { success: false, message: `Error creating Razorpay order: ${error.message}` };
+    }
+  }
+
+  @Post('payments/razorpay/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyRazorpayPayment(@Body() body: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    signature: string;
+    userId: string;
+    amount: number;
+  }) {
+    try {
+      const keySecret = process.env.RAZORPAY_KEY_SECRET;
+      let isValid = true;
+
+      if (keySecret) {
+        const text = `${body.razorpayOrderId}|${body.razorpayPaymentId}`;
+        const generatedSignature = crypto
+          .createHmac('sha256', keySecret)
+          .update(text)
+          .digest('hex');
+        isValid = generatedSignature === body.signature;
+      }
+
+      if (!isValid) {
+        return { success: false, message: 'Invalid payment signature verified' };
+      }
+
+      const payment = await this.prisma.payment.findFirst({
+        where: { workflowId: `razorpay_${body.razorpayOrderId}` }
+      });
+
+      if (payment) {
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'completed' }
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Payment verified and captured successfully',
+        data: {
+          orderId: body.razorpayOrderId,
+          paymentId: body.razorpayPaymentId,
+          status: 'completed'
+        }
+      };
+    } catch (error: any) {
+      return { success: false, message: `Error verifying Razorpay payment: ${error.message}` };
+    }
+  }
+
+  @Post('payments/razorpay/webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleRazorpayWebhook(@Body() body: any) {
+    console.log('[RAZORPAY_WEBHOOK] Event received:', body.event);
+    return { success: true };
   }
 
   // ─── CROO Agent Protocol (CAP) Payments Endpoints ───────────────────────

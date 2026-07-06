@@ -144,4 +144,60 @@ export class WalletController {
       return { success: false, message: `Payment service unreachable: ${err.message}` };
     }
   }
+
+  @Post('payments/razorpay/order')
+  async createRazorpayOrder(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/razorpay/order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('payments/razorpay/verify')
+  async verifyRazorpayPayment(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/razorpay/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('payments/razorpay/webhook')
+  async handleRazorpayWebhook(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.paymentUrl}/payments/razorpay/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Payment service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('wallet/deposit-credits')
+  async depositCredits(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.walletUrl}/wallet/deposit-credits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
+  }
 }

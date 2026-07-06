@@ -11,15 +11,26 @@ import {
   Wallet, 
   PlusCircle, 
   Shuffle, 
-  HelpCircle,
-  ShieldCheck
+  ShieldCheck,
+  LogOut,
+  User
 } from 'lucide-react';
 
 export default function Navbar() {
   useKeyboardShortcuts();
   const pathname = usePathname();
+  
   const userWallet = useNexusStore((state) => state.userWallet);
   const isRunning = useNexusStore((state) => state.isRunning);
+  
+  // Auth states & actions
+  const user = useNexusStore((state) => state.user);
+  const logoutUser = useNexusStore((state) => state.logoutUser);
+  const setAuthModal = useNexusStore((state) => state.setAuthModal);
+  
+  // Demo Mode state & actions
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
 
   const links = [
     { href: '/', label: 'Portal', icon: Cpu },
@@ -68,9 +79,11 @@ export default function Navbar() {
           })}
         </div>
 
-        {/* Wallet Status & Indicators */}
+        {/* Status, Demo Mode, Wallet & Auth Dropdown */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+          
+          {/* Status Indicator */}
+          <div className="hidden lg:flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                 isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
@@ -84,12 +97,78 @@ export default function Navbar() {
             </span>
           </div>
 
+          {/* Demo Mode Toggle */}
+          <button
+            onClick={toggleDemoMode}
+            className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
+              isDemoMode
+                ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
+                : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
+            }`}
+            title="Toggle between demo simulated execution and production live payment mode"
+          >
+            {isDemoMode ? 'Demo Mode' : 'Live Mode'}
+          </button>
+
+          {/* Wallet Link */}
           <Link href="/wallet" className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300">
             <Wallet className="w-4 h-4 text-primary-neon" />
             <span className="text-sm font-mono font-bold text-white">
               {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-xs">USDC</span>
             </span>
           </Link>
+
+          {/* Auth Section */}
+          <div className="flex items-center gap-2 border-l border-border-dark pl-4">
+            {user ? (
+              <div className="relative group">
+                <button className="flex items-center gap-1.5 focus:outline-none">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
+                    {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : user.username.substring(0, 2).toUpperCase()}
+                  </div>
+                  <span className="text-xs text-gray-300 hover:text-white font-mono hidden lg:inline max-w-[80px] truncate">
+                    {user.displayName || user.username}
+                  </span>
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-black border border-border-dark rounded-xl shadow-xl p-1.5 hidden group-hover:block hover:block z-50 animate-in fade-in duration-100 font-mono text-xs">
+                  <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
+                    Role: <span className="text-primary-neon font-bold">{user.role}</span>
+                  </div>
+                  <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                    Dashboard
+                  </Link>
+                  <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                    Wallet ({userWallet.balance.toFixed(2)} USDC)
+                  </Link>
+                  <button
+                    onClick={logoutUser}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAuthModal(true, 'login')}
+                  className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => setAuthModal(true, 'register')}
+                  className="bg-primary-neon text-black text-xs font-extrabold px-3 py-1.5 rounded-md hover:brightness-110 transition-all font-mono"
+                >
+                  Register
+                </button>
+              </div>
+            )}
+          </div>
+          
         </div>
 
       </div>

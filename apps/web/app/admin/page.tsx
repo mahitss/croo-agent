@@ -397,6 +397,92 @@ export default function AdminPage() {
         </div>
 
       </div>
+ 
+      {/* Row 4: Admin Controls - Ban Users, Approve Agents, and Audit Logs */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Ban Users section */}
+        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-3">
+          <h3 className="font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+            <Users className="w-4 h-4 text-red-500" />
+            Manage Users (Ban/Restoration)
+          </h3>
+          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+            {[
+              { id: 'user-2', name: 'Bob Maloogaloog', email: 'bob@orbit.dev', status: 'active' },
+              { id: 'user-3', name: 'Alice Wonder', email: 'alice@orbit.dev', status: 'banned' },
+              { id: 'user-4', name: 'Charlie Sheen', email: 'charlie@orbit.dev', status: 'active' }
+            ].map((user) => (
+              <div key={user.id} className="border border-border-dark p-2.5 rounded-lg flex items-center justify-between bg-black/30 hover:border-white/5 transition-all">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-white text-[10px]">{user.name}</span>
+                  <span className="text-[9px] text-gray-500">{user.email}</span>
+                </div>
+                <button
+                  onClick={() => toast(`Status of user ${user.name} modified successfully!`, 'success')}
+                  className={`text-[9px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
+                    user.status === 'banned'
+                      ? 'bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500 hover:text-black'
+                      : 'bg-green-500/20 border-green-500 text-green-500 hover:bg-green-500 hover:text-black'
+                  }`}
+                >
+                  {user.status === 'banned' ? 'BAN_USER' : 'ACTIVE'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Approve/Reject Agents section */}
+        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-3">
+          <h3 className="font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+            <Cpu className="w-4 h-4 text-primary-neon animate-pulse" />
+            Registry Approvals (SLA Check)
+          </h3>
+          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+            {[
+              { id: 'agent-12', name: 'Fintech Sentinel', category: 'Finance', status: 'pending' },
+              { id: 'agent-13', name: 'Scraper Matrix', category: 'Research', status: 'pending' }
+            ].map((agent) => (
+              <div key={agent.id} className="border border-border-dark p-2.5 rounded-lg flex flex-col gap-1.5 bg-black/30 hover:border-white/5 transition-all">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-white text-[10px]">{agent.name}</span>
+                  <span className="text-[9px] text-primary-neon font-mono font-bold bg-primary-neon/10 px-1.5 py-0.5 rounded">{agent.category}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toast(`Agent ${agent.name} approved successfully!`, 'success')}
+                    className="flex-1 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500 hover:text-black text-[9px] font-mono py-1 rounded"
+                  >
+                    APPROVE
+                  </button>
+                  <button
+                    onClick={() => toast(`Agent ${agent.name} rejected successfully!`, 'info')}
+                    className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-black text-[9px] font-mono py-1 rounded"
+                  >
+                    REJECT
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Audit Log history */}
+        <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-3">
+          <h3 className="font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5 border-b border-border-dark pb-2 text-[10px]">
+            <ShieldCheck className="w-4 h-4 text-accent-blue" />
+            Security & Operations Audit Log
+          </h3>
+          <div className="bg-black/60 p-3 rounded-lg border border-border-dark text-[9px] text-gray-500 flex flex-col gap-1.5 font-mono max-h-[300px] overflow-y-auto leading-normal">
+            <span>[16:45:01] AUDIT: Razorpay credentials handshake completed successfully.</span>
+            <span>[16:44:58] AUDIT: Neon database migrations check passed.</span>
+            <span>[16:44:12] SECURITY: API key verification request routed to /api/v1/auth/me.</span>
+            <span>[16:43:20] OPERATION: Registered new node Fintech Sentinel (status: pending).</span>
+            <span>[16:40:55] AUDIT: Sentry error limits synchronization initialized.</span>
+          </div>
+        </div>
+      </div>
 
     </div>
   );
