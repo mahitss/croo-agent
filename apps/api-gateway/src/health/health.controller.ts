@@ -15,6 +15,11 @@ export class HealthController {
     };
   }
 
+  @Get()
+  getRoot() {
+    return this.handleHealth();
+  }
+
   @Get('health')
   getHealth() {
     return this.handleHealth();
