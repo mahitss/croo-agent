@@ -4,6 +4,7 @@ import time
 import urllib.request
 import urllib.error
 import logging
+import hashlib
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
 
@@ -289,19 +290,76 @@ class GeminiProvider(BaseLLMProvider):
                 error_message=str(e)
             )
 
-class OpenRouterProvider(BaseLLMProvider):
+class ModelRouter:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.model_name = os.environ.get("FALLBACK_MODEL", "google/gemini-flash-1.5")
         self.url = "https://openrouter.ai/api/v1/chat/completions"
+        self.models_config = [
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "poolside/laguna-m.1:free",
+            "tencent/hy3:free",
+            "google/gemma-4-26b-a4b-it:free",
+            "liquid/lfm-2.5-1.2b-instruct:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "qwen/qwen3-coder:free",
+            "cohere/north-mini-code:free"
+        ]
+        self.stats = {
+            model: {
+                "success_count": 0,
+                "failure_count": 0,
+                "consecutive_failures": 0,
+                "429_count": 0,
+                "timeout_count": 0,
+                "total_latency_ms": 0,
+                "last_successful_response": None
+            }
+            for model in self.models_config
+        }
+        self.local_cache = {}
 
-    def generate(
+    def get_prompt_hash(self, prompt: str) -> str:
+        return hashlib.sha256(prompt.encode('utf-8')).hexdigest()
+
+    def get_cached_response(self, prompt: str) -> Optional[LLMResult]:
+        p_hash = self.get_prompt_hash(prompt)
+        if p_hash in self.local_cache:
+            res, expiry = self.local_cache[p_hash]
+            if time.time() < expiry:
+                logger.info(f"Local in-memory Cache HIT for prompt hash: {p_hash}")
+                return res
+            else:
+                del self.local_cache[p_hash]
+        return None
+
+    def set_cached_response(self, prompt: str, result: LLMResult, ttl: int = 60):
+        p_hash = self.get_prompt_hash(prompt)
+        self.local_cache[p_hash] = (result, time.time() + ttl)
+
+    def get_ordered_models(self) -> List[str]:
+        def sort_key(model):
+            consecutive = self.stats[model]["consecutive_failures"]
+            original_index = self.models_config.index(model)
+            return (consecutive, original_index)
+        return sorted(self.models_config, key=sort_key)
+
+    def clean_json_response(self, content: str) -> str:
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
+
+    def call_openrouter(
         self,
+        model: str,
         prompt: str,
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
-        timeout: int = 15,
-        model: Optional[str] = None
+        timeout: int = 30
     ) -> LLMResult:
         start_time = time.time()
         headers = {
@@ -316,12 +374,11 @@ class OpenRouterProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        target_model = model or self.model_name
-        data: Dict[str, Any] = {
-            "model": target_model,
+        data = {
+            "model": model,
             "messages": messages,
-            "temperature": float(os.environ.get("MODEL_TEMPERATURE", "0.2")),
-            "max_tokens": int(os.environ.get("MAX_TOKENS", "8192"))
+            "temperature": 0.2,
+            "max_tokens": 8192
         }
         if json_mode:
             data["response_format"] = {"type": "json_object"}
@@ -337,34 +394,208 @@ class OpenRouterProvider(BaseLLMProvider):
                 latency_ms = int((time.time() - start_time) * 1000)
                 res_data = json.loads(response.read().decode("utf-8"))
                 
-                content = res_data["choices"][0]["message"]["content"]
+                if "error" in res_data:
+                    err_info = res_data["error"]
+                    err_code = err_info.get("code")
+                    err_msg = err_info.get("message", "")
+                    return LLMResult(
+                        content="",
+                        provider="openrouter",
+                        model=model,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error_message=f"OpenRouter Error {err_code}: {err_msg}"
+                    )
+                
+                choices = res_data.get("choices", [])
+                if not choices:
+                    return LLMResult(
+                        content="",
+                        provider="openrouter",
+                        model=model,
+                        latency_ms=latency_ms,
+                        success=False,
+                        error_message="OpenRouter returned empty choices"
+                    )
+                
+                content = choices[0]["message"]["content"]
                 usage = res_data.get("usage", {})
                 prompt_tokens = usage.get("prompt_tokens", 0)
                 completion_tokens = usage.get("completion_tokens", 0)
-                
                 cost = (prompt_tokens * 0.000000075) + (completion_tokens * 0.00000030)
 
                 return LLMResult(
                     content=content,
                     provider="openrouter",
-                    model=target_model,
+                    model=model,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     latency_ms=latency_ms,
                     cost=round(cost, 6),
                     success=True
                 )
-        except Exception as e:
+        except urllib.error.HTTPError as e:
             latency_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"OpenRouter provider call failed: {e}")
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8")
+            except:
+                pass
             return LLMResult(
                 content="",
                 provider="openrouter",
-                model=target_model,
+                model=model,
                 latency_ms=latency_ms,
                 success=False,
-                error_message=str(e)
+                error_message=f"HTTPError_{e.code}: {e.reason} - {err_body}"
             )
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            return LLMResult(
+                content="",
+                provider="openrouter",
+                model=model,
+                latency_ms=latency_ms,
+                success=False,
+                error_message=f"Timeout/Exception: {str(e)}"
+            )
+
+    def route_request(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_mode: bool = False,
+        timeout: int = 30,
+        retry_delay: int = 2
+    ) -> LLMResult:
+        cached = self.get_cached_response(prompt)
+        if cached:
+            return cached
+
+        ordered_models = self.get_ordered_models()
+        models_tried = []
+
+        for i, model in enumerate(ordered_models):
+            models_tried.append(model)
+            max_attempts = 3
+            attempt = 0
+            
+            if i > 0:
+                logger.info(f"Switching to fallback model: {model}")
+
+            while attempt < max_attempts:
+                logger.info(f"Trying model: {model} (Attempt {attempt + 1}/{max_attempts})")
+                
+                result = self.call_openrouter(
+                    model=model,
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    json_mode=json_mode,
+                    timeout=timeout
+                )
+                
+                if result.success:
+                    if json_mode:
+                        try:
+                            cleaned = self.clean_json_response(result.content)
+                            parsed = json.loads(cleaned)
+                            if "workflow" not in parsed:
+                                raise ValueError("Missing 'workflow' property in JSON response")
+                            
+                            self.stats[model]["success_count"] += 1
+                            self.stats[model]["consecutive_failures"] = 0
+                            self.stats[model]["total_latency_ms"] += result.latency_ms
+                            self.stats[model]["last_successful_response"] = result.content
+                            
+                            logger.info(f"Success. Model: {model}. Latency: {result.latency_ms}ms. Selected fallback: {ordered_models[i-1] if i > 0 else 'None'}. Final model used: {model}")
+                            self.set_cached_response(prompt, result)
+                            return result
+                        except Exception as e:
+                            logger.warning(f"Invalid JSON schema parsed for model {model}: {e}")
+                            if attempt == 0:
+                                attempt += 1
+                                time.sleep(retry_delay)
+                                continue
+                            else:
+                                logger.warning(f"Parsing failed for model {model} after retry. Switching to next model...")
+                                self.stats[model]["failure_count"] += 1
+                                self.stats[model]["consecutive_failures"] += 1
+                                break
+                    else:
+                        self.stats[model]["success_count"] += 1
+                        self.stats[model]["consecutive_failures"] = 0
+                        self.stats[model]["total_latency_ms"] += result.latency_ms
+                        self.stats[model]["last_successful_response"] = result.content
+                        logger.info(f"Success. Model: {model}. Latency: {result.latency_ms}ms. Final model used: {model}")
+                        self.set_cached_response(prompt, result)
+                        return result
+                
+                err_msg = result.error_message or ""
+                is_429 = "HTTPError_429" in err_msg or "429" in err_msg
+                is_unavailable = "model_not_found" in err_msg or "404" in err_msg or "not loaded" in err_msg or "unavailable" in err_msg
+                is_timeout = "timeout" in err_msg.lower() or "timeout" in err_msg or "Exception" in err_msg
+                is_5xx = any(f"HTTPError_{code}" in err_msg for code in ["500", "502", "503", "504"])
+                
+                if is_429:
+                    self.stats[model]["429_count"] += 1
+                    self.stats[model]["failure_count"] += 1
+                    self.stats[model]["consecutive_failures"] += 1
+                    logger.warning(f"Model {model} returned 429 rate limit. Reason for switch: 429 Rate Limit. Switching...")
+                    break
+                    
+                if is_unavailable:
+                    self.stats[model]["failure_count"] += 1
+                    self.stats[model]["consecutive_failures"] += 1
+                    logger.warning(f"Model {model} is unavailable. Reason for switch: Unavailable. Skipping immediately...")
+                    break
+                    
+                if is_timeout or is_5xx:
+                    if is_timeout:
+                        self.stats[model]["timeout_count"] += 1
+                    
+                    if attempt < max_attempts - 1:
+                        attempt += 1
+                        logger.warning(f"Retryable error for {model}: {err_msg}. Retrying in {retry_delay}s... ({attempt}/{max_attempts-1})")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        logger.warning(f"Model {model} failed after {max_attempts} attempts. Reason for switch: Max Retries Exhausted. Switching...")
+                        self.stats[model]["failure_count"] += 1
+                        self.stats[model]["consecutive_failures"] += 1
+                        break
+                
+                logger.warning(f"Non-retryable error for {model}: {err_msg}. Reason for switch: Non-retryable error. Switching...")
+                self.stats[model]["failure_count"] += 1
+                self.stats[model]["consecutive_failures"] += 1
+                break
+
+        return LLMResult(
+            content="",
+            provider="openrouter",
+            model="failed-all",
+            success=False,
+            error_message="All AI planner models are currently unavailable. Please try again shortly."
+        )
+
+class OpenRouterProvider(BaseLLMProvider):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.router = ModelRouter(api_key)
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_mode: bool = False,
+        timeout: int = 30,
+        model: Optional[str] = None
+    ) -> LLMResult:
+        return self.router.route_request(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            json_mode=json_mode,
+            timeout=timeout
+        )
 
 class LLMProviderManager:
     def __init__(self):
@@ -422,6 +653,23 @@ class LLMProviderManager:
             timeout_sec = max(1, int(int(env_timeout_ms) / 1000))
         else:
             timeout_sec = timeout
+
+        if preferred == "openrouter" and "openrouter" in self.providers:
+            provider = self.providers["openrouter"]
+            result = provider.generate(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                json_mode=json_mode,
+                timeout=timeout_sec,
+                model=model
+            )
+            if result.success:
+                self.metrics["openrouter"]["total_latency"] += result.latency_ms
+                self.metrics["openrouter"]["total_tokens"] += (result.prompt_tokens + result.completion_tokens)
+                self.metrics["openrouter"]["total_cost"] += result.cost
+            else:
+                self.metrics["openrouter"]["failures"] += 1
+            return result
 
         
         # Build fallback list beginning with preferred provider

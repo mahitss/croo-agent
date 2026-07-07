@@ -389,15 +389,45 @@ def plan_workflow(req: PlanRequest):
             return plan
         except Exception as e:
             logger.error(f"Error parsing LLM response for /plan: {e}.")
-            raise HTTPException(
+            from fastapi.responses import JSONResponse
+            models_tried = [
+                "nvidia/nemotron-3-ultra-550b-a55b:free",
+                "poolside/laguna-m.1:free",
+                "tencent/hy3:free",
+                "google/gemma-4-26b-a4b-it:free",
+                "liquid/lfm-2.5-1.2b-instruct:free",
+                "meta-llama/llama-3.2-3b-instruct:free",
+                "qwen/qwen3-coder:free",
+                "cohere/north-mini-code:free"
+            ]
+            return JSONResponse(
                 status_code=502,
-                detail=f"AI planner service failed to generate a valid workflow DAG: {str(e)}"
+                content={
+                    "success": False,
+                    "message": "All AI planner models are currently unavailable. Please try again shortly.",
+                    "modelsTried": models_tried
+                }
             )
 
     # If LLM execution failed or returned success=False
-    raise HTTPException(
+    from fastapi.responses import JSONResponse
+    models_tried = [
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "poolside/laguna-m.1:free",
+        "tencent/hy3:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "liquid/lfm-2.5-1.2b-instruct:free",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "qwen/qwen3-coder:free",
+        "cohere/north-mini-code:free"
+    ]
+    return JSONResponse(
         status_code=503,
-        detail=f"AI planner service failed or was unreachable. Error: {result.error_message if not result.success else 'Empty LLM content'}"
+        content={
+            "success": False,
+            "message": "All AI planner models are currently unavailable. Please try again shortly.",
+            "modelsTried": models_tried
+        }
     )
 
 @app.post("/estimate", response_model=EstimateResponse)

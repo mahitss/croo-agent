@@ -132,7 +132,7 @@ export class WorkflowsController {
       if (!res.ok || !data || !data.workflow) {
         return {
           success: false,
-          message: data?.detail || `AI planner service failed to return valid DAG workflow (status ${res.status})`
+          message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${res.status})`
         };
       }
       
