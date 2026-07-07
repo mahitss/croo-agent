@@ -23,6 +23,9 @@ interface NexusState {
   isDemoMode: boolean;
   isAuthModalOpen: boolean;
   authModalTab: 'login' | 'register' | 'forgot';
+  isWorkflowSaved: boolean;
+  unsavedWorkflowTemplate: any | null;
+  saveWorkflow: () => Promise<void>;
   
   // Actions
   setUserQuery: (query: string) => void;
@@ -301,6 +304,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
     isDemoMode: true,
     isAuthModalOpen: false,
     authModalTab: 'login',
+    isWorkflowSaved: true,
+    unsavedWorkflowTemplate: null,
 
     setUserQuery: (query) => set({ userQuery: query }),
 
@@ -553,18 +558,30 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     generateWorkflow: async (query, routingMode, budget) => {
+      console.log('[STRUCTURED_LOG] START_GENERATE', { query, routingMode, budget });
       const state = get();
       const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
 
-      const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
-        query,
-        routingMode,
-        budget
-      });
+      if (!dbAgents || dbAgents.length === 0) {
+        throw new Error('Marketplace failure: No candidate agents found in registry');
+      }
+
+      let planRes;
+      try {
+        planRes = await apiClient.post<any>('/api/v1/ai/plan', {
+          query,
+          routingMode,
+          budget
+        });
+      } catch (err: any) {
+        throw new Error(`Planner failure: ${err.message || err}`);
+      }
 
       if (!planRes.success || !planRes.data) {
-        throw new Error(planRes.message || 'AI Planner failed to generate DAG');
+        throw new Error(`Planner failure: ${planRes.message || 'AI Planner failed to generate DAG'}`);
       }
+
+      console.log('[STRUCTURED_LOG] PLAN_SUCCESS', { nodesCount: planRes.data.nodes?.length });
 
       const promptTokens = planRes.data.prompt_tokens || 0;
       const completionTokens = planRes.data.completion_tokens || 0;
@@ -582,26 +599,34 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const nodeTitles: Record<string, string> = {};
       const agentSelectionReasons: Record<string, string> = {};
 
-      const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
-        const cap = n.capability.toLowerCase();
-        const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
-        assignedIds.push(agent.id);
+      let nodes: TaskNode[] = [];
+      try {
+        nodes = planRes.data.nodes.map((n: any) => {
+          const cap = n.capability.toLowerCase();
+          const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
+          if (!agent) {
+            throw new Error(`No matching agent for capability: ${cap}`);
+          }
+          assignedIds.push(agent.id);
 
-        const nodeTitle = n.label || n.id.toUpperCase();
-        nodeTitles[n.id] = nodeTitle;
-        agentSelectionReasons[n.id] = reason;
+          const nodeTitle = n.label || n.id.toUpperCase();
+          nodeTitles[n.id] = nodeTitle;
+          agentSelectionReasons[n.id] = reason;
 
-        return {
-          id: n.id,
-          name: nodeTitle,
-          description: `Execute capability: ${cap}. Selected because: ${reason}`,
-          capability: cap,
-          costEstimate: agent.price,
-          timeEstimate: agent.latency,
-          status: 'pending',
-          assignedAgentId: agent.id
-        };
-      });
+          return {
+            id: n.id,
+            name: nodeTitle,
+            description: `Execute capability: ${cap}. Selected because: ${reason}`,
+            capability: cap,
+            costEstimate: agent.price,
+            timeEstimate: agent.latency,
+            status: 'pending' as const,
+            assignedAgentId: agent.id
+          };
+        });
+      } catch (err: any) {
+        throw new Error(`Marketplace failure: ${err.message || err}`);
+      }
 
       const edges = planRes.data.edges.map((e: any) => ({
         id: e.id,
@@ -617,7 +642,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           id: n.id,
           agentId: n.assignedAgentId,
           capability: n.capability,
-          status: 'pending',
+          status: 'pending' as const,
           positionX: 100 + idx * 180,
           positionY: 200
         })),
@@ -627,38 +652,55 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }))
       };
 
-      const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
-      if (!wfCreate.success || !wfCreate.data) {
-        throw new Error(wfCreate.message || 'Failed to create workflow template in database');
+      let dbWorkflow: any = null;
+      let persistError: string | null = null;
+
+      try {
+        const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
+        if (wfCreate.success && wfCreate.data) {
+          dbWorkflow = wfCreate.data;
+          set({ isWorkflowSaved: true, unsavedWorkflowTemplate: null });
+          console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId: dbWorkflow.id });
+        } else {
+          persistError = wfCreate.message || 'Failed to create workflow template in database';
+        }
+      } catch (err: any) {
+        persistError = err.message || err;
       }
 
-      const dbWorkflow = wfCreate.data;
+      if (persistError) {
+        console.warn('[STRUCTURED_LOG] SAVE_WORKFLOW_FAILED', { error: persistError });
+        set({ isWorkflowSaved: false, unsavedWorkflowTemplate: workflowTemplate });
+      }
 
-      // Cache metadata in localStorage
-      localStorage.setItem(`orbit_workflow_metadata_${dbWorkflow.id}`, JSON.stringify({
-        query,
-        routingMode,
-        budget,
-        promptTokens,
-        completionTokens,
-        totalTokens,
-        estimatedCost: estCost,
-        nodeTitles,
-        agentSelectionReasons
-      }));
-      localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
-      
-      // Update URL query parameters without forcing page reload
-      if (typeof window !== 'undefined') {
-        const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${dbWorkflow.id}`;
-        window.history.pushState({ path: newUrl }, '', newUrl);
+      const workflowId = dbWorkflow ? dbWorkflow.id : `temp-${Date.now()}`;
+      const createdAt = dbWorkflow ? dbWorkflow.createdAt : new Date().toISOString();
+
+      if (dbWorkflow) {
+        localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
+          query,
+          routingMode,
+          budget,
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          estimatedCost: estCost,
+          nodeTitles,
+          agentSelectionReasons
+        }));
+        localStorage.setItem('orbit_last_workflow_id', workflowId);
+        
+        if (typeof window !== 'undefined') {
+          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
+        }
       }
 
       const workflow: Workflow = {
-        id: dbWorkflow.id,
-        name: dbWorkflow.title,
+        id: workflowId,
+        name: dbWorkflow ? dbWorkflow.title : workflowTemplate.title,
         query,
-        nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+        nodes: dbWorkflow && dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
           const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
           return {
             id: n.id,
@@ -671,7 +713,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             assignedAgentId: n.agentId
           };
         }) : nodes,
-        edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+        edges: dbWorkflow && dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
           id: e.id,
           source: e.sourceNode,
           target: e.targetNode
@@ -679,11 +721,65 @@ export const useNexusStore = create<NexusState>((set, get) => {
         budget,
         routingMode,
         retryCount: 0,
-        status: 'pending',
-        createdAt: dbWorkflow.createdAt
+        status: 'pending' as const,
+        createdAt
       };
 
       set({ activeWorkflow: workflow, userQuery: query });
+      console.log('[STRUCTURED_LOG] RENDER_WORKFLOW_SUCCESS', { workflowId });
+
+      if (persistError) {
+        throw new Error(`Workflow persistence failure: ${persistError}`);
+      }
+    },
+
+    saveWorkflow: async () => {
+      const state = get();
+      const template = state.unsavedWorkflowTemplate;
+      if (!template) return;
+
+      try {
+        const wfCreate = await apiClient.post<any>('/api/v1/workflows', template);
+        if (!wfCreate.success || !wfCreate.data) {
+          throw new Error(wfCreate.message || 'Failed to create workflow template in database');
+        }
+
+        const dbWorkflow = wfCreate.data;
+        console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId: dbWorkflow.id });
+        
+        const workflowId = dbWorkflow.id;
+        const active = state.activeWorkflow;
+
+        localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
+          query: active?.query || template.title,
+          routingMode: active?.routingMode || 'balanced',
+          budget: active?.budget || 2.0,
+          promptTokens: state.promptTokens,
+          completionTokens: state.completionTokens,
+          totalTokens: state.totalTokens,
+          estimatedCost: state.estimatedCost,
+          nodeTitles: active?.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
+          agentSelectionReasons: active?.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
+        }));
+        localStorage.setItem('orbit_last_workflow_id', workflowId);
+
+        if (typeof window !== 'undefined') {
+          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
+        }
+
+        if (active) {
+          const updated: Workflow = {
+            ...active,
+            id: workflowId,
+            createdAt: dbWorkflow.createdAt
+          };
+          set({ activeWorkflow: updated, isWorkflowSaved: true, unsavedWorkflowTemplate: null });
+        }
+      } catch (err: any) {
+        console.error('[STRUCTURED_LOG] SAVE_WORKFLOW_FAILED', { error: err.message });
+        throw new Error(`Workflow persistence failure: ${err.message}`);
+      }
     },
 
     startExecution: async (query, routingMode, budget) => {

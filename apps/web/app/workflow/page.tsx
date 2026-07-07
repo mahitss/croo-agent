@@ -35,6 +35,10 @@ export default function WorkflowPage() {
   const deleteNode = useNexusStore((state) => state.deleteNode);
   const retryNode = useNexusStore((state) => state.retryNode);
   const cancelWorkflow = useNexusStore((state) => state.cancelWorkflow);
+  
+  // Persistence operations
+  const isWorkflowSaved = useNexusStore((state) => state.isWorkflowSaved);
+  const saveWorkflow = useNexusStore((state) => state.saveWorkflow);
 
   const { toast } = useToast();
 
@@ -48,6 +52,19 @@ export default function WorkflowPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [nodeNameInput, setNodeNameInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveWorkflow = async () => {
+    setIsSaving(true);
+    try {
+      await saveWorkflow();
+      toast('Workflow successfully persisted in database!', 'success');
+    } catch (err: any) {
+      toast(`Save failed: ${err.message}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Check URL query parameters and initialize store
   useEffect(() => {
@@ -133,6 +150,22 @@ export default function WorkflowPage() {
           </button>
         )}
       </div>
+
+      {!isWorkflowSaved && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl flex items-center justify-between text-xs text-yellow-400 font-mono">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-500 animate-pulse" />
+            <span>Workflow persistence failed: The local canvas graph is rendered but is not saved on-chain.</span>
+          </div>
+          <button
+            onClick={handleSaveWorkflow}
+            disabled={isSaving}
+            className="bg-yellow-500 text-black px-4 py-1.5 rounded-lg font-bold hover:brightness-110 disabled:opacity-50 transition-all shrink-0"
+          >
+            {isSaving ? 'Saving...' : 'Retry Save'}
+          </button>
+        </div>
+      )}
 
       {/* AI Prompt Input Bar */}
       <div className="glass-card p-4 rounded-xl border border-border-dark flex flex-col md:flex-row gap-3 items-center">

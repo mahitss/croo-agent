@@ -165,7 +165,7 @@ export class WorkflowsController {
         },
       };
     } catch (err: any) {
-      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+      return { success: false, message: err.message || 'AI planner service error' };
     }
   }
 
@@ -179,7 +179,7 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+      return { success: false, message: err.message || 'AI planner cost estimation error' };
     }
   }
 
@@ -193,7 +193,7 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `AI planner service unreachable: ${err.message}` };
+      return { success: false, message: err.message || 'AI planner verification error' };
     }
   }
 }
