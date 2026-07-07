@@ -294,16 +294,20 @@ class ModelRouter:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.url = "https://openrouter.ai/api/v1/chat/completions"
-        self.models_config = [
-            "nvidia/nemotron-3-ultra-550b-a55b:free",
-            "poolside/laguna-m.1:free",
-            "tencent/hy3:free",
-            "google/gemma-4-26b-a4b-it:free",
-            "liquid/lfm-2.5-1.2b-instruct:free",
-            "meta-llama/llama-3.2-3b-instruct:free",
-            "qwen/qwen3-coder:free",
-            "cohere/north-mini-code:free"
-        ]
+        env_models = os.environ.get("PLANNER_FALLBACK_MODELS")
+        if env_models:
+            self.models_config = [m.strip() for m in env_models.split(",") if m.strip()]
+        else:
+            self.models_config = [
+                "nvidia/nemotron-3-ultra-550b-a55b:free",
+                "poolside/laguna-m.1:free",
+                "tencent/hy3:free",
+                "google/gemma-4-26b-a4b-it:free",
+                "liquid/lfm-2.5-1.2b-instruct:free",
+                "meta-llama/llama-3.2-3b-instruct:free",
+                "qwen/qwen3-coder:free",
+                "cohere/north-mini-code:free"
+            ]
         self.stats = {
             model: {
                 "success_count": 0,
