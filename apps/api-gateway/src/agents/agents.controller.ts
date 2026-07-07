@@ -2,7 +2,8 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, Htt
 
 @Controller('api/v1')
 export class AgentsController {
-  private readonly agentUrl = process.env.AGENT_SERVICE_URL || 'http://127.0.0.1:5002/api/v1';
+  private readonly agentUrl = process.env.AGENT_SERVICE_URL || 
+    (process.env.RENDER === 'true' ? 'http://agent-service:5002/api/v1' : 'http://127.0.0.1:5002/api/v1');
 
   @Post('agents')
   @HttpCode(HttpStatus.CREATED)

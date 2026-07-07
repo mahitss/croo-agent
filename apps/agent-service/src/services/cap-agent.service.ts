@@ -49,7 +49,10 @@ export class CAPAgentService {
       capabilities: agent.capabilities.map((ac) => ac.capability.name),
       pricingUsdc: pricing ? Number(pricing.price) : 0,
       pricingType: pricing?.pricingType || 'per_request',
-      endpoint: latestVersion?.endpoint || `http://localhost:5002/api/v1/agents/${agentId}/a2a`,
+      endpoint: latestVersion?.endpoint || 
+        (process.env.RENDER === 'true' 
+          ? `http://agent-service:5002/api/v1/agents/${agentId}/a2a` 
+          : `http://localhost:5002/api/v1/agents/${agentId}/a2a`),
       logoUrl: agent.logoUrl || undefined,
       version: latestVersion?.version || '1.0.0',
       inputSchema: latestVersion?.inputSchema as Record<string, any> || {},

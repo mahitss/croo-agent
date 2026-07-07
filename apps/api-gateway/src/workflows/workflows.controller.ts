@@ -2,8 +2,10 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, HttpCode, HttpStatus
 
 @Controller('api/v1')
 export class WorkflowsController {
-  private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 'http://127.0.0.1:5003/api/v1';
-  private readonly aiUrl = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
+  private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 
+    (process.env.RENDER === 'true' ? 'http://workflow-service:5003/api/v1' : 'http://127.0.0.1:5003/api/v1');
+  private readonly aiUrl = process.env.AI_SERVICE_URL || 
+    (process.env.RENDER === 'true' ? 'http://ai-service:8000' : 'http://127.0.0.1:8000');
 
   @Post('workflows')
   @HttpCode(HttpStatus.CREATED)
