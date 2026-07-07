@@ -1,12 +1,37 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client-agent';
 
+declare const process: any;
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
+    const originalUrl = process.env.DATABASE_URL;
+    let modifiedUrl = originalUrl;
+    if (originalUrl) {
+      try {
+        const parsed = new URL(originalUrl);
+        if (parsed.hostname.includes('-pooler') || originalUrl.includes('pgbouncer=true')) {
+          parsed.searchParams.set('pgbouncer', 'true');
+          parsed.searchParams.set('statement_cache_size', '0');
+          if (!parsed.searchParams.has('connection_limit')) {
+            parsed.searchParams.set('connection_limit', '5');
+          }
+          modifiedUrl = parsed.toString();
+        }
+      } catch (e) {
+        // Fallback to original
+      }
+    }
+
     super({
+      datasources: {
+        db: {
+          url: modifiedUrl,
+        },
+      },
       log: ['info', 'warn', 'error'],
     });
   }
