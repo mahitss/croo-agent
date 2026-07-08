@@ -2,13 +2,37 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { PrismaClient } from '@prisma/client-agent';
 
 declare const process: any;
+declare const require: any;
+declare const __dirname: string;
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const originalUrl = process.env.DATABASE_URL;
+    let originalUrl = process.env.DATABASE_URL;
+    
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const envPaths = [
+        path.resolve(__dirname, '..', '..', '.env'),
+        path.resolve(__dirname, '..', '..', '..', '.env'),
+        path.resolve(process.cwd(), '.env')
+      ];
+      for (const envPath of envPaths) {
+        if (fs.existsSync(envPath)) {
+          const envContent = fs.readFileSync(envPath, 'utf8');
+          const match = envContent.match(/DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/);
+          if (match && match[1] && match[1].includes('schema=')) {
+            originalUrl = match[1];
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
     
     // Diagnostics & Validation (P2 DB connection pass)
     const serviceName = process.env.RENDER_SERVICE_NAME || 'Agent Service';
