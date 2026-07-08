@@ -1,3 +1,37 @@
+// Pre-load schema before NestJS AppModule imports Prisma Client
+(function preLoadSchema() {
+  try {
+    require('dns').setDefaultResultOrder('ipv4first');
+  } catch (e) {}
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    let dir = __dirname;
+    let localEnvPath = null;
+    while (dir) {
+      const pkgPath = path.join(dir, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        const envPath = path.join(dir, '.env');
+        if (fs.existsSync(envPath)) {
+          localEnvPath = envPath;
+        }
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    if (localEnvPath) {
+      const envContent = fs.readFileSync(localEnvPath, 'utf8');
+      const match = envContent.match(/DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/);
+      if (match && match[1]) {
+        process.env.DATABASE_URL = match[1];
+      }
+    }
+  } catch (e) {}
+})();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 

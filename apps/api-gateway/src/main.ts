@@ -1,3 +1,8 @@
+declare const require: any;
+try {
+  require('dns').setDefaultResultOrder('ipv4first');
+} catch (e) {}
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';

@@ -103,6 +103,9 @@ export default function WorkflowPage() {
       console.log("CLICK_HANDLER STEP D: generateWorkflow completed");
       setShowExplanation(true);
       toast('Workflow DAG generated successfully from backend!', 'success');
+      
+      console.log("CLICK_HANDLER STEP D2: automatically starting execution run");
+      await startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
       console.error("CLICK_HANDLER STEP E: caught error", err);
       if (err && err.stack) {
@@ -130,8 +133,12 @@ export default function WorkflowPage() {
       .slice(0, 2);
   };
 
-  const assignedAgent = selectedNode 
-    ? agents.find(a => a.id === selectedNode.assignedAgentId) 
+  const liveSelectedNode = (selectedNode && activeWorkflow)
+    ? activeWorkflow.nodes.find((n: any) => n.id === selectedNode.id) || selectedNode
+    : selectedNode;
+
+  const assignedAgent = liveSelectedNode 
+    ? agents.find(a => a.id === liveSelectedNode.assignedAgentId) 
     : null;
 
   return (
@@ -247,7 +254,7 @@ export default function WorkflowPage() {
                     value={nodeNameInput}
                     onChange={(e) => {
                       setNodeNameInput(e.target.value);
-                      renameNode(selectedNode.id, e.target.value);
+                      renameNode(liveSelectedNode.id, e.target.value);
                     }}
                     className="bg-black/60 border border-border-dark focus:border-primary-neon/40 px-2 py-1 rounded text-white outline-none"
                   />
@@ -257,15 +264,15 @@ export default function WorkflowPage() {
                   <span className="text-[9px] text-gray-500 uppercase">Execution Status</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${
-                      selectedNode.status === 'completed' ? 'bg-primary-neon shadow-[0_0_8px_#00ffcc]' :
-                      selectedNode.status === 'running' ? 'bg-secondary-neon animate-ping' :
-                      selectedNode.status === 'failed' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
+                      liveSelectedNode.status === 'completed' ? 'bg-primary-neon shadow-[0_0_8px_#00ffcc]' :
+                      liveSelectedNode.status === 'running' ? 'bg-secondary-neon animate-ping' :
+                      liveSelectedNode.status === 'failed' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
                     }`}></span>
                     <span className={`uppercase font-bold ${
-                      selectedNode.status === 'completed' ? 'text-primary-neon' :
-                      selectedNode.status === 'running' ? 'text-secondary-neon' :
-                      selectedNode.status === 'failed' ? 'text-red-500' : 'text-gray-500'
-                    }`}>{selectedNode.status}</span>
+                      liveSelectedNode.status === 'completed' ? 'text-primary-neon' :
+                      liveSelectedNode.status === 'running' ? 'text-secondary-neon' :
+                      liveSelectedNode.status === 'failed' ? 'text-red-500' : 'text-gray-500'
+                    }`}>{liveSelectedNode.status}</span>
                   </div>
                 </div>
 
@@ -278,7 +285,7 @@ export default function WorkflowPage() {
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-400">
                       <span>Rating: {assignedAgent.rating}⭐</span>
-                      <span>SLA Fee: {selectedNode.costEstimate} USDC</span>
+                      <span>SLA Fee: {liveSelectedNode.costEstimate} USDC</span>
                     </div>
                   </div>
                 )}
@@ -286,7 +293,7 @@ export default function WorkflowPage() {
                 <div className="flex flex-col border-t border-border-dark pt-2.5">
                   <span className="text-[9px] text-gray-500 uppercase">Retry Attempts</span>
                   <span className="text-white font-bold mt-0.5">
-                    {selectedNode.retryCount > 0 ? `${selectedNode.retryCount} Retries` : '0 Retries'}
+                    {liveSelectedNode.retryCount > 0 ? `${liveSelectedNode.retryCount} Retries` : '0 Retries'}
                   </span>
                 </div>
 
@@ -304,7 +311,7 @@ export default function WorkflowPage() {
                     <div className="bg-black/30 p-2 rounded border border-border-dark/50 flex flex-col gap-1.5 text-[10px] animate-in slide-in-from-top duration-100">
                       <div className="flex justify-between">
                         <span className="text-gray-500">Capability:</span>
-                        <span className="text-gray-300">{selectedNode.capability}</span>
+                        <span className="text-gray-300">{liveSelectedNode.capability}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Endpoint:</span>
@@ -322,12 +329,12 @@ export default function WorkflowPage() {
                 <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                   <span className="text-[9px] text-gray-500 uppercase">Operations</span>
                   <div className="flex gap-2">
-                    {selectedNode.status === 'failed' && (
+                    {liveSelectedNode.status === 'failed' && (
                       <button
                         type="button"
                         onClick={() => {
-                          retryNode(selectedNode.id);
-                          toast(`Retrying node execution: ${selectedNode.name}`, 'info');
+                          retryNode(liveSelectedNode.id);
+                          toast(`Retrying node execution: ${liveSelectedNode.name}`, 'info');
                           setSelectedNode((prev: any) => ({ ...prev, status: 'pending', retryCount: (prev.retryCount || 0) + 1 }));
                         }}
                         className="bg-yellow-400 text-black text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all flex-1 text-center"
@@ -338,8 +345,8 @@ export default function WorkflowPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        deleteNode(selectedNode.id);
-                        toast(`Removed node from DAG: ${selectedNode.name}`, 'success');
+                        deleteNode(liveSelectedNode.id);
+                        toast(`Removed node from DAG: ${liveSelectedNode.name}`, 'success');
                         setSelectedNode(null);
                       }}
                       className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-all flex-grow text-center"
@@ -363,20 +370,20 @@ export default function WorkflowPage() {
                   </div>
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">Est. Completion Time</span>
-                    <span className="text-white">{(selectedNode.timeEstimate / 1000).toFixed(1)}s</span>
+                    <span className="text-white">{(liveSelectedNode.timeEstimate / 1000).toFixed(1)}s</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">SLA Settlement Cost</span>
-                    <span className="text-secondary-neon font-bold">{selectedNode.costEstimate} USDC</span>
+                    <span className="text-secondary-neon font-bold">{liveSelectedNode.costEstimate} USDC</span>
                   </div>
                 </div>
 
                 {/* Alternative suggestions */}
-                {assignedAgent && getAlternativeAgents(selectedNode).length > 0 && (
+                {assignedAgent && getAlternativeAgents(liveSelectedNode).length > 0 && (
                   <div className="flex flex-col border-t border-border-dark pt-2.5 gap-1.5">
                     <span className="text-[9px] text-gray-500 uppercase">Alternative Candidates Evaluated</span>
                     <div className="flex flex-col gap-1.5">
-                      {getAlternativeAgents(selectedNode).map((alt) => (
+                      {getAlternativeAgents(liveSelectedNode).map((alt) => (
                         <div key={alt.id} className="bg-black/40 border border-border-dark p-2 rounded flex justify-between items-center text-[10px] hover:border-primary-neon/20 transition-all">
                           <div>
                             <span className="text-white block font-semibold">{alt.name}</span>
@@ -397,19 +404,19 @@ export default function WorkflowPage() {
                   </span>
                   <div className="bg-black/60 p-2.5 rounded border border-border-dark text-[9px] text-gray-400 flex flex-col gap-1 font-mono max-h-[120px] overflow-y-auto leading-normal">
                     <span>[14:12:01] Init intention channel...</span>
-                    {selectedNode.status !== 'pending' && (
+                    {liveSelectedNode.status !== 'pending' && (
                       <>
                         <span>[14:12:03] Locking SLA budget escrow...</span>
-                        <span>[14:12:05] Calling node capability: {selectedNode.capability}...</span>
+                        <span>[14:12:05] Calling node capability: {liveSelectedNode.capability}...</span>
                       </>
                     )}
-                    {selectedNode.status === 'completed' && (
+                    {liveSelectedNode.status === 'completed' && (
                       <>
                         <span>[14:12:08] Node output verified by Consensus node.</span>
                         <span>[14:12:09] Settlement released payout to agent.</span>
                       </>
                     )}
-                    {selectedNode.status === 'failed' && (
+                    {liveSelectedNode.status === 'failed' && (
                       <span className="text-red-400 flex items-center gap-1 mt-1">
                         <ShieldAlert className="w-3 h-3 text-red-500" />
                         [FATAL] Swarm execution timed out.
@@ -419,11 +426,11 @@ export default function WorkflowPage() {
                 </div>
 
                 {/* Outputs detail */}
-                {selectedNode.status === 'completed' && (
+                {liveSelectedNode.status === 'completed' && (
                   <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
                     <span className="text-[9px] text-gray-500 uppercase">Step Output Payload</span>
                     <div className="bg-black/40 border border-border-dark p-2 rounded text-[10px] text-primary-neon max-h-[100px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                      {selectedNode.output || 'Success. Output payloads generated.'}
+                      {liveSelectedNode.output || 'Success. Output payloads generated.'}
                     </div>
                   </div>
                 )}

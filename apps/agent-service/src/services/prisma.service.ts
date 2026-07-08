@@ -15,19 +15,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       const fs = require('fs');
       const path = require('path');
-      const envPaths = [
-        path.resolve(__dirname, '..', '..', '.env'),
-        path.resolve(__dirname, '..', '..', '..', '.env'),
-        path.resolve(process.cwd(), '.env')
-      ];
-      for (const envPath of envPaths) {
-        if (fs.existsSync(envPath)) {
-          const envContent = fs.readFileSync(envPath, 'utf8');
-          const match = envContent.match(/DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/);
-          if (match && match[1] && match[1].includes('schema=')) {
-            originalUrl = match[1];
-            break;
+      let dir = __dirname;
+      let localEnvPath = null;
+      while (dir) {
+        const pkgPath = path.join(dir, 'package.json');
+        if (fs.existsSync(pkgPath)) {
+          const envPath = path.join(dir, '.env');
+          if (fs.existsSync(envPath)) {
+            localEnvPath = envPath;
           }
+          break;
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+      }
+      if (localEnvPath) {
+        const envContent = fs.readFileSync(localEnvPath, 'utf8');
+        const match = envContent.match(/DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/);
+        if (match && match[1]) {
+          originalUrl = match[1];
         }
       }
     } catch (e) {
@@ -81,8 +88,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error(errMsg);
     }
     
+    const redactedUrl = originalUrl.replace(/:([^:@]+)@/, ':****@');
     new Logger('PrismaService').log(
-      `[DB_DIAGNOSTICS] Service: ${serviceName} | Env: ${nodeEnv} | Connecting to Host: ${hostname} | DB: ${database}`
+      `[DB_DIAGNOSTICS] Service: ${serviceName} | Env: ${nodeEnv} | Connecting to URL: ${redactedUrl}`
     );
 
     let modifiedUrl = originalUrl;
@@ -92,12 +100,35 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         parsed.searchParams.set('pgbouncer', 'true');
         parsed.searchParams.set('statement_cache_size', '0');
         if (!parsed.searchParams.has('connection_limit')) {
-          parsed.searchParams.set('connection_limit', '5');
+          parsed.searchParams.set('connection_limit', '1');
         }
         modifiedUrl = parsed.toString();
       }
     } catch (e) {
       // Fallback to original
+    }
+
+    try {
+      const parsed = new URL(modifiedUrl);
+      if (parsed.hostname.includes('.neon.tech') && !parsed.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        const { execSync } = require('child_process');
+        const hostname = parsed.hostname;
+        const endpointId = hostname.split('.')[0];
+        const nslookupOut = execSync(`nslookup ${hostname}`).toString();
+        const nameParts = nslookupOut.split(/Name:\s+/);
+        if (nameParts.length > 1) {
+          const ips = nameParts[1].match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g);
+          if (ips && ips.length > 0) {
+            const ipv4 = ips[0];
+            parsed.hostname = ipv4;
+            parsed.searchParams.set('sslaccept', 'accept_invalid_certs');
+            parsed.searchParams.set('options', `endpoint=${endpointId}`);
+            modifiedUrl = parsed.toString();
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore and fallback
     }
 
     process.env.DATABASE_URL = modifiedUrl;

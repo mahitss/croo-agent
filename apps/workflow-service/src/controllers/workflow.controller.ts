@@ -124,6 +124,8 @@ export class WorkflowController {
         where: { id },
         data: { status: 'running' },
       });
+
+      console.log('[STRUCTURED_LOG] EXECUTION_STARTED', { workflowId: id, executionId: execution.id });
   
       // Asynchronous background workflow node execution orchestrator (Phase 3 Compliance)
       (async () => {
@@ -131,17 +133,19 @@ export class WorkflowController {
           const nodes = await this.prisma.workflowNode.findMany({
             where: { workflowId: id },
           });
-  
+   
           // Topological ordering execution simulator
           for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
-  
+   
             // 1. Mark node as running
             await this.prisma.workflowNode.update({
               where: { id: node.id },
               data: { status: 'running' },
             });
-  
+
+            console.log('[STRUCTURED_LOG] NODE_STARTED', { nodeId: node.id, capability: node.capability, status: 'running' });
+   
             // 2. Create database task entry
             const task = await this.prisma.task.create({
               data: {
@@ -152,7 +156,7 @@ export class WorkflowController {
                 inputPayload: { stage: i + 1 },
               },
             });
-  
+   
             // 3. Log task steps
             await this.prisma.taskLog.create({
               data: {
@@ -161,9 +165,9 @@ export class WorkflowController {
                 message: `Initializing node discovery for capability: ${node.capability}`,
               },
             });
-  
+   
             await new Promise(resolve => setTimeout(resolve, 800));
-  
+   
             await this.prisma.taskLog.create({
               data: {
                 taskId: task.id,
@@ -171,9 +175,9 @@ export class WorkflowController {
                 message: `Task node linked successfully. Querying agent endpoint results...`,
               },
             });
-  
+   
             await new Promise(resolve => setTimeout(resolve, 1000));
-  
+   
             // 4. Mark task and node completed
             await this.prisma.task.update({
               where: { id: task.id },
@@ -183,12 +187,14 @@ export class WorkflowController {
                 outputPayload: { result: `Node ${node.capability} resolved successfully.` },
               },
             });
-  
+   
             await this.prisma.workflowNode.update({
               where: { id: node.id },
               data: { status: 'completed' },
             });
-  
+
+            console.log('[STRUCTURED_LOG] NODE_COMPLETED', { nodeId: node.id, capability: node.capability, status: 'completed' });
+   
             await this.prisma.taskLog.create({
               data: {
                 taskId: task.id,
@@ -197,7 +203,7 @@ export class WorkflowController {
               },
             });
           }
-  
+   
           // Finalize execution
           await this.prisma.workflowExecution.update({
             where: { id: execution.id },
@@ -206,13 +212,15 @@ export class WorkflowController {
               completedAt: new Date(),
             },
           });
-  
+   
           await this.prisma.workflow.update({
             where: { id },
             data: { status: 'completed' },
           });
-  
-        } catch (err) {
+
+          console.log('[STRUCTURED_LOG] WORKFLOW_COMPLETED', { workflowId: id, executionId: execution.id, status: 'completed' });
+   
+        } catch (err: any) {
           console.error('Workflow background run crashed:', err);
           await this.prisma.workflowExecution.update({
             where: { id: execution.id },
@@ -222,6 +230,7 @@ export class WorkflowController {
             where: { id },
             data: { status: 'failed' },
           });
+          console.log('[STRUCTURED_LOG] WORKFLOW_FAILED', { workflowId: id, executionId: execution.id, status: 'failed', error: err.message || err });
         }
       })();
   
