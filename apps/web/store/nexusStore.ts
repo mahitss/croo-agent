@@ -569,18 +569,49 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
 
       let planRes;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:10000" : window.location.origin) : "http://localhost:10000")}/api/v1/ai/plan`;
+
+      console.log("URL:", url);
+
       try {
-        planRes = await apiClient.post<any>('/api/v1/ai/plan', {
-          query,
-          routingMode,
-          budget
-        });
-      } catch (err: any) {
-        throw new Error(`Planner failure: ${err.message || err}`);
+          console.log("FETCH START");
+          console.log("fetch reference type:", typeof fetch);
+          console.log("fetch reference string:", String(fetch));
+
+          const response = await fetch(url,{
+              method:"POST",
+              headers:{
+                  "Content-Type":"application/json"
+              },
+              body:JSON.stringify({
+                  query,
+                  routingMode,
+                  budget
+              })
+          });
+
+          console.log("FETCH RETURNED");
+          console.log("STATUS:",response.status);
+
+          const text = await response.text();
+          console.log("RAW RESPONSE:",text);
+
+          planRes = JSON.parse(text);
+      }
+      catch(err){
+          console.error("===== REAL ERROR =====");
+          console.error(err);
+
+          if(err instanceof Error){
+              console.error("MESSAGE:", err.message);
+              console.error("STACK:", err.stack);
+              console.error("NAME:", err.name);
+          }
+          throw err;
       }
 
-      if (!planRes.success || !planRes.data) {
-        throw new Error(`Planner failure: ${planRes.message || 'AI Planner failed to generate DAG'}`);
+      if (!planRes || !planRes.success || !planRes.data) {
+        throw new Error(`Planner failure: ${planRes?.message || 'AI Planner failed to generate DAG'}`);
       }
 
       console.log('[STRUCTURED_LOG] PLAN_SUCCESS', { nodesCount: planRes.data.nodes?.length });

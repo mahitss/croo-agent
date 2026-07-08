@@ -2,10 +2,8 @@ import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestj
 
 @Controller('api/v1')
 export class WalletController {
-  private readonly walletUrl = process.env.WALLET_SERVICE_URL || 
-    (process.env.RENDER === 'true' ? 'http://wallet-service:5005/api/v1' : 'http://127.0.0.1:5005/api/v1');
-  private readonly paymentUrl = process.env.PAYMENT_SERVICE_URL || 
-    (process.env.RENDER === 'true' ? 'http://payment-service:5004/api/v1' : 'http://127.0.0.1:5004/api/v1');
+  private readonly walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
+  private readonly paymentUrl = process.env.PAYMENT_SERVICE_URL || 'http://127.0.0.1:5004/api/v1';
 
   @Get('wallet')
   async getWallet() {

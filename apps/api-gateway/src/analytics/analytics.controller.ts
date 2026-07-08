@@ -5,12 +5,9 @@ import { Roles } from '../decorators/roles.decorator';
 
 @Controller('api/v1')
 export class AnalyticsController {
-  private readonly analyticsUrl = process.env.ANALYTICS_SERVICE_URL || 
-    (process.env.RENDER === 'true' ? 'http://analytics-service:5007/api/v1' : 'http://127.0.0.1:5007/api/v1');
-  private readonly notificationUrl = process.env.NOTIFICATION_SERVICE_URL || 
-    (process.env.RENDER === 'true' ? 'http://notification-service:5006/api/v1' : 'http://127.0.0.1:5006/api/v1');
-  private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 
-    (process.env.RENDER === 'true' ? 'http://workflow-service:5003/api/v1' : 'http://127.0.0.1:5003/api/v1');
+  private readonly analyticsUrl = process.env.ANALYTICS_SERVICE_URL || 'http://127.0.0.1:5007/api/v1';
+  private readonly notificationUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://127.0.0.1:5006/api/v1';
+  private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 'http://127.0.0.1:5003/api/v1';
 
   @Get('notifications')
   async getNotifications() {
