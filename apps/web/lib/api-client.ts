@@ -7,7 +7,7 @@ const BASE_URL =
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs = 15000
+  timeoutMs = 90000
 ) {
   if (!BASE_URL && typeof window !== "undefined") {
     throw new Error(
