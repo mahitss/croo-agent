@@ -49,7 +49,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     new Logger('PrismaService').log(
       `[DB_DIAGNOSTICS] Service: ${serviceName} | Env: ${nodeEnv} | Connecting to Host: ${hostname} | DB: ${database}`
     );
-
     let modifiedUrl = originalUrl;
     try {
       const parsed = new URL(originalUrl);
@@ -64,6 +63,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     } catch (e) {
       // Fallback to original
     }
+
+    process.env.DATABASE_URL = modifiedUrl;
 
     super({
       datasources: {
@@ -103,6 +104,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleDestroy() {
+    console.log(`[PRISMA_DISCONNECT_LOG] Disconnect requested from auth-service PrismaService:`, new Error().stack);
     await this.$disconnect();
   }
 }

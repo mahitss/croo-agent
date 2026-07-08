@@ -65,6 +65,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // Fallback to original
     }
 
+    process.env.DATABASE_URL = modifiedUrl;
+
     super({
       datasources: {
         db: {
@@ -103,6 +105,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleDestroy() {
+    console.log(`[PRISMA_DISCONNECT_LOG] Disconnect requested from wallet-service PrismaService:`, new Error().stack);
     await this.$disconnect();
   }
 }
