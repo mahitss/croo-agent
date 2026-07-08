@@ -530,34 +530,75 @@ export default function MarketplacePage() {
                   </p>
                   
                   <div className="flex flex-col gap-4 mt-2">
-                    {Object.values(groupedAgents).map((group: any) => (
-                      <div key={group.agentId} className="border border-border-dark bg-black/40 p-4 rounded-xl flex flex-col gap-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h5 className="text-xs font-bold text-white leading-tight">{group.agentName}</h5>
-                            <span className="text-[9px] text-gray-500 font-mono font-normal">ID: {group.agentId}</span>
-                          </div>
-                          {group.trustScore !== undefined && (
-                            <span className="text-[8px] bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded font-mono font-bold">
-                              {group.trustScore}% TRUST
-                            </span>
-                          )}
-                        </div>
+                    {(() => {
+                      const getAgentDisplayInfo = (agentId: string) => {
+                        const id = agentId.toLowerCase();
+                        const agentsMap: Record<string, { name: string; emoji: string }> = {
+                          'agent-research-1': { name: 'Research Agent', emoji: '🔍' },
+                          'agent-research-2': { name: 'Research Agent', emoji: '⚡' },
+                          'agent-finance-1': { name: 'Finance Agent', emoji: '📊' },
+                          'agent-legal-1': { name: 'Legal Agent', emoji: '⚖' },
+                          'agent-code-1': { name: 'Coding Agent', emoji: '💻' },
+                          'agent-security-1': { name: 'Security Agent', emoji: '🔒' },
+                          'agent-translate-1': { name: 'Translation Agent', emoji: '🌐' },
+                          'agent-verify-1': { name: 'Verification Agent', emoji: '🛡' },
+                        };
+                        if (agentsMap[id]) return agentsMap[id];
+                        if (id.startsWith('agent-search') || id.startsWith('agent-research')) return { name: 'Research Agent', emoji: '🔍' };
+                        if (id.startsWith('agent-translate')) return { name: 'Translation Agent', emoji: '🌐' };
+                        if (id.startsWith('agent-verify')) return { name: 'Verification Agent', emoji: '🛡' };
+                        if (id.startsWith('agent-finance')) return { name: 'Finance Agent', emoji: '📊' };
+                        if (id.startsWith('agent-legal')) return { name: 'Legal Agent', emoji: '⚖' };
+                        if (id.startsWith('agent-code')) return { name: 'Coding Agent', emoji: '💻' };
+                        if (id.startsWith('agent-security')) return { name: 'Security Agent', emoji: '🔒' };
+                        return { name: 'Agent', emoji: '🤖' };
+                      };
 
-                        <div className="flex flex-col gap-1.5 border-t border-border-dark/50 pt-2">
-                          <span className="text-[9px] text-gray-400 uppercase font-mono tracking-wider">Assigned Stages ({group.stages.length}):</span>
-                          {group.stages.map((stage: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-1.5 text-[10px] text-white font-mono bg-white/5 px-2.5 py-1.5 rounded-lg border border-border-dark/30">
-                              <span className="text-primary-neon font-bold">✓</span>
-                              <div className="flex flex-col">
-                                <span className="font-extrabold">{stage.stageName}</span>
-                                <span className="text-[9px] text-gray-400 font-mono font-normal">Cap: {stage.capability} • {stage.reason}</span>
-                              </div>
+                      return Object.values(groupedAgents).map((group: any) => (
+                        <div key={group.agentId} className="border border-border-dark bg-black/40 p-4 rounded-xl flex flex-col gap-3 hover:border-primary-neon/10 transition-all">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h5 className="text-xs font-bold text-white leading-tight">{group.agentName}</h5>
+                              <span className="text-[9px] text-gray-400 font-mono italic">Role: {getAgentDisplayInfo(group.agentId).name}</span>
+                              <span className="text-[8px] text-gray-500 font-mono block mt-0.5">ID: {group.agentId}</span>
                             </div>
-                          ))}
+                            {group.trustScore !== undefined && (
+                              <span className="text-[8px] bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded font-mono font-bold shrink-0">
+                                {group.trustScore}% TRUST
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Agent Meta */}
+                          <div className="grid grid-cols-2 gap-2 text-[9px] font-mono text-gray-400 bg-white/2 p-2 rounded-lg border border-border-dark/30">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Fee:</span>
+                              <span className="text-white font-bold">{Number(group.cost).toFixed(2)} USDC</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Latency:</span>
+                              <span className="text-white font-bold">{group.time}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5 border-t border-border-dark/50 pt-2">
+                            <span className="text-[9px] text-gray-400 uppercase font-mono tracking-wider">Assigned Stages ({group.stages.length}):</span>
+                            {group.stages.map((stage: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 text-[10px] text-white font-mono bg-white/5 px-2.5 py-1.5 rounded-lg border border-border-dark/30">
+                                <span className="text-primary-neon font-bold">✓</span>
+                                <div className="flex flex-col w-full">
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="font-extrabold text-white">{stage.stageName}</span>
+                                    <span className="text-[8px] bg-white/5 border border-border-dark px-1.5 py-0.2 rounded text-gray-400 tracking-wide font-normal">{stage.capability.toUpperCase()}</span>
+                                  </div>
+                                  <span className="text-[9px] text-gray-400 font-mono font-normal mt-0.5">{stage.reason}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
 
@@ -803,10 +844,13 @@ export default function MarketplacePage() {
                           </div>
                         </div>
 
-                        <h3 className="text-base font-extrabold text-white mb-2 flex items-center gap-1.5 leading-tight">
+                        <h3 className="text-base font-extrabold text-white mb-0.5 flex items-center gap-1.5 leading-tight">
                           {agent.name}
                           <span className="text-[10px] text-gray-500 font-mono font-normal">v{agent.version}</span>
                         </h3>
+                        <span className="text-[9px] text-gray-400 font-mono italic mb-2.5 block">
+                          Role: {agent.category} Agent
+                        </span>
                         
                         <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 mb-4">
                           {agent.description}

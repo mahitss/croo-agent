@@ -382,7 +382,8 @@ export default function DashboardPage() {
                   </td>
                   <td className="py-3.5 px-4 font-bold text-white flex flex-col">
                     <span>{agent.name}</span>
-                    <span className="text-[10px] text-gray-500 font-normal font-mono">{agent.id}</span>
+                    <span className="text-[9px] text-gray-400 font-mono italic font-normal">Role: {agent.category} Agent</span>
+                    <span className="text-[9px] text-gray-500 font-normal font-mono">{agent.id}</span>
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="bg-white/3 border border-border-dark px-2 py-0.5 rounded text-gray-300">

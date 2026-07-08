@@ -273,7 +273,8 @@ export default function WorkflowPage() {
                   <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                     <div>
                       <span className="text-[9px] text-gray-500 uppercase">Assigned Node</span>
-                      <span className="text-white block mt-0.5">{assignedAgent.name}</span>
+                      <span className="text-white block mt-0.5 font-bold">{assignedAgent.name}</span>
+                      <span className="text-[9px] text-gray-400 font-mono italic block mt-0.5">Role: {assignedAgent.category} Agent</span>
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-400">
                       <span>Rating: {assignedAgent.rating}⭐</span>

@@ -84,16 +84,19 @@ export default function AgentDetailModal({ agent, onClose }: AgentDetailModalPro
               {agent.name.charAt(0)}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white leading-none">{agent.name}</h2>
-                <span className="text-[9px] font-mono bg-white/5 border border-border-dark text-gray-400 px-1.5 py-0.5 rounded">
-                  v{agent.version}
-                </span>
-                {agent.trustScore >= 95 && (
-                  <span className="flex items-center gap-0.5 text-[8px] bg-primary-neon/15 text-primary-neon px-1.5 py-0.5 rounded font-mono border border-primary-neon/20">
-                    <Award className="w-3.5 h-3.5" /> VERIFIED
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-white leading-none">{agent.name}</h2>
+                  <span className="text-[9px] font-mono bg-white/5 border border-border-dark text-gray-400 px-1.5 py-0.5 rounded">
+                    v{agent.version}
                   </span>
-                )}
+                  {agent.trustScore >= 95 && (
+                    <span className="flex items-center gap-0.5 text-[8px] bg-primary-neon/15 text-primary-neon px-1.5 py-0.5 rounded font-mono border border-primary-neon/20">
+                      <Award className="w-3.5 h-3.5" /> VERIFIED
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-400 font-mono italic">Role: {agent.category} Agent</span>
               </div>
               <p className="text-[10px] text-gray-500 font-mono mt-1">Wallet: {agent.walletAddress}</p>
             </div>
