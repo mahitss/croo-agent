@@ -7,9 +7,14 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 async function bootstrap() {
-  // Load environment configurations
-  const localEnv = dotenv.config();
-  const parentEnv = dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+  // Load environment configurations only if in development or if critical variables are missing
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+  let localEnv: any = { parsed: {} };
+  let parentEnv: any = { parsed: {} };
+  if (!isProduction || !process.env.DATABASE_URL) {
+    localEnv = dotenv.config();
+    parentEnv = dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+  }
   
   console.log('[SENTRY_DEBUG] process.cwd() is:', process.cwd());
   console.log('[SENTRY_DEBUG] localEnv parsed:', localEnv.parsed ? 'yes' : 'no');

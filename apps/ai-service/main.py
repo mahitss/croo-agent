@@ -1,8 +1,9 @@
 import os
 import urllib.request
 try:
-    from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+    if os.environ.get("NODE_ENV") != "production" and not os.environ.get("DATABASE_URL"):
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 except ImportError:
     pass
 
