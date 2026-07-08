@@ -88,9 +88,18 @@ function startRemainingServices() {
   });
 }
 
+const restartCounts = {};
+
 function startService(service) {
   const serviceDir = path.resolve(__dirname, '..', service.dir);
-  console.log(`[MANAGER] Starting ${service.name} on port ${service.port} in ${serviceDir}...`);
+  
+  if (restartCounts[service.name] === undefined) {
+    restartCounts[service.name] = 0;
+  } else {
+    restartCounts[service.name]++;
+  }
+
+  console.log(`[MANAGER] Service Started: ${service.name} | Port: ${service.port} | Dir: ${serviceDir} | Restart Count: ${restartCounts[service.name]}`);
   
   // Set up child environment overrides
   const env = { 
@@ -136,10 +145,18 @@ function startService(service) {
     console.error(`[${service.name}] [ERROR] ${data.toString().trim()}`);
   });
 
-  child.on('close', (code) => {
-    console.log(`[MANAGER] ${service.name} exited with code ${code}`);
+  child.on('close', (code, signal) => {
+    let crashReason = 'None';
+    if (signal) {
+      crashReason = `Terminated by signal ${signal}`;
+    } else if (code !== 0) {
+      crashReason = `Exited with non-zero status code ${code}`;
+    }
+
+    console.log(`[MANAGER] Service Exited: ${service.name} | Exit Code: ${code} | Signal: ${signal} | Restart Count: ${restartCounts[service.name]} | Crash Reason: ${crashReason}`);
+    
     // Auto-restart logic for crucial services (excluding manual shutdown)
-    if (code !== 0 && !process.env.STOPPING) {
+    if ((code !== 0 || signal) && !process.env.STOPPING) {
       console.log(`[MANAGER] Restarting ${service.name} in 3 seconds...`);
       setTimeout(() => startService(service), 3000);
     }

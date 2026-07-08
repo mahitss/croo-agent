@@ -80,6 +80,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     // Await database connection on startup to fail fast if incorrect
     await this.connectWithRetry();
+
+    // Start a periodic heartbeat to keep PgBouncer/Neon connections warm and prevent "Error { kind: Closed }"
+    const pingInterval = setInterval(async () => {
+      try {
+        await this.$queryRawUnsafe('SELECT 1');
+      } catch (err) {
+        this.logger.warn(`Database heartbeat ping failed: ${err.message}`);
+      }
+    }, 15000);
+
+    (this as any)._pingInterval = pingInterval;
   }
 
   private async connectWithRetry(retries = 5, delay = 2000): Promise<void> {
@@ -105,7 +116,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleDestroy() {
-    console.log(`[PRISMA_DISCONNECT_LOG] Disconnect requested from payment-service PrismaService:`, new Error().stack);
+    if ((this as any)._pingInterval) {
+      clearInterval((this as any)._pingInterval);
+    }
+    console.error("PRISMA DISCONNECT CALLED");
+    console.error(new Error().stack);
     await this.$disconnect();
   }
 }
