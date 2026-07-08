@@ -13,6 +13,32 @@ export default function AgentNode({ data }: { data: any }) {
   const agents = useNexusStore((state) => state.agents);
   const assignedAgent = agents.find(a => a.id === data.assignedAgentId);
 
+  const getAgentDisplayInfo = (agentId: string) => {
+    const id = agentId.toLowerCase();
+    if (id.startsWith('agent-search') || id.startsWith('agent-research')) {
+      return { name: 'Research Agent', emoji: '🔍' };
+    }
+    if (id.startsWith('agent-translate')) {
+      return { name: 'Translation Agent', emoji: '🌐' };
+    }
+    if (id.startsWith('agent-verify')) {
+      return { name: 'Verification Agent', emoji: '🛡' };
+    }
+    if (id.startsWith('agent-finance')) {
+      return { name: 'Finance Agent', emoji: '📊' };
+    }
+    if (id.startsWith('agent-legal')) {
+      return { name: 'Legal Agent', emoji: '⚖' };
+    }
+    if (id.startsWith('agent-code')) {
+      return { name: 'Coding Agent', emoji: '💻' };
+    }
+    if (id.startsWith('agent-security')) {
+      return { name: 'Security Agent', emoji: '🔒' };
+    }
+    return { name: agentId, emoji: '🤖' };
+  };
+
   const getStatusIcon = () => {
     switch (data.status) {
       case 'completed':
@@ -41,23 +67,23 @@ export default function AgentNode({ data }: { data: any }) {
 
   const getStatusBadge = () => {
     const status = (data.status || 'ready').toLowerCase();
-    let label = 'READY';
+    let label = 'Ready';
     let bgColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     
     if (status === 'completed') {
-      label = 'COMPLETED';
+      label = 'Completed';
       bgColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     } else if (status === 'running') {
-      label = 'RUNNING';
+      label = 'Running';
       bgColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
     } else if (status === 'failed') {
-      label = 'FAILED';
+      label = 'Failed';
       bgColor = 'bg-red-500/20 text-red-400 border-red-500/30';
     } else if (status === 'pending') {
-      label = 'PENDING';
+      label = 'Pending';
       bgColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     } else if (data.assignedAgent || data.assignedAgentId) {
-      label = 'READY';
+      label = 'Ready';
       bgColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     }
 
@@ -67,6 +93,10 @@ export default function AgentNode({ data }: { data: any }) {
       </span>
     );
   };
+
+  const rawTitle = data.task || data.name;
+  const isGeneric = !rawTitle || rawTitle.startsWith('Stage:') || rawTitle.toUpperCase().startsWith('NODE-');
+  const nodeTitle = isGeneric ? (data.id?.startsWith('node-') ? data.id.toUpperCase() : `NODE-${(data.index ?? 0) + 1}`) : rawTitle;
 
   return (
     <div className={`glass-card border px-4 py-3 rounded-lg w-[220px] text-left transition-all duration-300 ${getStatusClass()}`}>
@@ -88,28 +118,38 @@ export default function AgentNode({ data }: { data: any }) {
         </div>
       </div>
 
-      <h4 className="text-xs font-bold text-white leading-tight mb-1 truncate" title={data.task || data.name}>
-        {data.task || data.name}
+      <h4 className="text-xs font-bold text-white leading-tight mb-1 truncate" title={nodeTitle}>
+        {nodeTitle}
       </h4>
 
       {assignedAgent ? (
         <div className="mt-2 pt-2 border-t border-border-dark flex flex-col gap-0.5">
-          <span className="text-[10px] text-gray-400 truncate">
-            Assigned: <strong className="text-white">{assignedAgent.name}</strong>
-          </span>
-          <div className="flex justify-between items-center text-[9px] font-mono text-gray-500">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-white flex items-center gap-1">
+              {getAgentDisplayInfo(assignedAgent.id).emoji} {getAgentDisplayInfo(assignedAgent.id).name}
+            </span>
+            <span className="text-[8px] text-gray-500 font-mono">
+              ID: {assignedAgent.id}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 mt-1">
             <span>Rating: {assignedAgent.rating}⭐</span>
-            <span>Fee: {data.costEstimate} USDC</span>
+            <span>Estimated Cost: {Number(data.costEstimate || 0).toFixed(2)} USDC</span>
           </div>
         </div>
       ) : (data.assignedAgent || data.assignedAgentId) ? (
         <div className="mt-2 pt-2 border-t border-border-dark flex flex-col gap-0.5">
-          <span className="text-[10px] text-gray-400 truncate">
-            🤖 <strong className="text-white">{data.assignedAgent || data.assignedAgentId}</strong>
-          </span>
-          <div className="flex justify-between items-center text-[9px] font-mono text-gray-500">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-white flex items-center gap-1">
+              {getAgentDisplayInfo(data.assignedAgent || data.assignedAgentId).emoji} {getAgentDisplayInfo(data.assignedAgent || data.assignedAgentId).name}
+            </span>
+            <span className="text-[8px] text-gray-500 font-mono">
+              ID: {data.assignedAgent || data.assignedAgentId}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 mt-1">
             <span>Assigned Agent</span>
-            <span>Fee: {data.costEstimate || '0.00'} USDC</span>
+            <span>Estimated Cost: {Number(data.costEstimate || 0).toFixed(2)} USDC</span>
           </div>
         </div>
       ) : (

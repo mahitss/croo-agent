@@ -88,7 +88,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
     const spacingY = 160;
     const centerX = 200;
 
-    const mappedNodes = activeWorkflow.nodes.map(node => {
+    const mappedNodes = activeWorkflow.nodes.map((node, idx) => {
       const lvl = levels[node.id] || 0;
       const levelNodes = nodesByLevel[lvl];
       const indexInLevel = levelNodes.indexOf(node.id);
@@ -109,6 +109,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         position: { x, y },
         data: { 
           id: node.id,
+          index: idx,
           name: node.name, 
           task: nodeTask,
           assignedAgent: assignedAgent,

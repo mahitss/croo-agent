@@ -142,6 +142,7 @@ export class WorkflowsController {
             id: node.id,
             capability: node.capability,
             label: node.task || node.id.toUpperCase(),
+            task: node.task || node.id.toUpperCase(),
           })),
           edges: (() => {
             const list: any[] = [];

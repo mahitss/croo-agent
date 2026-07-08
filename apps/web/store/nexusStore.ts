@@ -739,12 +739,12 @@ export const useNexusStore = create<NexusState>((set, get) => {
         query,
         nodes: dbWorkflow && dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
           const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
-          const taskName = nodeTitles[n.id] || nodeTitles[idx] || `Stage: ${n.capability.toUpperCase()}`;
+          const taskName = nodeTitles[n.id] || nodeTitles[String(idx)] || nodeTitles[idx] || `Stage: ${n.capability.toUpperCase()}`;
           return {
             id: n.id,
             name: taskName,
             task: taskName,
-            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || agentSelectionReasons[idx] || 'Optimal selection'}`,
+            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || agentSelectionReasons[String(idx)] || agentSelectionReasons[idx] || 'Optimal selection'}`,
             capability: n.capability,
             costEstimate: agent.price,
             timeEstimate: agent.latency,
@@ -1245,12 +1245,12 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 query: meta.query,
                 nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
                   const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
-                  const taskName = meta.nodeTitles?.[n.id] || meta.nodeTitles?.[idx] || `Stage: ${n.capability.toUpperCase()}`;
+                  const taskName = meta.nodeTitles?.[n.id] || meta.nodeTitles?.[String(idx)] || meta.nodeTitles?.[idx] || `Stage: ${n.capability.toUpperCase()}`;
                   return {
                     id: n.id,
                     name: taskName,
                     task: taskName,
-                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || meta.agentSelectionReasons?.[idx] || 'Optimal selection'}`,
+                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || meta.agentSelectionReasons?.[String(idx)] || meta.agentSelectionReasons?.[idx] || 'Optimal selection'}`,
                     capability: n.capability,
                     costEstimate: agent.price,
                     timeEstimate: agent.latency,

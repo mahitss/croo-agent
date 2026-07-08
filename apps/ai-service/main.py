@@ -70,6 +70,7 @@ class TaskNodeResponse(BaseModel):
     id: str
     capability: str
     dependencies: List[str]
+    task: Optional[str] = None
 
 class PlanResponse(BaseModel):
     workflow: List[TaskNodeResponse]
@@ -370,10 +371,12 @@ def plan_workflow(req: PlanRequest):
                 node_id = item.get("id") or item.get("task") or f"node-{idx+1}"
                 capability = item.get("capability") or "research"
                 dependencies = item.get("dependencies") or []
+                task = item.get("task") or item.get("label") or node_id.upper()
                 workflow_list.append(TaskNodeResponse(
                     id=node_id,
                     capability=capability,
-                    dependencies=dependencies
+                    dependencies=dependencies,
+                    task=task
                 ))
             
             plan = PlanResponse(
