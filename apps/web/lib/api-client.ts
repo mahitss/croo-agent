@@ -1,19 +1,16 @@
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:5000"
-    : "");
+  (typeof window !== "undefined"
+    ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? "http://localhost:10000"
+      : window.location.origin)
+    : "http://localhost:10000");
 
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs = 90000
 ) {
-  if (!BASE_URL && typeof window !== "undefined") {
-    throw new Error(
-      "NEXT_PUBLIC_API_URL is not defined. Please configure it in your Vercel Environment Variables."
-    );
-  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
