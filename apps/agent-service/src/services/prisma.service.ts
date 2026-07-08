@@ -38,10 +38,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       if (originalUrl) {
         const parsed = new URL(originalUrl);
-        if (!parsed.searchParams.has('schema')) {
-          parsed.searchParams.set('schema', 'agents');
-          originalUrl = parsed.toString();
-        }
+        parsed.searchParams.set('schema', 'agents');
+        originalUrl = parsed.toString();
       }
     } catch (e) {
       // Ignore
@@ -75,7 +73,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error(errMsg);
     }
     
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+    const isProduction = nodeEnv === 'production';
     const isNeon = hostname.includes('neon.tech');
     if ((isProduction || isNeon) && !originalUrl.includes('sslmode=require')) {
       const errMsg = `[DB_ERROR] Service: ${serviceName} | Env: ${nodeEnv} | DATABASE_URL is missing 'sslmode=require' query parameter!`;
@@ -117,6 +115,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     // Await database connection on startup to fail fast if incorrect
     await this.connectWithRetry();
+    await this.validateDatabaseSchema();
 
     // Start a periodic heartbeat to keep PgBouncer/Neon connections warm and prevent "Error { kind: Closed }"
     const pingInterval = setInterval(async () => {
@@ -128,6 +127,34 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }, 15000);
 
     (this as any)._pingInterval = pingInterval;
+  }
+
+  private async validateDatabaseSchema() {
+    const expectedTables = ['agents', 'agent_versions', 'capabilities', 'agent_capabilities', 'pricing_models', 'reviews'];
+    try {
+      const activeSchema: any = await this.$queryRawUnsafe('SELECT current_schema() as schema');
+      const schemaName = activeSchema[0]?.schema || 'public';
+      
+      const tableList = expectedTables.map(t => `'${t}'`).join(', ');
+      const tables: any = await this.$queryRawUnsafe(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = '${schemaName}' AND table_name IN (${tableList})
+      `);
+
+      const existingTables = tables.map((t: any) => t.table_name);
+      const missingTables = expectedTables.filter(t => !existingTables.includes(t));
+
+      if (missingTables.length > 0) {
+        const errMsg = `[DB_VALIDATION_ERROR] Missing expected tables in schema "${schemaName}": ${missingTables.join(', ')}`;
+        this.logger.error(errMsg);
+        throw new Error(errMsg);
+      }
+      this.logger.log(`[DB_VALIDATION_SUCCESS] All required tables verified in schema "${schemaName}".`);
+    } catch (err) {
+      this.logger.error(`Database startup validation failed: ${err.message}`);
+      throw err;
+    }
   }
 
   private async connectWithRetry(retries = 5, delay = 2000): Promise<void> {
