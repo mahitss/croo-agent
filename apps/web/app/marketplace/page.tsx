@@ -107,15 +107,23 @@ export default function MarketplacePage() {
 
   const handleMatchmaker = async () => {
     if (!matchmakerPrompt.trim()) return;
+    console.log("STEP START: handleMatchmaker");
     setIsMatching(true);
     const activeAgents = agents.length > 0 ? agents : seedAgents;
     try {
+      console.log("FETCH START: POST /api/v1/ai/plan");
       const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
         query: matchmakerPrompt,
         routingMode: 'balanced',
         budget: 2.0
       });
+      console.log("FETCH RETURNED: POST /api/v1/ai/plan");
+      console.log("HTTP STATUS: 200");
+      console.log("RAW RESPONSE:", JSON.stringify(planRes));
+      console.log("PARSED RESPONSE:", planRes);
+
       if (planRes.success && planRes.data) {
+        console.log("TRANSFORMED OBJECT START");
         const assignedIds: string[] = [];
         const chainItems = planRes.data.nodes.map((node: any) => {
           const cap = node.capability.toLowerCase();
@@ -250,14 +258,21 @@ export default function MarketplacePage() {
           return matched.latency || 0;
         }));
 
-        setMatchedStack({
+        const transformedObject = {
           chain: chainItems,
           cost: totalCost || planRes.data.estimated_cost || 0.33,
           time: `${Math.round(maxLatencyVal / 1000) || 5}s`
-        });
+        };
+        console.log("TRANSFORMED OBJECT:", transformedObject);
+        setMatchedStack(transformedObject);
       }
+      console.log("NEXT STEP: Swarm stack generation complete");
     } catch (err: any) {
+      console.error("FULL ERROR");
+      console.error(err);
+      console.error(err.stack);
       toast(`Matchmaking error: ${err.message || err}`, 'error');
+      throw err;
     } finally {
       setIsMatching(false);
     }
