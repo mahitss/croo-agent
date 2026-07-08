@@ -559,6 +559,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     generateWorkflow: async (query, routingMode, budget) => {
       console.log('[STRUCTURED_LOG] START_GENERATE', { query, routingMode, budget });
+      console.log("STEP 1");
+      console.log("process.env.NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
       const state = get();
       const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
 

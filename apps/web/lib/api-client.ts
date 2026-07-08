@@ -11,6 +11,8 @@ async function fetchWithTimeout(
   options: RequestInit = {},
   timeoutMs = 90000
 ) {
+  console.log("STEP 3");
+  console.log("ABOUT TO FETCH", url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -22,8 +24,12 @@ async function fetchWithTimeout(
 
     clearTimeout(timeout);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(timeout);
+    console.error("FETCH FAILED", error);
+    if (error && error.stack) {
+      console.error(error.stack);
+    }
     throw error;
   }
 }
@@ -80,6 +86,8 @@ export const apiClient = {
   },
 
   async post<T>(url: string, body: any): Promise<T> {
+    console.log("STEP 2");
+    console.log("REQUEST BODY", body);
     const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "POST",
       headers: {
