@@ -77,10 +77,13 @@ export class AgentController {
     const cached = await this.redis.get('marketplace:agents');
     if (cached) {
       try {
-        return {
-          success: true,
-          data: JSON.parse(cached),
-        };
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return {
+            success: true,
+            data: parsed,
+          };
+        }
       } catch (err) {
         // Safe fallback
       }

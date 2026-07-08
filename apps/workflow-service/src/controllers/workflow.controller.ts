@@ -320,6 +320,21 @@ export class WorkflowController {
     };
   }
 
+  @Get('workflows/:id/status')
+  async getStatus(@Param('id') id: string) {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    return {
+      success: true,
+      status: workflow?.status || 'pending',
+      data: {
+        status: workflow?.status || 'pending',
+      },
+    };
+  }
+
   @Get('workflows/:id/graph')
   async getGraph(@Param('id') id: string) {
     const workflow = await this.prisma.workflow.findFirst({

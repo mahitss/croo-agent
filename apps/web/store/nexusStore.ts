@@ -43,6 +43,8 @@ interface NexusState {
   withdrawUserWallet: (amount: number) => Promise<void>;
   initialize: () => Promise<void>;
   resetDemoMode: () => void;
+  logExecution: (phase: ExecutionLog['phase'], message: string, type?: ExecutionLog['type'], metadata?: any) => void;
+  pollActiveWorkflowStatus: (workflow: Workflow) => Promise<void>;
   
   // Auth Actions
   setAuthModal: (open: boolean, tab?: 'login' | 'register' | 'forgot') => void;
@@ -898,12 +900,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       set({ isRunning: true, userQuery: query, currentPhaseIndex: 1, executionLogs: [] });
 
       const log = (phase: ExecutionLog['phase'], message: string, type: ExecutionLog['type'] = 'info', metadata?: any) => {
-        set((prev) => ({
-          executionLogs: [
-            ...prev.executionLogs,
-            { id: `log-${Date.now()}-${Math.random()}`, timestamp: new Date().toISOString(), phase, message, type, metadata }
-          ]
-        }));
+        get().logExecution(phase, message, type, metadata);
       };
 
       try {
@@ -1115,120 +1112,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           throw new Error('Backend workflow engine failed to start execution run');
         }
 
-        let isPolling = true;
-        const loggedIds = new Set<string>();
-
-        while (isPolling) {
-          await new Promise(r => setTimeout(r, 1200));
-          
-          const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
-          if (statusRes.success && statusRes.data) {
-            const currentWf = statusRes.data;
-            
-            const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
-              let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
-              if (!dbNode && currentWf.nodes[idx]) {
-                dbNode = currentWf.nodes[idx];
-              }
-              if (!dbNode) {
-                dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
-              }
-              return dbNode ? { 
-                ...n, 
-                status: dbNode.status,
-                assignedAgentId: dbNode.agentId || n.assignedAgentId,
-                assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
-              } : n;
-            });
-            
-            const computedStatus = computeWorkflowStatus(updatedNodes);
-            logWorkflowStatusChange(workflow.id, computedStatus, updatedNodes);
-
-            workflow = {
-              ...workflow,
-              status: computedStatus,
-              nodes: updatedNodes
-            };
-            set({ activeWorkflow: workflow });
-
-            // Fetch live task logs from the database
-            const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
-            if (logsRes.success && Array.isArray(logsRes.data)) {
-              logsRes.data.forEach((logItem: any) => {
-                const logKey = `${logItem.id}-${logItem.createdAt}`;
-                if (!loggedIds.has(logKey)) {
-                  loggedIds.add(logKey);
-                  const isVerify = logItem.message.toLowerCase().includes('verify');
-                  log(
-                    isVerify ? 'verification' : 'execution',
-                    logItem.message,
-                    logItem.logLevel === 'error' ? 'error' : 'info'
-                  );
-                }
-              });
-            }
-
-            if (computedStatus === 'completed' || computedStatus === 'failed') {
-              isPolling = false;
-              if (computedStatus === 'completed') {
-                // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
-                set({ currentPhaseIndex: 9 });
-                log('settlement', 'Releasing escrow vault payouts to active agent wallets...');
-                await new Promise(r => setTimeout(r, 800));
-                
-                set(state => {
-                  const updatedAgentWallets = { ...state.agentWallets };
-                  const userWallet = { ...state.userWallet };
-                  const releaseTransactions: Transaction[] = [];
-
-                  updatedNodes.forEach(n => {
-                    const agentId = n.assignedAgentId!;
-                    const agent = state.agents.find(a => a.id === agentId)!;
-                    const fee = n.costEstimate;
-
-                    const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
-                    const agentTx: Transaction = {
-                      id: `tx-agent-release-${Date.now()}-${n.id}`,
-                      senderAddress: 'ESCROW_VAULT',
-                      receiverAddress: agent.walletAddress,
-                      amount: fee,
-                      type: 'escrow_release',
-                      timestamp: new Date().toISOString(),
-                      status: 'completed',
-                      txHash: '0x' + Math.random().toString(16).substring(2, 42),
-                      taskId: n.id
-                    };
-
-                    updatedAgentWallets[agentId] = {
-                      ...wallet,
-                      balance: wallet.balance + fee,
-                      history: [agentTx, ...wallet.history]
-                    };
-                    releaseTransactions.push(agentTx);
-                  });
-
-                  userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
-                  userWallet.history = [...releaseTransactions, ...userWallet.history];
-
-                  return {
-                    agentWallets: updatedAgentWallets,
-                    userWallet
-                  };
-                });
-                
-                log('settlement', 'Decentralized escrow finalized. Transactions recorded.', 'success');
-                log('settlement', 'Workflow execution successfully completed.', 'success');
-              } else {
-                throw new Error('Backend execution pipeline reported failed status');
-              }
-            }
-          } else {
-            isPolling = false;
-            throw new Error('Lost connection to backend database service');
-          }
-        }
-
-        set({ isRunning: false });
+        await get().pollActiveWorkflowStatus(workflow);
       } catch (err: any) {
         log('execution', `Workflow run failed: ${err.message || err}`, 'error');
         const latestNodes = get().activeWorkflow?.nodes || [];
@@ -1376,14 +1260,21 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 createdAt: dbWorkflow.createdAt
               };
 
+              const isRunning = workflow.status === 'running';
               set({
                 activeWorkflow: workflow,
+                isRunning,
+                currentPhaseIndex: isRunning ? 7 : 0,
                 userQuery: meta.query,
                 promptTokens: meta.promptTokens,
                 completionTokens: meta.completionTokens,
                 totalTokens: meta.totalTokens,
                 estimatedCost: meta.estimatedCost
               });
+
+              if (isRunning) {
+                get().pollActiveWorkflowStatus(workflow);
+              }
             }
           } catch (wfErr) {
             console.warn('Failed to restore active workflow session', wfErr);
@@ -1438,6 +1329,138 @@ export const useNexusStore = create<NexusState>((set, get) => {
         currentPhaseIndex: 0,
         userQuery: '',
       });
+    },
+
+    logExecution: (phase, message, type = 'info', metadata) => {
+      set((prev) => ({
+        executionLogs: [
+          ...prev.executionLogs,
+          {
+            id: `log-${Date.now()}-${Math.random()}`,
+            timestamp: new Date().toISOString(),
+            phase,
+            message,
+            type,
+            metadata
+          }
+        ]
+      }));
+    },
+
+    pollActiveWorkflowStatus: async (wf: Workflow) => {
+      let workflow = wf;
+      let isPolling = true;
+      const loggedIds = new Set<string>();
+      const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
+
+      while (isPolling) {
+        await new Promise(r => setTimeout(r, 1200));
+        
+        const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
+        if (statusRes.success && statusRes.data) {
+          const currentWf = statusRes.data;
+          
+          const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
+            let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
+            if (!dbNode && currentWf.nodes[idx]) {
+              dbNode = currentWf.nodes[idx];
+            }
+            if (!dbNode) {
+              dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
+            }
+            return dbNode ? { 
+              ...n, 
+              status: dbNode.status,
+              assignedAgentId: dbNode.agentId || n.assignedAgentId,
+              assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
+            } : n;
+          });
+          
+          const computedStatus = computeWorkflowStatus(updatedNodes);
+          logWorkflowStatusChange(workflow.id, computedStatus, updatedNodes);
+
+          workflow = {
+            ...workflow,
+            status: computedStatus,
+            nodes: updatedNodes
+          };
+          set({ activeWorkflow: workflow });
+
+          // Fetch live task logs from the database
+          const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
+          if (logsRes.success && Array.isArray(logsRes.data)) {
+            logsRes.data.forEach((logItem: any) => {
+              const logKey = `${logItem.id}-${logItem.createdAt}`;
+              if (!loggedIds.has(logKey)) {
+                loggedIds.add(logKey);
+                const isVerify = logItem.message.toLowerCase().includes('verify');
+                get().logExecution(
+                  isVerify ? 'verification' : 'execution',
+                  logItem.message,
+                  logItem.logLevel === 'error' ? 'error' : 'info'
+                );
+              }
+            });
+          }
+
+          if (computedStatus === 'completed' || computedStatus === 'failed') {
+            isPolling = false;
+            if (computedStatus === 'completed') {
+              // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
+              set({ currentPhaseIndex: 9 });
+              get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
+              await new Promise(r => setTimeout(r, 800));
+              
+              set(state => {
+                const updatedAgentWallets = { ...state.agentWallets };
+                const userWallet = { ...state.userWallet };
+                const releaseTransactions: Transaction[] = [];
+
+                updatedNodes.forEach(n => {
+                  const agentId = n.assignedAgentId!;
+                  const agent = state.agents.find(a => a.id === agentId)!;
+                  const fee = n.costEstimate;
+
+                  const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
+                  const agentTx: Transaction = {
+                    id: `tx-agent-release-${Date.now()}-${n.id}`,
+                    senderAddress: 'ESCROW_VAULT',
+                    receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
+                    amount: fee,
+                    type: 'escrow_release',
+                    timestamp: new Date().toISOString(),
+                    status: 'completed',
+                    txHash: '0x' + Math.random().toString(16).substring(2, 42),
+                    taskId: n.id
+                  };
+
+                  updatedAgentWallets[agentId] = {
+                    ...wallet,
+                    balance: wallet.balance + fee,
+                    history: [agentTx, ...wallet.history]
+                  };
+                  releaseTransactions.push(agentTx);
+                });
+
+                userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
+                userWallet.history = [...releaseTransactions, ...userWallet.history];
+                
+                return {
+                  agentWallets: updatedAgentWallets,
+                  userWallet,
+                  isRunning: false,
+                  currentPhaseIndex: 9
+                };
+              });
+              
+              get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
+            } else {
+              set({ isRunning: false, currentPhaseIndex: 0 });
+              get().logExecution('execution', 'Swarm execution failed!', 'error');
+            }
+          }
+        }
+      }
     },
 
     setAuthModal: (open, tab = 'login') => set({ isAuthModalOpen: open, authModalTab: tab }),

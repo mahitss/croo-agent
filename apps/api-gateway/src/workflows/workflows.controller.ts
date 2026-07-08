@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { handleGatewayError } from '../utils/gateway-error';
 
 @Controller('api/v1')
 export class WorkflowsController {
@@ -8,6 +9,7 @@ export class WorkflowsController {
   @Post('workflows')
   @HttpCode(HttpStatus.CREATED)
   async createWorkflow(@Body() body: any) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows`, {
         method: 'POST',
@@ -16,12 +18,13 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', 'POST /workflows', start);
     }
   }
 
   @Patch('workflows/:id')
   async updateWorkflow(@Param('id') id: string, @Body() body: any) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}`, {
         method: 'PATCH',
@@ -30,107 +33,134 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `PATCH /workflows/${id}`, start);
     }
   }
 
   @Post('workflows/:id/run')
   async runWorkflow(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
         method: 'POST',
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/run`, start);
     }
   }
 
   @Post('workflows/:id/pause')
   async pauseWorkflow(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/pause`, { method: 'POST' });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/pause`, start);
     }
   }
 
   @Post('workflows/:id/resume')
   async resumeWorkflow(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/resume`, { method: 'POST' });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/resume`, start);
     }
   }
 
   @Post('workflows/:id/cancel')
   async cancelWorkflow(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/cancel`, { method: 'POST' });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/cancel`, start);
     }
   }
 
   @Get('workflows/history')
   async getHistory() {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows`);
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', 'GET /workflows', start);
     }
   }
 
   @Get('workflows/:id')
   async getWorkflow(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}`);
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `GET /workflows/${id}`, start);
+    }
+  }
+
+  @Get('workflows/:id/status')
+  async getWorkflowStatus(@Param('id') id: string) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}`);
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        return { success: true, status: data.data.status, data: { status: data.data.status } };
+      }
+      return data;
+    } catch (err: any) {
+      return handleGatewayError(err, 'Workflow Service', `GET /workflows/${id}/status`, start);
     }
   }
 
   @Get('workflows/:id/logs')
   async getWorkflowLogs(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/logs`);
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `GET /workflows/${id}/logs`, start);
     }
   }
 
   @Get('workflows/:id/graph')
   async getWorkflowGraph(@Param('id') id: string) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/graph`);
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: `Workflow service unreachable: ${err.message}` };
+      return handleGatewayError(err, 'Workflow Service', `GET /workflows/${id}/graph`, start);
     }
   }
 
   // --- AI ORCHESTRATION ---
   @Post('ai/plan')
   async planWorkflow(@Body() body: any) {
+    const start = Date.now();
+    let rawResponse: Response | undefined;
+    let responseBody = '';
     try {
-      const res = await fetch(`${this.aiUrl}/plan`, {
+      rawResponse = await fetch(`${this.aiUrl}/plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
       });
       
-      const data = await res.json();
-      if (!res.ok || !data || !data.workflow) {
+      responseBody = await rawResponse.text();
+      const data = JSON.parse(responseBody);
+      if (!rawResponse.ok || !data || !data.workflow) {
         return {
           success: false,
-          message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${res.status})`
+          message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${rawResponse.status})`
         };
       }
       
@@ -166,12 +196,13 @@ export class WorkflowsController {
         },
       };
     } catch (err: any) {
-      return { success: false, message: err.message || 'AI planner service error' };
+      return handleGatewayError(err, 'AI Service', 'POST /plan', start, rawResponse, responseBody);
     }
   }
 
   @Post('ai/cost')
   async estimateCost(@Body() body: any) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.aiUrl}/estimate`, {
         method: 'POST',
@@ -180,12 +211,13 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: err.message || 'AI planner cost estimation error' };
+      return handleGatewayError(err, 'AI Service', 'POST /estimate', start);
     }
   }
 
   @Post('ai/verify')
   async verifyOutput(@Body() body: any) {
+    const start = Date.now();
     try {
       const res = await fetch(`${this.aiUrl}/verify`, {
         method: 'POST',
@@ -194,7 +226,7 @@ export class WorkflowsController {
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, message: err.message || 'AI planner verification error' };
+      return handleGatewayError(err, 'AI Service', 'POST /verify', start);
     }
   }
 }
