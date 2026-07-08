@@ -40,7 +40,17 @@ export default function MarketplacePage() {
   const [matchmakerPrompt, setMatchmakerPrompt] = useState('');
   const [isMatching, setIsMatching] = useState(false);
   const [matchedStack, setMatchedStack] = useState<{
-    chain: { name: string; reason: string }[];
+    chain: {
+      nodeId: string;
+      stageName: string;
+      capability: string;
+      agentId: string;
+      agentName: string;
+      reason: string;
+      cost: number;
+      time: string;
+      trustScore?: number;
+    }[];
     cost: number;
     time: string;
   } | null>(null);
@@ -205,15 +215,29 @@ export default function MarketplacePage() {
             console.log("Actual value: undefined");
             console.log("Why it is undefined: Best matched candidate resolves to undefined (candidates list empty).");
             return {
-              name: 'No compatible agent found',
-              reason: 'None available'
+              nodeId: node.id,
+              stageName: node.label || node.task || node.id.toUpperCase(),
+              capability: node.capability,
+              agentId: 'no-agent',
+              agentName: 'No compatible agent found',
+              reason: 'None available',
+              cost: 0,
+              time: '0ms',
+              trustScore: 0
             };
           }
 
           assignedIds.push(bestAgent.id);
           return {
-            name: bestAgent.name || 'Agent',
-            reason: bestReason
+            nodeId: node.id,
+            stageName: node.label || node.task || node.id.toUpperCase(),
+            capability: node.capability,
+            agentId: bestAgent.id,
+            agentName: bestAgent.name || 'Agent',
+            reason: bestReason,
+            cost: bestAgent.price || 0,
+            time: `${bestAgent.latency || 0}ms`,
+            trustScore: bestAgent.trustScore || 0
           };
         });
 
@@ -395,40 +419,153 @@ export default function MarketplacePage() {
           </button>
         </div>
 
-        {matchedStack && (
-          <div className="border border-border-dark bg-black/80 p-5 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-2 transition-all relative z-10">
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Recommended Swarm Execution Flow:</span>
-              <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-white font-mono">
-                {matchedStack.chain.map((step, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <div className="bg-white/5 border border-border-dark px-3 py-2 rounded-xl flex flex-col items-start gap-1">
-                      <span className="text-primary-neon font-bold">{step.name}</span>
-                      <span className="text-[9px] text-gray-400 font-mono font-normal">Selected: {step.reason}</span>
-                    </div>
-                    {idx < matchedStack.chain.length - 1 && <ArrowRight className="w-4 h-4 text-gray-600" />}
+        {matchedStack && (() => {
+          const groupedAgents = matchedStack.chain.reduce((groups, step) => {
+            if (!groups[step.agentId]) {
+              groups[step.agentId] = {
+                agentName: step.agentName,
+                agentId: step.agentId,
+                cost: step.cost,
+                time: step.time,
+                trustScore: step.trustScore,
+                stages: []
+              };
+            }
+            groups[step.agentId].stages.push({
+              nodeId: step.nodeId,
+              stageName: step.stageName,
+              capability: step.capability,
+              reason: step.reason
+            });
+            return groups;
+          }, {} as Record<string, any>);
+
+          return (
+            <div className="border border-border-dark bg-black/85 p-6 rounded-2xl flex flex-col gap-6 mt-3 transition-all relative z-10 w-full">
+              
+              {/* Header Info */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-border-dark/50 pb-4 gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white font-mono flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
+                    OPTIMAL SWARM STACK COMPILATION
+                  </h3>
+                  <span className="text-[10px] text-gray-500 font-mono">Dynamic Agent Allocation Pipeline for input prompt</span>
+                </div>
+                <div className="flex items-center gap-6 shrink-0 font-mono text-xs w-full md:w-auto justify-between md:justify-end">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-gray-500 uppercase">Total Swarm Cost</span>
+                    <span className="text-secondary-neon font-bold text-sm mt-0.5">{matchedStack.cost.toFixed(2)} USDC</span>
                   </div>
-                ))}
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-gray-500 uppercase">Max Pipeline Latency</span>
+                    <span className="text-white font-bold text-sm mt-0.5">{matchedStack.time}</span>
+                  </div>
+                  <Link
+                    href={`/workflow?prompt=${encodeURIComponent(matchmakerPrompt)}`}
+                    className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-bold px-5 py-2.5 rounded-lg hover:brightness-110 transition-all font-sans"
+                  >
+                    Create Workflow &rarr;
+                  </Link>
+                </div>
               </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Column 1 & 2: Execution Sequence */}
+                <div className="lg:col-span-2 flex flex-col gap-4">
+                  <h4 className="text-xs font-bold text-gray-400 font-mono uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-primary-neon" />
+                    Sequence of Execution Stages
+                  </h4>
+                  <div className="flex flex-col gap-3">
+                    {matchedStack.chain.map((step, idx) => (
+                      <div key={step.nodeId || idx} className="flex flex-col gap-2 relative">
+                        <div className="bg-white/5 border border-border-dark p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-primary-neon/20 transition-all">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-primary-neon font-mono font-bold">{step.nodeId}</span>
+                              <span className="text-xs font-extrabold text-white">{step.stageName}</span>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono font-normal">Capability: {step.capability}</span>
+                            <span className="text-[10px] text-gray-500 font-mono mt-1">
+                              Selected Agent: <strong className="text-white font-bold">{step.agentName}</strong> ({step.reason})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-[10px] font-mono text-gray-400 shrink-0 border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-between md:justify-end">
+                            {step.trustScore !== undefined && (
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] text-gray-500">TRUST SCORE</span>
+                                <span className="text-white font-bold">{step.trustScore}%</span>
+                              </div>
+                            )}
+                            <div className="flex flex-col items-end">
+                              <span className="text-[9px] text-gray-500">STAGE FEE</span>
+                              <span className="text-primary-neon font-bold">{step.cost.toFixed(2)} USDC</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-[9px] text-gray-500">LATENCY</span>
+                              <span className="text-white font-bold">{step.time}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {idx < matchedStack.chain.length - 1 && (
+                          <div className="flex justify-center my-0.5">
+                            <span className="text-gray-600 font-bold">&darr;</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 3: Consolidated Swarm Allocation */}
+                <div className="lg:col-span-1 flex flex-col gap-4 border-t lg:border-t-0 lg:border-l border-border-dark pt-6 lg:pt-0 lg:pl-6">
+                  <h4 className="text-xs font-bold text-gray-400 font-mono uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary-neon" />
+                    Consolidated Swarm Organization
+                  </h4>
+                  <p className="text-[10px] text-gray-500 font-mono leading-relaxed">
+                    The matching engine allocates roles based on agent capability scores. Multi-stage reuse (the same agent handling multiple stages) indicates high cost efficiency and avoids cold-start latency overrides.
+                  </p>
+                  
+                  <div className="flex flex-col gap-4 mt-2">
+                    {Object.values(groupedAgents).map((group: any) => (
+                      <div key={group.agentId} className="border border-border-dark bg-black/40 p-4 rounded-xl flex flex-col gap-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h5 className="text-xs font-bold text-white leading-tight">{group.agentName}</h5>
+                            <span className="text-[9px] text-gray-500 font-mono font-normal">ID: {group.agentId}</span>
+                          </div>
+                          {group.trustScore !== undefined && (
+                            <span className="text-[8px] bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded font-mono font-bold">
+                              {group.trustScore}% TRUST
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 border-t border-border-dark/50 pt-2">
+                          <span className="text-[9px] text-gray-400 uppercase font-mono tracking-wider">Assigned Stages ({group.stages.length}):</span>
+                          {group.stages.map((stage: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-1.5 text-[10px] text-white font-mono bg-white/5 px-2.5 py-1.5 rounded-lg border border-border-dark/30">
+                              <span className="text-primary-neon font-bold">✓</span>
+                              <div className="flex flex-col">
+                                <span className="font-extrabold">{stage.stageName}</span>
+                                <span className="text-[9px] text-gray-400 font-mono font-normal">Cap: {stage.capability} • {stage.reason}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
             </div>
-            <div className="flex items-center gap-6 shrink-0 font-mono text-xs border-t md:border-t-0 pt-3 md:pt-0 border-border-dark w-full md:w-auto justify-between md:justify-start">
-              <div className="flex flex-col">
-                <span className="text-[9px] text-gray-500 uppercase">EST. BUDGET</span>
-                <span className="text-secondary-neon font-bold text-sm mt-0.5">{matchedStack.cost.toFixed(2)} USDC</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-gray-500 uppercase">EST. LATENCY</span>
-                <span className="text-white font-bold text-sm mt-0.5">{matchedStack.time}</span>
-              </div>
-              <Link
-                href={`/workflow?prompt=${encodeURIComponent(matchmakerPrompt)}`}
-                className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-bold px-5 py-2.5 rounded-lg hover:brightness-110 transition-all font-sans"
-              >
-                Create Workflow
-              </Link>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Main Section */}
