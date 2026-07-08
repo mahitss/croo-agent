@@ -748,6 +748,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const createdAt = dbWorkflow ? dbWorkflow.createdAt : new Date().toISOString();
 
       if (dbWorkflow) {
+        const nodeMapping = dbWorkflow.nodeMapping || {};
+        const uuidNodeTitles: Record<string, string> = {};
+        const uuidAgentReasons: Record<string, string> = {};
+        
+        Object.entries(nodeTitles).forEach(([key, val]) => {
+          const mappedKey = nodeMapping[key] || key;
+          uuidNodeTitles[mappedKey] = val;
+        });
+
+        Object.entries(agentSelectionReasons).forEach(([key, val]) => {
+          const mappedKey = nodeMapping[key] || key;
+          uuidAgentReasons[mappedKey] = val;
+        });
+
         localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
           query,
           routingMode,
@@ -756,8 +770,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
           completionTokens,
           totalTokens,
           estimatedCost: estCost,
-          nodeTitles,
-          agentSelectionReasons
+          nodeTitles: uuidNodeTitles,
+          agentSelectionReasons: uuidAgentReasons
         }));
         localStorage.setItem('orbit_last_workflow_id', workflowId);
         
@@ -823,33 +837,50 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
 
         const dbWorkflow = wfCreate.data;
-        console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId: dbWorkflow.id });
-        
         const workflowId = dbWorkflow.id;
         const active = state.activeWorkflow;
+        const nodeMapping = dbWorkflow.nodeMapping || {};
 
-        localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
-          query: active?.query || template.title,
-          routingMode: active?.routingMode || 'balanced',
-          budget: active?.budget || 2.0,
-          promptTokens: state.promptTokens,
-          completionTokens: state.completionTokens,
-          totalTokens: state.totalTokens,
-          estimatedCost: state.estimatedCost,
-          nodeTitles: active?.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
-          agentSelectionReasons: active?.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
-        }));
-        localStorage.setItem('orbit_last_workflow_id', workflowId);
-
-        if (typeof window !== 'undefined') {
-          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
-          window.history.pushState({ path: newUrl }, '', newUrl);
-        }
+        console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId });
 
         if (active) {
+          const updatedNodes = active.nodes.map((n: any, idx: number) => {
+            const dn = dbWorkflow.nodes ? dbWorkflow.nodes[idx] : null;
+            return {
+              ...n,
+              id: dn?.id || nodeMapping[n.id] || n.id
+            };
+          });
+
+          const updatedEdges = active.edges.map((e: any) => ({
+            ...e,
+            source: nodeMapping[e.source] || e.source,
+            target: nodeMapping[e.target] || e.target
+          }));
+
+          localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
+            query: active?.query || template.title,
+            routingMode: active?.routingMode || 'balanced',
+            budget: active?.budget || 2.0,
+            promptTokens: state.promptTokens,
+            completionTokens: state.completionTokens,
+            totalTokens: state.totalTokens,
+            estimatedCost: state.estimatedCost,
+            nodeTitles: updatedNodes.reduce((acc: Record<string, string>, n: any) => ({ ...acc, [n.id]: n.name }), {}) || {},
+            agentSelectionReasons: updatedNodes.reduce((acc: Record<string, string>, n: any) => ({ ...acc, [n.id]: n.description }), {}) || {}
+          }));
+          localStorage.setItem('orbit_last_workflow_id', workflowId);
+
+          if (typeof window !== 'undefined') {
+            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+          }
+
           const updated: Workflow = {
             ...active,
             id: workflowId,
+            nodes: updatedNodes,
+            edges: updatedEdges,
             createdAt: dbWorkflow.createdAt
           };
           set({ activeWorkflow: updated, isWorkflowSaved: true, unsavedWorkflowTemplate: null });
@@ -953,6 +984,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             userId: 'user-1',
             estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
             nodes: nodes.map((n, idx) => ({
+              id: n.id,
               agentId: n.assignedAgentId,
               capability: n.capability,
               status: 'pending',
@@ -972,48 +1004,40 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }
 
           const dbWorkflow = wfCreate.data;
-          
+          const nodeMapping = dbWorkflow.nodeMapping || {};
+
           workflow = {
             id: dbWorkflow.id,
             name: dbWorkflow.title,
             query,
-            nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
-              const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
-
-              console.log("Matched Agent", agent);
-              console.log("Available Agents", dbAgents);
-              console.log("Planner Node", n);
-              console.log("Capability", n.capability);
-
-              const agentPrice = agent ? agent.price : 0;
-              const agentLatency = agent ? agent.latency : 0;
-              const agentName = agent ? agent.name : (n.agentId || 'No compatible agent found');
-
-              const taskName = nodes[idx]?.name || `Stage: ${n.capability.toUpperCase()}`;
-              return {
-                id: n.id,
-                name: taskName,
-                task: taskName,
-                description: `Execute capability: ${n.capability}`,
-                capability: n.capability,
-                costEstimate: agentPrice,
-                timeEstimate: agentLatency,
-                status: n.status,
-                assignedAgentId: n.agentId,
-                assignedAgent: agentName
-              };
-            }) : nodes,
-            edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-              id: e.id,
-              source: e.sourceNode,
-              target: e.targetNode
-            })) : edges,
+            nodes: nodes.map((n: any) => ({
+              ...n,
+              id: nodeMapping[n.id] || n.id
+            })),
+            edges: edges.map((e: any) => ({
+              ...e,
+              source: nodeMapping[e.source] || e.source,
+              target: nodeMapping[e.target] || e.target
+            })),
             budget,
             routingMode,
             retryCount: 0,
-            status: computeWorkflowStatus(dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => ({ status: n.status })) as any : nodes),
+            status: dbWorkflow.status,
             createdAt: dbWorkflow.createdAt
           };
+
+          localStorage.setItem(`orbit_workflow_metadata_${dbWorkflow.id}`, JSON.stringify({
+            query,
+            routingMode,
+            budget,
+            promptTokens: state.promptTokens,
+            completionTokens: state.completionTokens,
+            totalTokens: state.totalTokens,
+            estimatedCost: state.estimatedCost,
+            nodeTitles: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
+            agentSelectionReasons: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
+          }));
+          localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
 
           logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
           set({ activeWorkflow: workflow });
@@ -1101,7 +1125,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           if (statusRes.success && statusRes.data) {
             const currentWf = statusRes.data;
             
-            const updatedNodes = workflow.nodes.map((n, idx) => {
+            const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
               let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
               if (!dbNode && currentWf.nodes[idx]) {
                 dbNode = currentWf.nodes[idx];
@@ -1120,13 +1144,12 @@ export const useNexusStore = create<NexusState>((set, get) => {
             const computedStatus = computeWorkflowStatus(updatedNodes);
             logWorkflowStatusChange(workflow.id, computedStatus, updatedNodes);
 
-            set({
-              activeWorkflow: {
-                ...workflow,
-                status: computedStatus,
-                nodes: updatedNodes
-              }
-            });
+            workflow = {
+              ...workflow,
+              status: computedStatus,
+              nodes: updatedNodes
+            };
+            set({ activeWorkflow: workflow });
 
             // Fetch live task logs from the database
             const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);

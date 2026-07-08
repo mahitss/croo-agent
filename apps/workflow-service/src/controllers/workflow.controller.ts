@@ -53,10 +53,21 @@ export class WorkflowController {
         }
       }
   
+      const fullWorkflow = await this.prisma.workflow.findUnique({
+        where: { id: workflow.id },
+        include: {
+          nodes: true,
+          edges: true,
+        },
+      });
+
       return {
         success: true,
         message: 'Workflow template successfully parsed and stored',
-        data: workflow,
+        data: {
+          ...fullWorkflow,
+          nodeMapping: Object.fromEntries(nodeMapping),
+        },
       };
     } catch (error: any) {
       return {
