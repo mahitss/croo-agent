@@ -33,6 +33,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     } catch (e) {
       // Fallback
     }
+
+    // Dynamic schema fallback injection (P2 DB connection pass)
+    try {
+      if (originalUrl) {
+        const parsed = new URL(originalUrl);
+        if (!parsed.searchParams.has('schema')) {
+          parsed.searchParams.set('schema', 'wallet');
+          originalUrl = parsed.toString();
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
     
     // Diagnostics & Validation (P2 DB connection pass)
     const serviceName = process.env.RENDER_SERVICE_NAME || 'Wallet Service';
