@@ -28,6 +28,8 @@ export interface TaskNode {
   timeEstimate: number;
   status: 'pending' | 'running' | 'completed' | 'failed';
   assignedAgentId?: string;
+  assignedAgent?: string;
+  task?: string;
   output?: string;
   error?: string;
   retryCount?: number;

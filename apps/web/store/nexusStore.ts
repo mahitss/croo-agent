@@ -634,7 +634,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
       let nodes: TaskNode[] = [];
       try {
-        nodes = planRes.data.nodes.map((n: any) => {
+        nodes = planRes.data.nodes.map((n: any, idx: number) => {
           const cap = n.capability.toLowerCase();
           const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
           if (!agent) {
@@ -644,17 +644,21 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
           const nodeTitle = n.label || n.id.toUpperCase();
           nodeTitles[n.id] = nodeTitle;
+          nodeTitles[idx] = nodeTitle;
           agentSelectionReasons[n.id] = reason;
+          agentSelectionReasons[idx] = reason;
 
           return {
             id: n.id,
             name: nodeTitle,
+            task: nodeTitle,
             description: `Execute capability: ${cap}. Selected because: ${reason}`,
             capability: cap,
             costEstimate: agent.price,
             timeEstimate: agent.latency,
             status: 'pending' as const,
-            assignedAgentId: agent.id
+            assignedAgentId: agent.id,
+            assignedAgent: agent.id
           };
         });
       } catch (err: any) {
@@ -733,19 +737,26 @@ export const useNexusStore = create<NexusState>((set, get) => {
         id: workflowId,
         name: dbWorkflow ? dbWorkflow.title : workflowTemplate.title,
         query,
-        nodes: dbWorkflow && dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+        nodes: dbWorkflow && dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
           const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+          const taskName = nodeTitles[n.id] || nodeTitles[idx] || `Stage: ${n.capability.toUpperCase()}`;
           return {
             id: n.id,
-            name: nodeTitles[n.id] || `Stage: ${n.capability.toUpperCase()}`,
-            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || 'Optimal selection'}`,
+            name: taskName,
+            task: taskName,
+            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || agentSelectionReasons[idx] || 'Optimal selection'}`,
             capability: n.capability,
             costEstimate: agent.price,
             timeEstimate: agent.latency,
             status: n.status,
-            assignedAgentId: n.agentId
+            assignedAgentId: n.agentId,
+            assignedAgent: n.agentId
           };
-        }) : nodes,
+        }) : nodes.map(n => ({
+          ...n,
+          task: n.name,
+          assignedAgent: n.assignedAgentId
+        })),
         edges: dbWorkflow && dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
           id: e.id,
           source: e.sourceNode,
@@ -871,15 +882,18 @@ export const useNexusStore = create<NexusState>((set, get) => {
           const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
             const cap = n.capability.toLowerCase();
             const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
+            const nodeTitle = n.label || n.id.toUpperCase();
             return {
               id: n.id,
-              name: n.label || n.id.toUpperCase(),
+              name: nodeTitle,
+              task: nodeTitle,
               description: `Execute capability: ${cap}`,
               capability: cap,
               costEstimate: matchedAgent.price,
               timeEstimate: matchedAgent.latency,
               status: 'pending',
-              assignedAgentId: matchedAgent.id
+              assignedAgentId: matchedAgent.id,
+              assignedAgent: matchedAgent.id
             };
           });
 
@@ -918,17 +932,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
             id: dbWorkflow.id,
             name: dbWorkflow.title,
             query,
-            nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+            nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
               const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+              const taskName = nodes[idx]?.name || `Stage: ${n.capability.toUpperCase()}`;
               return {
                 id: n.id,
-                name: `Stage: ${n.capability.toUpperCase()}`,
+                name: taskName,
+                task: taskName,
                 description: `Execute capability: ${n.capability}`,
                 capability: n.capability,
                 costEstimate: agent.price,
                 timeEstimate: agent.latency,
                 status: n.status,
-                assignedAgentId: n.agentId
+                assignedAgentId: n.agentId,
+                assignedAgent: n.agentId
               };
             }) : nodes,
             edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
@@ -1027,9 +1044,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
           if (statusRes.success && statusRes.data) {
             const currentWf = statusRes.data;
             
-            const updatedNodes = workflow.nodes.map(n => {
-              const dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
-              return dbNode ? { ...n, status: dbNode.status } : n;
+            const updatedNodes = workflow.nodes.map((n, idx) => {
+              let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
+              if (!dbNode && currentWf.nodes[idx]) {
+                dbNode = currentWf.nodes[idx];
+              }
+              if (!dbNode) {
+                dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
+              }
+              return dbNode ? { 
+                ...n, 
+                status: dbNode.status,
+                assignedAgentId: dbNode.agentId || n.assignedAgentId,
+                assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
+              } : n;
             });
             
             set({
@@ -1215,17 +1243,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 id: dbWorkflow.id,
                 name: dbWorkflow.title,
                 query: meta.query,
-                nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => {
+                nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
                   const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+                  const taskName = meta.nodeTitles?.[n.id] || meta.nodeTitles?.[idx] || `Stage: ${n.capability.toUpperCase()}`;
                   return {
                     id: n.id,
-                    name: meta.nodeTitles?.[n.id] || `Stage: ${n.capability.toUpperCase()}`,
-                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || 'Optimal selection'}`,
+                    name: taskName,
+                    task: taskName,
+                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || meta.agentSelectionReasons?.[idx] || 'Optimal selection'}`,
                     capability: n.capability,
                     costEstimate: agent.price,
                     timeEstimate: agent.latency,
                     status: n.status,
-                    assignedAgentId: n.agentId
+                    assignedAgentId: n.agentId,
+                    assignedAgent: n.agentId
                   };
                 }) : [],
                 edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({

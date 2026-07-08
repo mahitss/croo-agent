@@ -39,6 +39,35 @@ export default function AgentNode({ data }: { data: any }) {
     }
   };
 
+  const getStatusBadge = () => {
+    const status = (data.status || 'ready').toLowerCase();
+    let label = 'READY';
+    let bgColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    
+    if (status === 'completed') {
+      label = 'COMPLETED';
+      bgColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    } else if (status === 'running') {
+      label = 'RUNNING';
+      bgColor = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    } else if (status === 'failed') {
+      label = 'FAILED';
+      bgColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+    } else if (status === 'pending') {
+      label = 'PENDING';
+      bgColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    } else if (data.assignedAgent || data.assignedAgentId) {
+      label = 'READY';
+      bgColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    }
+
+    return (
+      <span className={`text-[8px] font-bold border px-1.5 py-0.5 rounded font-mono ${bgColor}`}>
+        {label}
+      </span>
+    );
+  };
+
   return (
     <div className={`glass-card border px-4 py-3 rounded-lg w-[220px] text-left transition-all duration-300 ${getStatusClass()}`}>
       
@@ -49,15 +78,18 @@ export default function AgentNode({ data }: { data: any }) {
         style={{ background: '#1b1e25', border: '1px solid #00ffcc', width: '8px', height: '8px' }} 
       />
 
-      <div className="flex justify-between items-start mb-1.5">
+      <div className="flex justify-between items-center mb-1.5">
         <span className="text-[9px] uppercase tracking-wider bg-white/5 border border-border-dark text-gray-400 px-1.5 py-0.5 rounded font-mono">
           {data.capability}
         </span>
-        {getStatusIcon()}
+        <div className="flex items-center gap-1.5">
+          {getStatusBadge()}
+          {getStatusIcon()}
+        </div>
       </div>
 
-      <h4 className="text-xs font-bold text-white leading-tight mb-1 truncate">
-        {data.name}
+      <h4 className="text-xs font-bold text-white leading-tight mb-1 truncate" title={data.task || data.name}>
+        {data.task || data.name}
       </h4>
 
       {assignedAgent ? (
@@ -68,6 +100,16 @@ export default function AgentNode({ data }: { data: any }) {
           <div className="flex justify-between items-center text-[9px] font-mono text-gray-500">
             <span>Rating: {assignedAgent.rating}⭐</span>
             <span>Fee: {data.costEstimate} USDC</span>
+          </div>
+        </div>
+      ) : (data.assignedAgent || data.assignedAgentId) ? (
+        <div className="mt-2 pt-2 border-t border-border-dark flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-400 truncate">
+            🤖 <strong className="text-white">{data.assignedAgent || data.assignedAgentId}</strong>
+          </span>
+          <div className="flex justify-between items-center text-[9px] font-mono text-gray-500">
+            <span>Assigned Agent</span>
+            <span>Fee: {data.costEstimate || '0.00'} USDC</span>
           </div>
         </div>
       ) : (

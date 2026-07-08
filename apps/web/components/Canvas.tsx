@@ -98,6 +98,11 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       const x = centerX - totalWidth / 2 + indexInLevel * spacingX;
       const y = 30 + lvl * spacingY;
 
+      const nodeTask = node.task || node.name;
+      const assignedAgent = node.assignedAgent || node.assignedAgentId;
+
+      console.log(`[DEBUG] Node ID: ${node.id} | Capability: ${node.capability} | Task: ${nodeTask} | Assigned Agent: ${assignedAgent} | Status: ${node.status}`);
+
       return {
         id: node.id,
         type: 'agentNode',
@@ -105,6 +110,8 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         data: { 
           id: node.id,
           name: node.name, 
+          task: nodeTask,
+          assignedAgent: assignedAgent,
           capability: node.capability, 
           status: node.status, 
           costEstimate: node.costEstimate,
