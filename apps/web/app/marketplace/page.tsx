@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useNexusStore } from '../../store/nexusStore';
+import { useNexusStore, seedAgents } from '../../store/nexusStore';
 import { apiClient } from '../../lib/api-client';
 import { Agent } from '@nexus-ai/types';
 import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
@@ -78,7 +78,19 @@ export default function MarketplacePage() {
   const toggleFavorite = (agentId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     let updated = [...favorites];
-    const match = agents.find(a => a.id === agentId);
+    const activeAgents = agents.length > 0 ? agents : seedAgents;
+    const match = activeAgents.find(a => {
+      console.log("Object before id access:", a);
+      if (!a) {
+        console.log("File: apps/web/app/marketplace/page.tsx");
+        console.log("Function: toggleFavorite");
+        console.log("Variable name: a");
+        console.log("Expected value: Agent object");
+        console.log("Actual value: undefined");
+        console.log("Why it is undefined: Available agents list contains an undefined entry.");
+      }
+      return a && a.id === agentId;
+    });
     const name = match ? match.name : 'Agent';
     if (favorites.includes(agentId)) {
       updated = updated.filter(id => id !== agentId);
@@ -96,6 +108,7 @@ export default function MarketplacePage() {
   const handleMatchmaker = async () => {
     if (!matchmakerPrompt.trim()) return;
     setIsMatching(true);
+    const activeAgents = agents.length > 0 ? agents : seedAgents;
     try {
       const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
         query: matchmakerPrompt,
@@ -107,27 +120,47 @@ export default function MarketplacePage() {
         const chainItems = planRes.data.nodes.map((node: any) => {
           const cap = node.capability.toLowerCase();
           
-          let candidates = agents.filter(a => 
-            a.skills.some(s => s.toLowerCase().includes(cap)) || 
-            a.category.toLowerCase().includes(cap)
-          );
-          if (candidates.length === 0) candidates = agents;
+          let candidates = activeAgents.filter(a => {
+            console.log("Object before id access:", a);
+            if (!a) {
+              console.log("File: apps/web/app/marketplace/page.tsx");
+              console.log("Function: handleMatchmaker filter");
+              console.log("Variable name: a");
+              console.log("Expected value: Agent object");
+              console.log("Actual value: undefined");
+              console.log("Why it is undefined: Available agents list contains an undefined entry.");
+              return false;
+            }
+            return (a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || 
+                   (a.category && a.category.toLowerCase().includes(cap));
+          });
+          if (candidates.length === 0) candidates = activeAgents;
           
-          const prices = candidates.map(c => c.price);
-          const latencies = candidates.map(c => c.latency);
+          const prices = candidates.map(c => c.price || 0);
+          const latencies = candidates.map(c => c.latency || 0);
           const maxPrice = Math.max(...prices, 0.5);
           const maxLatency = Math.max(...latencies, 3000);
           
-          let bestAgent = candidates[0] || agents[0];
+          let bestAgent = candidates[0] || activeAgents[0];
           let bestScore = -1;
           let bestReason = 'Optimal selection';
           
           candidates.forEach(agent => {
+            console.log("Object before id access:", agent);
+            if (!agent) {
+              console.log("File: apps/web/app/marketplace/page.tsx");
+              console.log("Function: handleMatchmaker forEach");
+              console.log("Variable name: agent");
+              console.log("Expected value: Agent object");
+              console.log("Actual value: undefined");
+              console.log("Why it is undefined: Match candidates contains an undefined entry.");
+              return;
+            }
             const costScore = 1 - (agent.price / maxPrice);
-            const trustScore = agent.trustScore / 100;
+            const trustScore = (agent.trustScore || 0) / 100;
             const latencyScore = 1 - (agent.latency / maxLatency);
-            const accuracyScore = agent.accuracy / 100;
-            const successScore = (100 - agent.failureRate) / 100;
+            const accuracyScore = (agent.accuracy || 0) / 100;
+            const successScore = (100 - (agent.failureRate || 0)) / 100;
             
             let score = (costScore * 0.2) + (trustScore * 0.25) + (latencyScore * 0.15) + (accuracyScore * 0.2) + (successScore * 0.2);
             
@@ -144,20 +177,34 @@ export default function MarketplacePage() {
               const reasons: string[] = [];
               const isCheapest = agent.price === Math.min(...prices);
               const isFastest = agent.latency === Math.min(...latencies);
-              const isHighTrust = agent.trustScore >= 95;
+              const isHighTrust = (agent.trustScore || 0) >= 95;
               
               if (isFastest) reasons.push('Fastest');
               if (isCheapest) reasons.push('Lowest cost');
               if (isHighTrust) reasons.push(`${agent.trustScore}% trust success`);
-              if (agent.accuracy >= 95) reasons.push('Highest accuracy');
+              if (agent.accuracy && agent.accuracy >= 95) reasons.push('Highest accuracy');
               
               bestReason = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'Optimal selection';
             }
           });
           
+          console.log("Object before id access:", bestAgent);
+          if (!bestAgent) {
+            console.log("File: apps/web/app/marketplace/page.tsx");
+            console.log("Function: handleMatchmaker chainItems");
+            console.log("Variable name: bestAgent");
+            console.log("Expected value: Agent object");
+            console.log("Actual value: undefined");
+            console.log("Why it is undefined: Best matched candidate resolves to undefined (candidates list empty).");
+            return {
+              name: 'No compatible agent found',
+              reason: 'None available'
+            };
+          }
+
           assignedIds.push(bestAgent.id);
           return {
-            name: bestAgent.name,
+            name: bestAgent.name || 'Agent',
             reason: bestReason
           };
         });
@@ -165,13 +212,42 @@ export default function MarketplacePage() {
         // Compute dynamic estimated budget and latency based on selected agents
         const totalCost = planRes.data.nodes.reduce((sum: number, n: any) => {
           const cap = n.capability.toLowerCase();
-          const matched = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || agents[0];
-          return sum + matched.price;
+          const matched = activeAgents.find(a => {
+            console.log("Object before id access:", a);
+            return a && ((a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || (a.category && a.category.toLowerCase().includes(cap)));
+          }) || activeAgents[0];
+          
+          console.log("Object before id access:", matched);
+          if (!matched) {
+            console.log("File: apps/web/app/marketplace/page.tsx");
+            console.log("Function: handleMatchmaker totalCost reduce");
+            console.log("Variable name: matched");
+            console.log("Expected value: Agent object");
+            console.log("Actual value: undefined");
+            console.log("Why it is undefined: Matched registry agent resolved to undefined.");
+            return sum;
+          }
+          return sum + (matched.price || 0);
         }, 0);
+        
         const maxLatencyVal = Math.max(...planRes.data.nodes.map((n: any) => {
           const cap = n.capability.toLowerCase();
-          const matched = agents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || agents[0];
-          return matched.latency;
+          const matched = activeAgents.find(a => {
+            console.log("Object before id access:", a);
+            return a && ((a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || (a.category && a.category.toLowerCase().includes(cap)));
+          }) || activeAgents[0];
+
+          console.log("Object before id access:", matched);
+          if (!matched) {
+            console.log("File: apps/web/app/marketplace/page.tsx");
+            console.log("Function: handleMatchmaker maxLatencyVal map");
+            console.log("Variable name: matched");
+            console.log("Expected value: Agent object");
+            console.log("Actual value: undefined");
+            console.log("Why it is undefined: Matched registry agent resolved to undefined.");
+            return 0;
+          }
+          return matched.latency || 0;
         }));
 
         setMatchedStack({
@@ -189,6 +265,16 @@ export default function MarketplacePage() {
 
   // Filter Logic
   const filteredAgents = agents.filter(agent => {
+    console.log("Object before id access:", agent);
+    if (!agent) {
+      console.log("File: apps/web/app/marketplace/page.tsx");
+      console.log("Function: filteredAgents filter");
+      console.log("Variable name: agent");
+      console.log("Expected value: Agent object");
+      console.log("Actual value: undefined");
+      console.log("Why it is undefined: Marketplace agents list filter received undefined item.");
+      return false;
+    }
     const matchesSearch = agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       agent.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (agent.skills && agent.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()))) ||
@@ -525,6 +611,16 @@ export default function MarketplacePage() {
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedAgents.map((agent) => {
+                  console.log("Object before id access:", agent);
+                  if (!agent) {
+                    console.log("File: apps/web/app/marketplace/page.tsx");
+                    console.log("Function: paginatedAgents map");
+                    console.log("Variable name: agent");
+                    console.log("Expected value: Agent object");
+                    console.log("Actual value: undefined");
+                    console.log("Why it is undefined: Paginated list contains undefined entry.");
+                    return null;
+                  }
                   const isFav = favorites.includes(agent.id);
                   return (
                     <div 

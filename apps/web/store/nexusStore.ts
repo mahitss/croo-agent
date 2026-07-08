@@ -55,7 +55,7 @@ interface NexusState {
   toggleDemoMode: () => void;
 }
 
-const seedAgents: Agent[] = [
+export const seedAgents: Agent[] = [
   {
     id: 'agent-research-1',
     name: 'InsightFinder Pro',
