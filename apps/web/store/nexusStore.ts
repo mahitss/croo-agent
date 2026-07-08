@@ -278,6 +278,25 @@ function selectBestAgent(capability: string, assignedIds: string[], dbAgents: Ag
   return { agent: bestAgent, reason: bestReason };
 }
 
+function computeWorkflowStatus(nodes: TaskNode[]): 'pending' | 'running' | 'completed' | 'failed' {
+  if (!nodes || nodes.length === 0) return 'pending';
+  const hasFailed = nodes.some(n => n.status === 'failed');
+  if (hasFailed) return 'failed';
+  const hasRunning = nodes.some(n => n.status === 'running');
+  if (hasRunning) return 'running';
+  const allCompleted = nodes.every(n => n.status === 'completed');
+  if (allCompleted) return 'completed';
+  return 'pending';
+}
+
+function logWorkflowStatusChange(workflowId: string, status: string, nodes: TaskNode[]) {
+  const completed = nodes.filter(n => n.status === 'completed').length;
+  const running = nodes.filter(n => n.status === 'running').length;
+  const failed = nodes.filter(n => n.status === 'failed').length;
+  const pending = nodes.filter(n => n.status === 'pending').length;
+  console.log(`[STATUS_CHANGE] Workflow ID: ${workflowId} | Workflow Status: ${status.toUpperCase()} | Completed Nodes: ${completed} | Running Nodes: ${running} | Failed Nodes: ${failed} | Pending Nodes: ${pending}`);
+}
+
 export const useNexusStore = create<NexusState>((set, get) => {
   return {
     agents: [],
@@ -347,7 +366,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
       if (activeWorkflow) {
         const updatedNodes = activeWorkflow.nodes.filter(n => n.id !== nodeId);
         const updatedEdges = activeWorkflow.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
-        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes, edges: updatedEdges } });
+        const computedStatus = computeWorkflowStatus(updatedNodes);
+        logWorkflowStatusChange(activeWorkflow.id, computedStatus, updatedNodes);
+        set({ activeWorkflow: { ...activeWorkflow, status: computedStatus, nodes: updatedNodes, edges: updatedEdges } });
       }
     },
 
@@ -355,13 +376,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const activeWorkflow = get().activeWorkflow;
       if (activeWorkflow) {
         const updatedNodes = activeWorkflow.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const, retryCount: (n.retryCount || 0) + 1 } : n);
-        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes } });
+        const computedStatus = computeWorkflowStatus(updatedNodes);
+        logWorkflowStatusChange(activeWorkflow.id, computedStatus, updatedNodes);
+        set({ activeWorkflow: { ...activeWorkflow, status: computedStatus, nodes: updatedNodes } });
       }
     },
 
     cancelWorkflow: () => {
       const activeWorkflow = get().activeWorkflow;
       if (activeWorkflow) {
+        logWorkflowStatusChange(activeWorkflow.id, 'failed', activeWorkflow.nodes);
         set({ 
           activeWorkflow: { ...activeWorkflow, status: 'failed' as const },
           isRunning: false,
@@ -637,10 +661,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
         nodes = planRes.data.nodes.map((n: any, idx: number) => {
           const cap = n.capability.toLowerCase();
           const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
-          if (!agent) {
-            throw new Error(`No matching agent for capability: ${cap}`);
+
+          console.log("Matched Agent", agent);
+          console.log("Available Agents", dbAgents);
+          console.log("Planner Node", n);
+          console.log("Capability", n.capability);
+
+          const agentId = agent ? agent.id : 'no-agent';
+          const agentName = agent ? agent.name : 'No compatible agent found';
+          const agentPrice = agent ? agent.price : 0;
+          const agentLatency = agent ? agent.latency : 0;
+
+          if (agent) {
+            assignedIds.push(agent.id);
           }
-          assignedIds.push(agent.id);
 
           const nodeTitle = n.label || n.id.toUpperCase();
           nodeTitles[n.id] = nodeTitle;
@@ -654,11 +688,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
             task: nodeTitle,
             description: `Execute capability: ${cap}. Selected because: ${reason}`,
             capability: cap,
-            costEstimate: agent.price,
-            timeEstimate: agent.latency,
+            costEstimate: agentPrice,
+            timeEstimate: agentLatency,
             status: 'pending' as const,
-            assignedAgentId: agent.id,
-            assignedAgent: agent.id
+            assignedAgentId: agentId,
+            assignedAgent: agentName
           };
         });
       } catch (err: any) {
@@ -882,6 +916,17 @@ export const useNexusStore = create<NexusState>((set, get) => {
           const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
             const cap = n.capability.toLowerCase();
             const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
+
+            console.log("Matched Agent", matchedAgent);
+            console.log("Available Agents", dbAgents);
+            console.log("Planner Node", n);
+            console.log("Capability", n.capability);
+
+            const agentId = matchedAgent ? matchedAgent.id : 'no-agent';
+            const agentName = matchedAgent ? matchedAgent.name : 'No compatible agent found';
+            const agentPrice = matchedAgent ? matchedAgent.price : 0;
+            const agentLatency = matchedAgent ? matchedAgent.latency : 0;
+
             const nodeTitle = n.label || n.id.toUpperCase();
             return {
               id: n.id,
@@ -889,11 +934,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
               task: nodeTitle,
               description: `Execute capability: ${cap}`,
               capability: cap,
-              costEstimate: matchedAgent.price,
-              timeEstimate: matchedAgent.latency,
+              costEstimate: agentPrice,
+              timeEstimate: agentLatency,
               status: 'pending',
-              assignedAgentId: matchedAgent.id,
-              assignedAgent: matchedAgent.id
+              assignedAgentId: agentId,
+              assignedAgent: agentName
             };
           });
 
@@ -934,6 +979,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
             query,
             nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
               const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+
+              console.log("Matched Agent", agent);
+              console.log("Available Agents", dbAgents);
+              console.log("Planner Node", n);
+              console.log("Capability", n.capability);
+
+              const agentPrice = agent ? agent.price : 0;
+              const agentLatency = agent ? agent.latency : 0;
+              const agentName = agent ? agent.name : (n.agentId || 'No compatible agent found');
+
               const taskName = nodes[idx]?.name || `Stage: ${n.capability.toUpperCase()}`;
               return {
                 id: n.id,
@@ -941,11 +996,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 task: taskName,
                 description: `Execute capability: ${n.capability}`,
                 capability: n.capability,
-                costEstimate: agent.price,
-                timeEstimate: agent.latency,
+                costEstimate: agentPrice,
+                timeEstimate: agentLatency,
                 status: n.status,
                 assignedAgentId: n.agentId,
-                assignedAgent: n.agentId
+                assignedAgent: agentName
               };
             }) : nodes,
             edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
@@ -956,18 +1011,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
             budget,
             routingMode,
             retryCount: 0,
-            status: 'running',
+            status: computeWorkflowStatus(dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => ({ status: n.status })) as any : nodes),
             createdAt: dbWorkflow.createdAt
           };
 
+          logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
           set({ activeWorkflow: workflow });
           log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
         } else {
           // Pre-generated workflow is active in builder: transition it to running
           workflow = {
             ...workflow,
-            status: 'running'
+            status: computeWorkflowStatus(workflow.nodes)
           };
+          logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
           set({ activeWorkflow: workflow });
           log('intent', `Executing pre-generated workflow: "${workflow.name}"`, 'success');
         }
@@ -1060,10 +1117,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
               } : n;
             });
             
+            const computedStatus = computeWorkflowStatus(updatedNodes);
+            logWorkflowStatusChange(workflow.id, computedStatus, updatedNodes);
+
             set({
               activeWorkflow: {
                 ...workflow,
-                status: currentWf.status,
+                status: computedStatus,
                 nodes: updatedNodes
               }
             });
@@ -1085,9 +1145,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
               });
             }
 
-            if (currentWf.status === 'completed' || currentWf.status === 'failed') {
+            if (computedStatus === 'completed' || computedStatus === 'failed') {
               isPolling = false;
-              if (currentWf.status === 'completed') {
+              if (computedStatus === 'completed') {
                 // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
                 set({ currentPhaseIndex: 9 });
                 log('settlement', 'Releasing escrow vault payouts to active agent wallets...');
@@ -1148,11 +1208,23 @@ export const useNexusStore = create<NexusState>((set, get) => {
         set({ isRunning: false });
       } catch (err: any) {
         log('execution', `Workflow run failed: ${err.message || err}`, 'error');
-        set(state => ({
-          activeWorkflow: state.activeWorkflow ? { ...state.activeWorkflow, status: 'failed' } : null,
-          isRunning: false,
-          currentPhaseIndex: 0
-        }));
+        const latestNodes = get().activeWorkflow?.nodes || [];
+        const hasFailedNode = latestNodes.some(n => n.status === 'failed');
+        const computedStatus = hasFailedNode ? 'failed' : computeWorkflowStatus(latestNodes);
+        
+        if (get().activeWorkflow) {
+          logWorkflowStatusChange(get().activeWorkflow!.id, computedStatus, latestNodes);
+          set(state => ({
+            activeWorkflow: state.activeWorkflow ? { 
+              ...state.activeWorkflow, 
+              status: computedStatus 
+            } : null,
+            isRunning: false,
+            currentPhaseIndex: 0
+          }));
+        } else {
+          set({ isRunning: false, currentPhaseIndex: 0 });
+        }
       }
     },
 
@@ -1245,6 +1317,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 query: meta.query,
                 nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
                   const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
+
+                  console.log("Matched Agent", agent);
+                  console.log("Available Agents", dbAgents);
+                  console.log("Planner Node", n);
+                  console.log("Capability", n.capability);
+
+                  const agentPrice = agent ? agent.price : 0;
+                  const agentLatency = agent ? agent.latency : 0;
+                  const agentName = agent ? agent.name : (n.agentId || 'No compatible agent found');
+
                   const taskName = meta.nodeTitles?.[n.id] || meta.nodeTitles?.[String(idx)] || meta.nodeTitles?.[idx] || `Stage: ${n.capability.toUpperCase()}`;
                   return {
                     id: n.id,
@@ -1252,11 +1334,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
                     task: taskName,
                     description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || meta.agentSelectionReasons?.[String(idx)] || meta.agentSelectionReasons?.[idx] || 'Optimal selection'}`,
                     capability: n.capability,
-                    costEstimate: agent.price,
-                    timeEstimate: agent.latency,
+                    costEstimate: agentPrice,
+                    timeEstimate: agentLatency,
                     status: n.status,
                     assignedAgentId: n.agentId,
-                    assignedAgent: n.agentId
+                    assignedAgent: agentName
                   };
                 }) : [],
                 edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({

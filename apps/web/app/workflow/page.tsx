@@ -516,8 +516,14 @@ export default function WorkflowPage() {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] text-gray-500 uppercase">Status</span>
-                      <span className={`font-bold uppercase ${
-                        activeWorkflow.status === 'completed' ? 'text-primary-neon' : 'text-yellow-400'
+                      <span className={`font-bold capitalize ${
+                        activeWorkflow.status === 'completed' 
+                          ? 'text-primary-neon' 
+                          : activeWorkflow.status === 'failed'
+                            ? 'text-red-500'
+                            : activeWorkflow.status === 'running'
+                              ? 'text-blue-400'
+                              : 'text-yellow-400'
                       }`}>{activeWorkflow.status}</span>
                     </div>
                   </div>
