@@ -87,22 +87,33 @@ export default function WorkflowPage() {
   }, [selectedNode]);
 
   const handleGenerateWorkflow = async () => {
-    if (!promptInput.trim()) return;
+    console.log("CLICK_HANDLER STEP A: enter");
+    if (!promptInput.trim()) {
+      console.log("CLICK_HANDLER STEP B: empty prompt return");
+      return;
+    }
     setIsPlanning(true);
     setSelectedNode(null);
     setShowExplanation(false);
     setErrorMsg(null);
     
     try {
+      console.log("CLICK_HANDLER STEP C: about to call generateWorkflow");
       await generateWorkflow(promptInput, 'balanced', 2.0);
+      console.log("CLICK_HANDLER STEP D: generateWorkflow completed");
       setShowExplanation(true);
       toast('Workflow DAG generated successfully from backend!', 'success');
     } catch (err: any) {
+      console.error("CLICK_HANDLER STEP E: caught error", err);
+      if (err && err.stack) {
+        console.error(err.stack);
+      }
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
       toast(`Generation failed: ${msg}`, 'error');
     } finally {
       setIsPlanning(false);
+      console.log("CLICK_HANDLER STEP F: finally completed");
     }
   };
 
