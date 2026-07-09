@@ -21,11 +21,11 @@ dagreGraph.setDefaultEdgeLabel(() => ({}));
 
 const getLayoutedElements = (nodes: any[], edges: any[], direction = 'TB') => {
   const isHorizontal = direction === 'LR';
-  // Use professional vertical separation (260px center-to-center, leaving exactly 120px gap)
+  // Use professional vertical separation (180px center-to-center, leaving exactly 40px gap) and horizontal spacing (240px)
   dagreGraph.setGraph({ 
     rankdir: direction, 
-    ranksep: 260, 
-    nodesep: 120 
+    ranksep: 180, 
+    nodesep: 240 
   });
 
   nodes.forEach((node) => {
@@ -116,7 +116,6 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: 'smoothstep', // Orthogonal edge routing around cards
         animated: isRunning || isCompleted,
         style: { 
           stroke: strokeColor,
