@@ -109,10 +109,10 @@ function startService(service) {
     PRISMA_CLIENT_ENGINE_TYPE: 'library'
   };
 
-  // Check if python executable exists, fallback to standard python3 if not
+  // Check if python executable exists, fallback to standard python3/python if not
   let executable = service.cmd;
   if (service.name === 'ai-service' && !fs.existsSync(executable)) {
-    executable = 'python3';
+    executable = process.platform === 'win32' ? 'python' : 'python3';
   }
 
   const child = spawn(executable, service.args, {

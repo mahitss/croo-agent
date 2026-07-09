@@ -119,13 +119,15 @@ export class WorkflowController {
           status: 'running',
         },
       });
+      console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflow_executions', id: execution.id, status: 'running' });
   
       await this.prisma.workflow.update({
         where: { id },
         data: { status: 'running' },
       });
+      console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflows', id, status: 'running' });
 
-      console.log('[STRUCTURED_LOG] EXECUTION_STARTED', { workflowId: id, executionId: execution.id });
+      console.log('[STRUCTURED_LOG] WORKFLOW_EXECUTION_STARTED', { workflowId: id, executionId: execution.id });
   
       // Asynchronous background workflow node execution orchestrator (Phase 3 Compliance)
       (async () => {
@@ -133,18 +135,68 @@ export class WorkflowController {
           const nodes = await this.prisma.workflowNode.findMany({
             where: { workflowId: id },
           });
+
+          const edges = await this.prisma.workflowEdge.findMany({
+            where: { workflowId: id },
+          });
+
+          // Build topological order
+          const adj = new Map<string, string[]>();
+          const inDegree = new Map<string, number>();
+
+          for (const node of nodes) {
+            adj.set(node.id, []);
+            inDegree.set(node.id, 0);
+          }
+
+          for (const edge of edges) {
+            if (adj.has(edge.sourceNode) && adj.has(edge.targetNode)) {
+              adj.get(edge.sourceNode).push(edge.targetNode);
+              inDegree.set(edge.targetNode, (inDegree.get(edge.targetNode) || 0) + 1);
+            }
+          }
+
+          const queue: typeof nodes = [];
+          for (const node of nodes) {
+            if ((inDegree.get(node.id) || 0) === 0) {
+              queue.push(node);
+            }
+          }
+
+          const orderedNodes: typeof nodes = [];
+          while (queue.length > 0) {
+            const node = queue.shift()!;
+            orderedNodes.push(node);
+            const neighbors = adj.get(node.id) || [];
+            for (const neighborId of neighbors) {
+              const newInDegree = (inDegree.get(neighborId) || 0) - 1;
+              inDegree.set(neighborId, newInDegree);
+              if (newInDegree === 0) {
+                const neighborNode = nodes.find(n => n.id === neighborId);
+                if (neighborNode) {
+                  queue.push(neighborNode);
+                }
+              }
+            }
+          }
+
+          // If there is a cycle, we log and throw to fail the workflow
+          if (orderedNodes.length !== nodes.length) {
+            throw new Error('Cyclic dependency detected in workflow DAG; execution aborted.');
+          }
    
-          // Topological ordering execution simulator
-          for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
+          // Execute nodes in topological order
+          for (let i = 0; i < orderedNodes.length; i++) {
+            const node = orderedNodes[i];
    
-            // 1. Mark node as running
+            console.log('[STRUCTURED_LOG] CURRENT_NODE', { nodeId: node.id, capability: node.capability });
+
+            // 1. Mark node as running in DB
             await this.prisma.workflowNode.update({
               where: { id: node.id },
               data: { status: 'running' },
             });
-
-            console.log('[STRUCTURED_LOG] NODE_STARTED', { nodeId: node.id, capability: node.capability, status: 'running' });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflow_nodes', id: node.id, status: 'running' });
    
             // 2. Create database task entry
             const task = await this.prisma.task.create({
@@ -156,6 +208,7 @@ export class WorkflowController {
                 inputPayload: { stage: i + 1 },
               },
             });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'tasks', id: task.id, status: 'running' });
    
             // 3. Log task steps
             await this.prisma.taskLog.create({
@@ -165,6 +218,7 @@ export class WorkflowController {
                 message: `Initializing node discovery for capability: ${node.capability}`,
               },
             });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'task_logs', taskId: task.id, msg: 'Initializing node discovery' });
    
             await new Promise(resolve => setTimeout(resolve, 800));
    
@@ -175,10 +229,11 @@ export class WorkflowController {
                 message: `Task node linked successfully. Querying agent endpoint results...`,
               },
             });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'task_logs', taskId: task.id, msg: 'Task node linked successfully' });
    
             await new Promise(resolve => setTimeout(resolve, 1000));
    
-            // 4. Mark task and node completed
+            // 4. Mark task and node completed in DB
             await this.prisma.task.update({
               where: { id: task.id },
               data: {
@@ -187,13 +242,15 @@ export class WorkflowController {
                 outputPayload: { result: `Node ${node.capability} resolved successfully.` },
               },
             });
-   
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'tasks', id: task.id, status: 'completed' });
+    
             await this.prisma.workflowNode.update({
               where: { id: node.id },
               data: { status: 'completed' },
             });
-
-            console.log('[STRUCTURED_LOG] NODE_COMPLETED', { nodeId: node.id, capability: node.capability, status: 'completed' });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflow_nodes', id: node.id, status: 'completed' });
+ 
+            console.log('[STRUCTURED_LOG] NODE_COMPLETED', { nodeId: node.id, capability: node.capability });
    
             await this.prisma.taskLog.create({
               data: {
@@ -202,6 +259,7 @@ export class WorkflowController {
                 message: `Task node ${node.capability} completed execution. Escrow payouts updated.`,
               },
             });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'task_logs', taskId: task.id, msg: 'Task completed execution' });
           }
    
           // Finalize execution
@@ -212,25 +270,37 @@ export class WorkflowController {
               completedAt: new Date(),
             },
           });
+          console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflow_executions', id: execution.id, status: 'completed' });
    
           await this.prisma.workflow.update({
             where: { id },
             data: { status: 'completed' },
           });
-
-          console.log('[STRUCTURED_LOG] WORKFLOW_COMPLETED', { workflowId: id, executionId: execution.id, status: 'completed' });
+          console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflows', id, status: 'completed' });
+ 
+          console.log('[STRUCTURED_LOG] WORKFLOW_COMPLETED', { workflowId: id, executionId: execution.id });
    
         } catch (err: any) {
           console.error('Workflow background run crashed:', err);
-          await this.prisma.workflowExecution.update({
-            where: { id: execution.id },
-            data: { status: 'failed', completedAt: new Date() },
-          });
-          await this.prisma.workflow.update({
-            where: { id },
-            data: { status: 'failed' },
-          });
-          console.log('[STRUCTURED_LOG] WORKFLOW_FAILED', { workflowId: id, executionId: execution.id, status: 'failed', error: err.message || err });
+          try {
+            await this.prisma.workflowExecution.update({
+              where: { id: execution.id },
+              data: { status: 'failed', completedAt: new Date() },
+            });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflow_executions', id: execution.id, status: 'failed' });
+          } catch (e) {
+            console.error('Failed to update execution status to failed:', e);
+          }
+          try {
+            await this.prisma.workflow.update({
+              where: { id },
+              data: { status: 'failed' },
+            });
+            console.log('[STRUCTURED_LOG] DATABASE_UPDATED', { table: 'workflows', id, status: 'failed' });
+          } catch (e) {
+            console.error('Failed to update workflow status to failed:', e);
+          }
+          console.log('[STRUCTURED_LOG] WORKFLOW_FAILED', { workflowId: id, executionId: execution.id, error: err.message || err });
         }
       })();
   
