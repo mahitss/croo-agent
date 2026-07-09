@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client-wallet';
+import { PrismaClient } from '@prisma/client-notification';
 
 declare const process: any;
 declare const require: any;
@@ -35,25 +35,23 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // Fallback
     }
 
-    // Dynamic schema fallback injection (P2 DB connection pass)
     try {
       if (originalUrl) {
         const parsed = new URL(originalUrl);
-        parsed.searchParams.set('schema', 'wallet');
+        parsed.searchParams.set('schema', 'notifications');
         originalUrl = parsed.toString();
       }
     } catch (e) {
       // Ignore
     }
     
-    // Diagnostics & Validation (P2 DB connection pass)
-    const serviceName = process.env.RENDER_SERVICE_NAME || 'Wallet Service';
+    const serviceName = 'Notification Service';
     const nodeEnv = process.env.NODE_ENV || 'development';
     let hostname = 'N/A';
     let database = 'N/A';
     
     if (!originalUrl) {
-      const errMsg = `[DB_ERROR] Service: ${serviceName} | Env: ${nodeEnv} | DATABASE_URL is missing!`;
+      const errMsg = `[DB_ERROR] Service: ${serviceName} | DATABASE_URL is missing!`;
       new Logger('PrismaService').error(errMsg);
       throw new Error(errMsg);
     }
@@ -63,30 +61,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       hostname = parsed.hostname;
       database = parsed.pathname.replace('/', '');
     } catch (e) {
-      const errMsg = `[DB_ERROR] Service: ${serviceName} | Env: ${nodeEnv} | DATABASE_URL is not a valid URL!`;
+      const errMsg = `[DB_ERROR] Service: ${serviceName} | DATABASE_URL is not a valid URL!`;
       new Logger('PrismaService').error(errMsg);
       throw new Error(errMsg);
     }
     
-    if (!originalUrl.startsWith('postgresql://') && !originalUrl.startsWith('postgres://')) {
-      const errMsg = `[DB_ERROR] Service: ${serviceName} | Env: ${nodeEnv} | DATABASE_URL must start with postgresql:// or postgres://`;
-      new Logger('PrismaService').error(errMsg);
-      throw new Error(errMsg);
-    }
-    
-    const isProduction = nodeEnv === 'production';
-    const isNeon = hostname.includes('neon.tech');
-    if ((isProduction || isNeon) && !originalUrl.includes('sslmode=require')) {
-      const errMsg = `[DB_ERROR] Service: ${serviceName} | Env: ${nodeEnv} | DATABASE_URL is missing 'sslmode=require' query parameter!`;
-      new Logger('PrismaService').error(errMsg);
-      throw new Error(errMsg);
-    }
-    
-    const redactedUrl = originalUrl.replace(/:([^:@]+)@/, ':****@');
-    new Logger('PrismaService').log(
-      `[DB_DIAGNOSTICS] Service: ${serviceName} | Env: ${nodeEnv} | Connecting to URL: ${redactedUrl}`
-    );
-
     let modifiedUrl = originalUrl;
     try {
       const parsed = new URL(originalUrl);
@@ -99,7 +78,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         modifiedUrl = parsed.toString();
       }
     } catch (e) {
-      // Fallback to original
+      // Fallback
     }
 
     try {
@@ -116,18 +95,18 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             const ipv4 = ips[0];
             parsed.hostname = ipv4;
             parsed.searchParams.set('sslaccept', 'accept_invalid_certs');
-            parsed.searchParams.set('options', `endpoint=${endpointId}`);
+            parsed.searchParams.set('options', `options=project%3D${endpointId}`);
             modifiedUrl = parsed.toString();
           }
         }
       }
     } catch (e) {
-      // Ignore and fallback
+      // Ignore
     }
 
     process.env.DATABASE_URL = modifiedUrl;
 
-        let targetSchemaName = 'public';
+    let targetSchemaName = 'public';
     try {
       const parsedUrl = new URL(modifiedUrl);
       targetSchemaName = parsedUrl.searchParams.get('schema') || 'public';
@@ -146,11 +125,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    // Await database connection on startup to fail fast if incorrect
     await this.connectWithRetry();
     await this.validateDatabaseSchema();
 
-    // Start a periodic heartbeat to keep PgBouncer/Neon connections warm and prevent "Error { kind: Closed }"
     const pingInterval = setInterval(async () => {
       try {
         await this.$queryRawUnsafe('SELECT 1');
@@ -163,10 +140,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   private async validateDatabaseSchema() {
-    const expectedTables = ['wallets', 'balances', 'transactions'];
+    const expectedTables = ['notifications', 'notification_preferences'];
     try {
       const schemaName = this.targetSchema;
-      
       const tableList = expectedTables.map(t => `'${t}'`).join(', ');
       const tables: any = await this.$queryRawUnsafe(`
         SELECT table_name 
@@ -196,16 +172,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         this.logger.log('Database connection established successfully');
         return;
       } catch (error) {
-        this.logger.warn(
-          `Database connection attempt ${attempt}/${retries} failed: ${error.message}`,
-        );
+        this.logger.warn(`Database connection attempt ${attempt}/${retries} failed: ${error.message}`);
         if (attempt === retries) {
-          const errMsg = 'All database connection attempts exhausted. Failed to connect to database.';
-          this.logger.error(errMsg);
-          throw new Error(errMsg);
+          throw new Error('All database connection attempts exhausted. Failed to connect to database.');
         }
         const backoff = delay * Math.pow(1.5, attempt - 1);
-        this.logger.log(`Retrying in ${Math.round(backoff)}ms...`);
         await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
@@ -215,8 +186,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     if ((this as any)._pingInterval) {
       clearInterval((this as any)._pingInterval);
     }
-    console.error("PRISMA DISCONNECT CALLED");
-    console.error(new Error().stack);
     await this.$disconnect();
   }
 }

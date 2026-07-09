@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as crypto from 'crypto';
+import { GatewayAuthGuard } from '../guards/auth.guard';
 
 @Controller('api/v1')
 export class AuthController {
@@ -104,11 +105,18 @@ export class AuthController {
   }
 
   @Get('users/me')
-  async getMe() {
-    return {
-      success: true,
-      data: { id: 'user-1', email: 'user@orbitai.dev', username: 'orbit_builder', role: 'developer' },
-    };
+  @UseGuards(GatewayAuthGuard)
+  async getMe(@Req() req: any) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/me`, {
+        headers: {
+          'Authorization': req.headers.authorization || '',
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
   }
 
   @Patch('users/me')

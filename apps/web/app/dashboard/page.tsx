@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
 import { apiService } from '../../services/api';
+import { apiClient } from '../../lib/api-client';
 import Link from 'next/link';
 import { 
   TrendingUp, 
@@ -39,8 +40,22 @@ export default function DashboardPage() {
   const userWallet = useNexusStore((state) => state.userWallet);
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
   const initialize = useNexusStore((state) => state.initialize);
+  const user = useNexusStore((state) => state.user);
 
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [revenueChartData, setRevenueChartData] = useState<any[]>([
+    { hour: '08:00', volume: 4.2 },
+    { hour: '09:00', volume: 8.5 },
+    { hour: '10:00', volume: 14.8 },
+    { hour: '11:00', volume: 22.1 },
+    { hour: '12:00', volume: 32.5 },
+    { hour: '13:00', volume: 45.3 },
+    { hour: '14:00', volume: 55.7 }
+  ]);
+  const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     initialize();
@@ -54,25 +69,54 @@ export default function DashboardPage() {
       .catch(err => {
         console.warn('Failed to load live activity feed:', err);
       });
+
+    apiClient.get<any>('/api/v1/analytics/dashboard')
+      .then(res => {
+        if (res && res.success && res.data) {
+          setDashboardData(res.data);
+        }
+      })
+      .catch(err => console.warn('Failed to load dashboard statistics:', err))
+      .finally(() => setLoading(false));
+
+    apiClient.get<any>('/api/v1/notifications')
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data)) {
+          setNotifications(res.data);
+        }
+      })
+      .catch(err => console.warn('Failed to load notifications:', err));
+
+    apiClient.get<any>('/api/v1/analytics/revenue')
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const formatted = res.data.slice(-7).map((r: any) => ({
+            hour: r.date,
+            volume: Number(r.revenue)
+          }));
+          setRevenueChartData(formatted);
+        }
+      })
+      .catch(err => console.warn('Failed to load revenue analytics:', err));
+
+    apiClient.get<any>('/api/v1/analytics/agents')
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data)) {
+          setAgentMetrics(res.data);
+        }
+      })
+      .catch(err => console.warn('Failed to load agent metrics:', err));
   }, [initialize]);
 
-  // Mock revenue metrics over past hours
-  const revenueChartData = [
-    { hour: '08:00', volume: 4.2 },
-    { hour: '09:00', volume: 8.5 },
-    { hour: '10:00', volume: 14.8 },
-    { hour: '11:00', volume: 22.1 },
-    { hour: '12:00', volume: 32.5 },
-    { hour: '13:00', volume: 45.3 },
-    { hour: '14:00', volume: 55.7 }
-  ];
-
-  // Leaderboard data calculation
+  // Leaderboard data calculation using database analytics values
   const leaderboard = [...agents]
-    .map(agent => ({
-      ...agent,
-      earnings: agentWallets[agent.id]?.balance || 0
-    }))
+    .map(agent => {
+      const metric = agentMetrics.find(m => m.agentId === agent.id);
+      return {
+        ...agent,
+        earnings: metric ? Number(metric.revenueUsdc) : 0
+      };
+    })
     .sort((a, b) => b.trustScore - a.trustScore);
 
   const earningsChartData = leaderboard.slice(0, 5).map(agent => ({
@@ -80,13 +124,41 @@ export default function DashboardPage() {
     earnings: agent.earnings
   }));
 
-  const totalAgentEarnings = Object.values(agentWallets).reduce((sum, wallet) => sum + wallet.balance, 0);
+  const totalAgentEarnings = leaderboard.reduce((sum, a) => sum + a.earnings, 0);
 
   const metrics = [
-    { label: 'Active Workflows', value: activeWorkflow ? '1 Running' : '0 Running', icon: Layers, color: 'text-primary-neon' },
-    { label: 'Wallet Balance', value: `${userWallet.balance.toFixed(2)} USDC`, icon: Wallet, color: 'text-accent-blue' },
-    { label: 'Published Agents', value: `${agents.length} Nodes`, icon: Cpu, color: 'text-secondary-neon' },
-    { label: 'Platform Revenue', value: `${totalAgentEarnings.toFixed(2)} USDC`, icon: DollarSign, color: 'text-yellow-400' },
+    { 
+      label: 'Active Workflows', 
+      value: dashboardData?.activeWorkflows !== undefined 
+        ? `${dashboardData.activeWorkflows} Running` 
+        : (activeWorkflow ? '1 Running' : '0 Running'), 
+      icon: Layers, 
+      color: 'text-primary-neon' 
+    },
+    { 
+      label: 'Wallet Balance', 
+      value: dashboardData?.walletBalance !== undefined
+        ? `${Number(dashboardData.walletBalance).toFixed(2)} USDC`
+        : `${userWallet.balance.toFixed(2)} USDC`, 
+      icon: Wallet, 
+      color: 'text-accent-blue' 
+    },
+    { 
+      label: 'Published Agents', 
+      value: dashboardData?.publishedAgents !== undefined
+        ? `${dashboardData.publishedAgents} Nodes`
+        : `${agents.length} Nodes`, 
+      icon: Cpu, 
+      color: 'text-secondary-neon' 
+    },
+    { 
+      label: 'Platform Revenue', 
+      value: dashboardData?.platformRevenue !== undefined
+        ? `${Number(dashboardData.platformRevenue).toFixed(2)} USDC`
+        : `${totalAgentEarnings.toFixed(2)} USDC`, 
+      icon: DollarSign, 
+      color: 'text-yellow-400' 
+    },
   ];
 
   return (
@@ -96,10 +168,10 @@ export default function DashboardPage() {
       <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
-            👋 Welcome back, Mahit
+            👋 Welcome back, {user?.displayName || user?.username || 'Mahit'}
           </h1>
           <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
-            You have {activeWorkflow ? 1 : 0} active workflows, {agents.length} published agents, and ${userWallet.balance.toFixed(2)} USDC available in your wallet.
+            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : agents.length} published agents, and ${dashboardData?.walletBalance !== undefined ? Number(dashboardData.walletBalance).toFixed(2) : userWallet.balance.toFixed(2)} USDC available in your wallet.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -176,7 +248,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Wallet Summary Widget */}
+        {/* Wallet Escrow Overview Widget */}
         <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between h-[320px]">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 font-mono">
             <Wallet className="w-4 h-4 text-accent-blue" />
@@ -185,7 +257,11 @@ export default function DashboardPage() {
           <div className="my-4 flex flex-col gap-2">
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Available Balance</span>
-              <span className="text-white font-mono font-bold">{userWallet.balance.toFixed(2)} USDC</span>
+              <span className="text-white font-mono font-bold">
+                {dashboardData?.walletBalance !== undefined 
+                  ? `${Number(dashboardData.walletBalance).toFixed(2)} USDC` 
+                  : `${userWallet.balance.toFixed(2)} USDC`}
+              </span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Reserved (Escrow Lock)</span>
@@ -218,15 +294,27 @@ export default function DashboardPage() {
           <div className="flex-grow flex flex-col gap-3 justify-center text-xs">
             <div className="flex justify-between">
               <span className="text-gray-400">Today's Tokens</span>
-              <span className="text-white font-mono">1,489,200</span>
+              <span className="text-white font-mono">
+                {dashboardData?.todayTokens !== undefined 
+                  ? Number(dashboardData.todayTokens).toLocaleString() 
+                  : '1,489,200'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Inference Cost</span>
-              <span className="text-secondary-neon font-mono font-bold">0.89 USDC</span>
+              <span className="text-secondary-neon font-mono font-bold">
+                {dashboardData?.todayInferenceCost !== undefined 
+                  ? `${Number(dashboardData.todayInferenceCost).toFixed(2)} USDC` 
+                  : '0.89 USDC'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Average Latency</span>
-              <span className="text-white font-mono">820ms</span>
+              <span className="text-white font-mono">
+                {dashboardData?.averageLatency !== undefined 
+                  ? `${dashboardData.averageLatency}ms` 
+                  : '820ms'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Primary Model</span>
@@ -278,18 +366,21 @@ export default function DashboardPage() {
             Unread Notifications
           </h3>
           <div className="flex-grow flex flex-col gap-3 overflow-y-auto text-xs pr-1">
-            {[
-              { title: "SLA Warning", msg: "QuickScan latency exceeded 800ms limit threshold", type: "warn" },
-              { title: "Escrow Deposited", msg: "Reserved 1.25 USDC for Tesla Q1 intention", type: "info" }
-            ].map((notif, idx) => (
-              <div key={idx} className="border border-border-dark p-3 rounded-lg flex items-start gap-2.5 bg-black/10">
-                <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${notif.type === 'warn' ? 'text-yellow-500' : 'text-accent-blue'}`} />
-                <div className="flex flex-col">
-                  <span className="font-bold text-white">{notif.title}</span>
-                  <span className="text-[10px] text-gray-400 mt-0.5 font-mono leading-relaxed">{notif.msg}</span>
+            {notifications.length > 0 ? (
+              notifications.map((notif) => (
+                <div key={notif.id} className="border border-border-dark p-3 rounded-lg flex items-start gap-2.5 bg-black/10">
+                  <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${notif.type === 'warning' ? 'text-yellow-500' : 'text-accent-blue'}`} />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-white">{notif.title}</span>
+                    <span className="text-[10px] text-gray-400 mt-0.5 font-mono leading-relaxed">{notif.message}</span>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-12 text-gray-500 italic text-xs font-mono">
+                No new notifications.
               </div>
-            ))}
+            )}
           </div>
         </div>
 

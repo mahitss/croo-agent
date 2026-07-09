@@ -106,7 +106,8 @@ function startService(service) {
     ...process.env, 
     PORT: service.port.toString(),
     MALLOC_ARENA_MAX: '2',
-    PRISMA_CLIENT_ENGINE_TYPE: 'library'
+    PRISMA_CLIENT_ENGINE_TYPE: 'library',
+    NODE_OPTIONS: '--dns-result-order=ipv4first'
   };
 
   // Check if python executable exists, fallback to standard python3/python if not
