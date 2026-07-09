@@ -761,11 +761,17 @@ export const apiClient = {
     }
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -814,11 +820,17 @@ export const apiClient = {
       });
     }
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -836,11 +848,17 @@ export const apiClient = {
       });
     }
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
@@ -858,11 +876,17 @@ export const apiClient = {
       });
     }
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -879,11 +903,17 @@ export const apiClient = {
       });
     }
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetchWithTimeout(`${BASE_URL}${url}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body)
     });
 

@@ -114,17 +114,17 @@ async function main() {
   }
 
   // 6. Wallets & Payments Ledger
-  results.push(await runTest("Wallet Ledger Balance Retrieval", `${BASE_URL}/wallet/balance`));
+  results.push(await runTest("Wallet Ledger Balance Retrieval", `${BASE_URL}/wallet/balance`, 'GET', null, authHeader));
 
   const payRes = await runTest("Create Payment Invoice", `${BASE_URL}/payments`, 'POST', {
     workflowId: createdWorkflowId || 'wf-verification-dummy',
     payerWallet: '0xabc123...',
     amount: 2.50
-  });
+  }, authHeader);
   results.push(payRes);
   if (payRes.success && payRes.data && payRes.data.data) {
     const paymentId = payRes.data.data.id;
-    results.push(await runTest("Settle Payment Escrow", `${BASE_URL}/payments/settle`, 'POST', { paymentId }));
+    results.push(await runTest("Settle Payment Escrow", `${BASE_URL}/payments/settle`, 'POST', { paymentId }, authHeader));
   }
 
   console.log("\n=========================================");

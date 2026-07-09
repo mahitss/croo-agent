@@ -1195,11 +1195,27 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const storedDemoMode = localStorage.getItem('orbit_demomode');
         if (storedToken && storedUser) {
           set({ token: storedToken, user: JSON.parse(storedUser) });
+        } else {
+          set({ token: null, user: null });
         }
         if (storedDemoMode !== null) {
           set({ isDemoMode: storedDemoMode === 'true' });
         }
       }
+
+      // If in Live Mode and not logged in, reset wallet state to zero and do not fetch backend wallet APIs
+      if (!get().isDemoMode && !get().token) {
+        set({
+          userWallet: {
+            address: '0x0000000000000000000000000000000000000000',
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
+          }
+        });
+        return;
+      }
+
       try {
         const data = await apiService.getAgentsList() as any;
         if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
@@ -1383,26 +1399,37 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }
         }
       } catch (err) {
-        console.warn('API Gateway offline. Running in sandbox mode.', err);
-        const initialAgentWallets: Record<string, WalletState> = {};
-        seedAgents.forEach(agent => {
-          initialAgentWallets[agent.id] = {
-            address: agent.walletAddress,
-            balance: 15.0,
-            escrowBalance: 0.0,
-            history: []
-          };
-        });
-        set({
-          agents: seedAgents,
-          userWallet: {
-            address: '0xUserWalletAddress789c',
-            balance: 100.0,
-            escrowBalance: 0.0,
-            history: []
-          },
-          agentWallets: initialAgentWallets
-        });
+        console.warn('API Gateway offline or unauthenticated.', err);
+        if (get().isDemoMode) {
+          const initialAgentWallets: Record<string, WalletState> = {};
+          seedAgents.forEach(agent => {
+            initialAgentWallets[agent.id] = {
+              address: agent.walletAddress,
+              balance: 15.0,
+              escrowBalance: 0.0,
+              history: []
+            };
+          });
+          set({
+            agents: seedAgents,
+            userWallet: {
+              address: '0xUserWalletAddress789c',
+              balance: 100.0,
+              escrowBalance: 0.0,
+              history: []
+            },
+            agentWallets: initialAgentWallets
+          });
+        } else {
+          set({
+            userWallet: {
+              address: '0x0000000000000000000000000000000000000000',
+              balance: 0.0,
+              escrowBalance: 0.0,
+              history: []
+            }
+          });
+        }
       }
     },
 
@@ -1713,7 +1740,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
       } catch (err) {
         console.warn('Logout request failed:', err);
       }
-      set({ user: null, token: null });
+      set({
+        user: null,
+        token: null,
+        userWallet: {
+          address: '0x0000000000000000000000000000000000000000',
+          balance: 0.0,
+          escrowBalance: 0.0,
+          history: []
+        }
+      });
       localStorage.removeItem('orbit_token');
       localStorage.removeItem('orbit_user');
     },

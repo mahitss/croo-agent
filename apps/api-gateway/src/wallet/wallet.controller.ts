@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { GatewayAuthGuard } from '../guards/auth.guard';
 
 @Controller('api/v1')
 export class WalletController {
@@ -6,9 +7,10 @@ export class WalletController {
   private readonly paymentUrl = process.env.PAYMENT_SERVICE_URL || 'http://127.0.0.1:5004/api/v1';
 
   @Get('wallet')
-  async getWallet() {
+  @UseGuards(GatewayAuthGuard)
+  async getWallet(@Req() req: any) {
     try {
-      const res = await fetch(`${this.walletUrl}/wallet`);
+      const res = await fetch(`${this.walletUrl}/wallet?userId=${req.user.id}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Wallet service unreachable: ${err.message}` };
@@ -16,9 +18,10 @@ export class WalletController {
   }
 
   @Get('wallet/balance')
-  async getBalance() {
+  @UseGuards(GatewayAuthGuard)
+  async getBalance(@Req() req: any) {
     try {
-      const res = await fetch(`${this.walletUrl}/wallet/balance`);
+      const res = await fetch(`${this.walletUrl}/wallet/balance?userId=${req.user.id}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Wallet service unreachable: ${err.message}` };
@@ -26,12 +29,14 @@ export class WalletController {
   }
 
   @Post('wallet/deposit')
-  async deposit(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async deposit(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.walletUrl}/wallet/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -40,12 +45,14 @@ export class WalletController {
   }
 
   @Post('wallet/withdraw')
-  async withdraw(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async withdraw(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.walletUrl}/wallet/withdraw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -54,9 +61,10 @@ export class WalletController {
   }
 
   @Get('wallet/transactions')
-  async getTransactions() {
+  @UseGuards(GatewayAuthGuard)
+  async getTransactions(@Req() req: any) {
     try {
-      const res = await fetch(`${this.walletUrl}/wallet/transactions`);
+      const res = await fetch(`${this.walletUrl}/wallet/transactions?userId=${req.user.id}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Wallet service unreachable: ${err.message}` };
@@ -64,12 +72,14 @@ export class WalletController {
   }
 
   @Post('wallet/transfer')
-  async transfer(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async transfer(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.walletUrl}/wallet/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -79,13 +89,15 @@ export class WalletController {
 
   // --- PAYMENTS ---
   @Post('payments')
+  @UseGuards(GatewayAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  async createPayment(@Body() body: any) {
+  async createPayment(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.paymentUrl}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -94,7 +106,8 @@ export class WalletController {
   }
 
   @Get('payments/:id')
-  async getPaymentStatus(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async getPaymentStatus(@Req() req: any, @Param('id') id: string) {
     try {
       const res = await fetch(`${this.paymentUrl}/payments/${id}`);
       return await res.json();
@@ -104,12 +117,14 @@ export class WalletController {
   }
 
   @Post('payments/:id/refund')
-  async refundPayment(@Param('id') id: string, @Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async refundPayment(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.paymentUrl}/payments/${id}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -118,12 +133,15 @@ export class WalletController {
   }
 
   @Post('payments/escrow')
-  async lockEscrow(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async lockEscrow(@Req() req: any, @Body() body: any) {
     try {
-      const res = await fetch(`${this.paymentUrl}/payments/${body.paymentId || body.id}/escrow`, {
+      const payload = { ...body, userId: req.user.id };
+      const targetId = body.paymentId || body.id;
+      const res = await fetch(`${this.paymentUrl}/payments/${targetId}/escrow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -132,12 +150,15 @@ export class WalletController {
   }
 
   @Post('payments/settle')
-  async settlePayment(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async settlePayment(@Req() req: any, @Body() body: any) {
     try {
-      const res = await fetch(`${this.paymentUrl}/payments/${body.paymentId || body.id}/settle`, {
+      const payload = { ...body, userId: req.user.id };
+      const targetId = body.paymentId || body.id;
+      const res = await fetch(`${this.paymentUrl}/payments/${targetId}/settle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -146,12 +167,14 @@ export class WalletController {
   }
 
   @Post('payments/razorpay/order')
-  async createRazorpayOrder(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async createRazorpayOrder(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.paymentUrl}/payments/razorpay/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -160,12 +183,14 @@ export class WalletController {
   }
 
   @Post('payments/razorpay/verify')
-  async verifyRazorpayPayment(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async verifyRazorpayPayment(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.paymentUrl}/payments/razorpay/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
@@ -188,12 +213,14 @@ export class WalletController {
   }
 
   @Post('wallet/deposit-credits')
-  async depositCredits(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async depositCredits(@Req() req: any, @Body() body: any) {
     try {
+      const payload = { ...body, userId: req.user.id };
       const res = await fetch(`${this.walletUrl}/wallet/deposit-credits`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       return await res.json();
     } catch (err: any) {
