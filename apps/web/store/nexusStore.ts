@@ -16,6 +16,7 @@ interface NexusState {
   completionTokens: number;
   totalTokens: number;
   estimatedCost: number;
+  appState: 'planning' | 'draft' | 'running' | 'completed' | 'history';
   
   // Auth & Mode States
   user: { id: string; email: string; username: string; role: 'user' | 'creator' | 'admin'; displayName?: string; avatarUrl?: string; } | null;
@@ -318,6 +319,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
     completionTokens: 0,
     totalTokens: 0,
     estimatedCost: 0,
+    appState: 'planning',
     
     // Auth & Mode Defaults
     user: null,
@@ -330,16 +332,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     setUserQuery: (query) => set({ userQuery: query }),
 
-    resetExecution: () => set({
-      activeWorkflow: null,
-      executionLogs: [],
-      isRunning: false,
-      currentPhaseIndex: 0,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      estimatedCost: 0
-    }),
+    resetExecution: () => {
+      console.log('[CLEAR_EXECUTION_STATE] Resetting active workflow and execution logs.');
+      set({
+        activeWorkflow: null,
+        executionLogs: [],
+        isRunning: false,
+        currentPhaseIndex: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        estimatedCost: 0,
+        appState: 'planning'
+      });
+    },
 
     setRoutingMode: (mode) => {
       const activeWorkflow = get().activeWorkflow;
@@ -819,7 +825,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         createdAt
       };
 
-      set({ activeWorkflow: workflow, userQuery: query });
+      set({ activeWorkflow: workflow, userQuery: query, appState: 'draft' });
       console.log('[STRUCTURED_LOG] RENDER_WORKFLOW_SUCCESS', { workflowId });
 
       if (persistError) {
@@ -885,7 +891,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             edges: updatedEdges,
             createdAt: dbWorkflow.createdAt
           };
-          set({ activeWorkflow: updated, isWorkflowSaved: true, unsavedWorkflowTemplate: null });
+          set({ activeWorkflow: updated, isWorkflowSaved: true, unsavedWorkflowTemplate: null, appState: 'draft' });
         }
       } catch (err: any) {
         console.error('[STRUCTURED_LOG] SAVE_WORKFLOW_FAILED', { error: err.message });
@@ -897,7 +903,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const state = get();
       if (state.isRunning) return;
 
-      set({ isRunning: true, userQuery: query, currentPhaseIndex: 1, executionLogs: [] });
+      set({ isRunning: true, userQuery: query, currentPhaseIndex: 1, executionLogs: [], appState: 'running' });
 
       const log = (phase: ExecutionLog['phase'], message: string, type: ExecutionLog['type'] = 'info', metadata?: any) => {
         get().logExecution(phase, message, type, metadata);
@@ -1037,7 +1043,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
 
           logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
-          set({ activeWorkflow: workflow });
+          set({ activeWorkflow: workflow, appState: 'running' });
           log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
         } else {
           // Pre-generated workflow is active in builder: transition it to running
@@ -1046,7 +1052,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             status: computeWorkflowStatus(workflow.nodes)
           };
           logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
-          set({ activeWorkflow: workflow });
+          set({ activeWorkflow: workflow, appState: 'running' });
           log('intent', `Executing pre-generated workflow: "${workflow.name}"`, 'success');
         }
 
@@ -1181,6 +1187,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           });
         }
 
+        console.log('[APP_BOOT] Booting Orbit Autonomous Agent OS...');
         console.log('[BOOT] Initializing Workflow Builder startup lifecycle...');
 
         const clearWorkflowSession = (id?: string) => {
@@ -1193,7 +1200,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
             promptTokens: 0,
             completionTokens: 0,
             totalTokens: 0,
-            estimatedCost: 0
+            estimatedCost: 0,
+            appState: 'planning'
           });
           if (typeof window !== 'undefined') {
             localStorage.removeItem('orbit_last_workflow_id');
@@ -1208,22 +1216,15 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }
         };
 
-        // Reconstruct workflow if ID is in URL or localStorage
+        // Reconstruct workflow ONLY if ID is in URL query parameters (do not automatically restore from localStorage unless query param exists)
         let workflowId = '';
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           workflowId = params.get('workflowId') || '';
         }
-        if (!workflowId && typeof window !== 'undefined') {
-          workflowId = localStorage.getItem('orbit_last_workflow_id') || '';
-          if (workflowId) {
-            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-          }
-        }
 
         if (workflowId) {
-          console.log('[RESTORE] Restoring workflow ID: ' + workflowId);
+          console.log('[WORKFLOW_RESTORE] Attempting to restore workflow ID: ' + workflowId);
           try {
             const wfRes = await apiClient.get<any>(`/api/v1/workflows/${workflowId}`);
             if (wfRes?.success && wfRes.data) {
@@ -1301,6 +1302,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
               console.log('[WORKFLOW_STATUS] Workflow ID: ' + workflow.id + ' | Status: ' + workflow.status.toUpperCase());
 
               const isRunning = workflow.status === 'running';
+              if (isRunning) {
+                console.log('[WORKFLOW_RUNNING] Workflow ID: ' + workflow.id + ' is active/running.');
+              }
               set({
                 activeWorkflow: workflow,
                 isRunning,
@@ -1309,7 +1313,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 promptTokens: meta.promptTokens,
                 completionTokens: meta.completionTokens,
                 totalTokens: meta.totalTokens,
-                estimatedCost: meta.estimatedCost
+                estimatedCost: meta.estimatedCost,
+                appState: isRunning ? 'running' : 'draft'
               });
 
               console.log('[POLL] Starting status polling for workflow ID: ' + workflow.id);
@@ -1462,6 +1467,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             }
 
             if (computedStatus === 'completed' || computedStatus === 'failed' || computedStatus === 'cancelled') {
+              console.log(`[WORKFLOW_COMPLETED] Workflow ID: ${workflow.id} execution completed.`);
               console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Terminal status ${computedStatus.toUpperCase()} reached)`);
               isPolling = false;
               
@@ -1509,13 +1515,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
                     agentWallets: updatedAgentWallets,
                     userWallet,
                     isRunning: false,
-                    currentPhaseIndex: 9
+                    currentPhaseIndex: 9,
+                    appState: 'completed'
                   };
                 });
                 
                 get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
               } else {
-                set({ isRunning: false, currentPhaseIndex: 0 });
+                set({ isRunning: false, currentPhaseIndex: 0, appState: 'completed' });
                 get().logExecution('execution', 'Swarm execution failed!', 'error');
               }
             }

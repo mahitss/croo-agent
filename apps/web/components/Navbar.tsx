@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNexusStore } from '../store/nexusStore';
@@ -20,6 +21,33 @@ export default function Navbar() {
   useKeyboardShortcuts();
   const pathname = usePathname();
   
+  useEffect(() => {
+    console.log(`[PAGE_ROUTE] Navigating to: ${pathname}`);
+    if (pathname === '/workflow') {
+      const params = new URLSearchParams(window.location.search);
+      const workflowId = params.get('workflowId');
+      if (!workflowId) {
+        console.log('[CLEAR_EXECUTION_STATE] No workflowId provided on Builder. Resetting state.');
+        useNexusStore.getState().resetExecution();
+      }
+    } else if (pathname === '/') {
+      console.log('[PORTAL_EMPTY_STATE] Resetting active workflow to open in Portal mode.');
+      useNexusStore.getState().resetExecution();
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('workflowId')) {
+          params.delete('workflowId');
+          const searchStr = params.toString();
+          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
+          window.history.replaceState({ path: newUrl }, '', newUrl);
+        }
+      }
+    } else {
+      console.log(`[CLEAR_EXECUTION_STATE] Navigated to ${pathname}. Resetting execution state.`);
+      useNexusStore.getState().resetExecution();
+    }
+  }, [pathname]);
+
   const userWallet = useNexusStore((state) => state.userWallet);
   const isRunning = useNexusStore((state) => state.isRunning);
   
