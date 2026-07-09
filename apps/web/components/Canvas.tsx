@@ -25,12 +25,14 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
 
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
+  const [canvasHeight, setCanvasHeight] = useState(350);
 
   // Sync state from Zustand activeWorkflow
   useEffect(() => {
     if (!activeWorkflow) {
       setNodes([]);
       setEdges([]);
+      setCanvasHeight(350);
       return;
     }
 
@@ -146,6 +148,12 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       };
     });
 
+    const maxLevel = activeWorkflow.nodes.length > 0
+      ? Math.max(...activeWorkflow.nodes.map(n => levels[n.id] || 0), 0)
+      : 0;
+    const computedHeight = Math.max(30 + maxLevel * 160 + 130, 350);
+    setCanvasHeight(computedHeight);
+
     setNodes(mappedNodes);
     setEdges(mappedEdges);
   }, [activeWorkflow]);
@@ -157,7 +165,10 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
   };
 
   return (
-    <div className="w-full h-full min-h-[500px] bg-black/40 border border-border-dark rounded-xl relative overflow-hidden">
+    <div 
+      style={{ height: `${canvasHeight}px` }}
+      className="w-full min-h-[350px] bg-black/40 border border-border-dark rounded-xl relative overflow-hidden transition-all duration-300"
+    >
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <span className="text-xs bg-black/60 border border-border-dark text-gray-400 px-2.5 py-1 rounded font-mono flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-primary-neon animate-pulse"></span>

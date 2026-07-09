@@ -8,6 +8,7 @@ declare const __dirname: string;
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+  private targetSchema!: string;
 
   constructor() {
     let originalUrl = process.env.DATABASE_URL;
@@ -126,6 +127,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     process.env.DATABASE_URL = modifiedUrl;
 
+        let targetSchemaName = 'public';
+    try {
+      const parsedUrl = new URL(modifiedUrl);
+      targetSchemaName = parsedUrl.searchParams.get('schema') || 'public';
+    } catch (e) {}
+
     super({
       datasources: {
         db: {
@@ -134,6 +141,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       },
       log: ['info', 'warn', 'error'],
     });
+
+    this.targetSchema = targetSchemaName;
   }
 
   async onModuleInit() {
@@ -156,8 +165,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private async validateDatabaseSchema() {
     const expectedTables = ['daily_revenue', 'daily_workflows', 'daily_agent_usage'];
     try {
-      const activeSchema: any = await this.$queryRawUnsafe('SELECT current_schema() as schema');
-      const schemaName = activeSchema[0]?.schema || 'public';
+      const schemaName = this.targetSchema;
       
       const tableList = expectedTables.map(t => `'${t}'`).join(', ');
       const tables: any = await this.$queryRawUnsafe(`
@@ -181,7 +189,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
   }
 
-  private async connectWithRetry(retries = 5, delay = 2000): Promise<void> {
+  private async connectWithRetry(retries = 10, delay = 2000): Promise<void> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await this.$connect();
