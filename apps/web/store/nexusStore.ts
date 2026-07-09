@@ -1181,6 +1181,33 @@ export const useNexusStore = create<NexusState>((set, get) => {
           });
         }
 
+        console.log('[BOOT] Initializing Workflow Builder startup lifecycle...');
+
+        const clearWorkflowSession = (id?: string) => {
+          console.log('[CLEAR_WORKFLOW] Clearing active workflow and resetting URL search params.');
+          set({
+            activeWorkflow: null,
+            isRunning: false,
+            currentPhaseIndex: 0,
+            executionLogs: [],
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            estimatedCost: 0
+          });
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('orbit_last_workflow_id');
+            if (id) {
+              localStorage.removeItem(`orbit_workflow_metadata_${id}`);
+            }
+            const params = new URLSearchParams(window.location.search);
+            params.delete('workflowId');
+            const searchStr = params.toString();
+            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+          }
+        };
+
         // Reconstruct workflow if ID is in URL or localStorage
         let workflowId = '';
         if (typeof window !== 'undefined') {
@@ -1196,12 +1223,22 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
 
         if (workflowId) {
+          console.log('[RESTORE] Restoring workflow ID: ' + workflowId);
           try {
             const wfRes = await apiClient.get<any>(`/api/v1/workflows/${workflowId}`);
             if (wfRes?.success && wfRes.data) {
               const dbWorkflow = wfRes.data;
               const dbAgents = get().agents.length > 0 ? get().agents : seedAgents;
               
+              const isRestorable = dbWorkflow.status === 'running' || dbWorkflow.status === 'pending';
+              
+              if (!isRestorable) {
+                console.log('[CLEAR_WORKFLOW] Workflow status is terminal: ' + dbWorkflow.status + '. Clearing active workflow.');
+                console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + dbWorkflow.id + ' (Reason: Terminal status ' + dbWorkflow.status.toUpperCase() + ' reached)');
+                clearWorkflowSession(dbWorkflow.id);
+                return;
+              }
+
               let meta = {
                 query: dbWorkflow.title,
                 routingMode: 'balanced',
@@ -1260,6 +1297,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 createdAt: dbWorkflow.createdAt
               };
 
+              console.log('[RESTORE] Successfully restored active workflow ID: ' + workflow.id + ' (Status: ' + workflow.status + ')');
+              console.log('[WORKFLOW_STATUS] Workflow ID: ' + workflow.id + ' | Status: ' + workflow.status.toUpperCase());
+
               const isRunning = workflow.status === 'running';
               set({
                 activeWorkflow: workflow,
@@ -1272,12 +1312,18 @@ export const useNexusStore = create<NexusState>((set, get) => {
                 estimatedCost: meta.estimatedCost
               });
 
-              if (isRunning) {
-                get().pollActiveWorkflowStatus(workflow);
-              }
+              console.log('[POLL] Starting status polling for workflow ID: ' + workflow.id);
+              get().pollActiveWorkflowStatus(workflow);
+            } else {
+              console.log('[CLEAR_WORKFLOW] Invalid or stale workflowId: ' + workflowId + '.');
+              console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + workflowId + ' (Reason: Invalid/stale workflow ID)');
+              clearWorkflowSession(workflowId);
             }
           } catch (wfErr) {
             console.warn('Failed to restore active workflow session', wfErr);
+            console.log('[CLEAR_WORKFLOW] Exception occurred while fetching workflow: ' + workflowId + '. Clearing session.');
+            console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + workflowId + ' (Reason: Exception during restore)');
+            clearWorkflowSession(workflowId);
           }
         }
       } catch (err) {
@@ -1352,111 +1398,184 @@ export const useNexusStore = create<NexusState>((set, get) => {
       let isPolling = true;
       const loggedIds = new Set<string>();
       const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
+      let consecutiveErrors = 0;
 
       while (isPolling) {
         await new Promise(r => setTimeout(r, 1200));
-        
-        const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
-        if (statusRes.success && statusRes.data) {
-          const currentWf = statusRes.data;
-          
-          const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
-            let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
-            if (!dbNode && currentWf.nodes[idx]) {
-              dbNode = currentWf.nodes[idx];
-            }
-            if (!dbNode) {
-              dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
-            }
-            return dbNode ? { 
-              ...n, 
-              status: dbNode.status,
-              assignedAgentId: dbNode.agentId || n.assignedAgentId,
-              assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
-            } : n;
-          });
-          
-          const computedStatus = computeWorkflowStatus(updatedNodes);
-          logWorkflowStatusChange(workflow.id, computedStatus, updatedNodes);
 
-          workflow = {
-            ...workflow,
-            status: computedStatus,
-            nodes: updatedNodes
-          };
-          set({ activeWorkflow: workflow });
+        // If the active workflow was reset/cleared or changed in the store by the user, stop polling
+        const active = get().activeWorkflow;
+        if (!active || active.id !== workflow.id) {
+          console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Active workflow cleared or changed)`);
+          isPolling = false;
+          break;
+        }
 
-          // Fetch live task logs from the database
-          const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
-          if (logsRes.success && Array.isArray(logsRes.data)) {
-            logsRes.data.forEach((logItem: any) => {
-              const logKey = `${logItem.id}-${logItem.createdAt}`;
-              if (!loggedIds.has(logKey)) {
-                loggedIds.add(logKey);
-                const isVerify = logItem.message.toLowerCase().includes('verify');
-                get().logExecution(
-                  isVerify ? 'verification' : 'execution',
-                  logItem.message,
-                  logItem.logLevel === 'error' ? 'error' : 'info'
-                );
+        try {
+          console.log(`[POLL] Fetching status for workflow ID: ${workflow.id}...`);
+          const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
+          if (statusRes && statusRes.success && statusRes.data) {
+            consecutiveErrors = 0;
+            const currentWf = statusRes.data;
+            
+            const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
+              let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
+              if (!dbNode && currentWf.nodes[idx]) {
+                dbNode = currentWf.nodes[idx];
               }
+              if (!dbNode) {
+                dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
+              }
+              return dbNode ? { 
+                ...n, 
+                status: dbNode.status,
+                assignedAgentId: dbNode.agentId || n.assignedAgentId,
+                assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
+              } : n;
             });
-          }
+            
+            const computedStatus = computeWorkflowStatus(updatedNodes) as any;
+            console.log(`[WORKFLOW_STATUS] Workflow ID: ${workflow.id} | Status: ${computedStatus.toUpperCase()}`);
 
-          if (computedStatus === 'completed' || computedStatus === 'failed') {
-            isPolling = false;
-            if (computedStatus === 'completed') {
-              // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
-              set({ currentPhaseIndex: 9 });
-              get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
-              await new Promise(r => setTimeout(r, 800));
-              
-              set(state => {
-                const updatedAgentWallets = { ...state.agentWallets };
-                const userWallet = { ...state.userWallet };
-                const releaseTransactions: Transaction[] = [];
+            workflow = {
+              ...workflow,
+              status: computedStatus,
+              nodes: updatedNodes
+            };
+            set({ activeWorkflow: workflow });
 
-                updatedNodes.forEach(n => {
-                  const agentId = n.assignedAgentId!;
-                  const agent = state.agents.find(a => a.id === agentId)!;
-                  const fee = n.costEstimate;
-
-                  const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
-                  const agentTx: Transaction = {
-                    id: `tx-agent-release-${Date.now()}-${n.id}`,
-                    senderAddress: 'ESCROW_VAULT',
-                    receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
-                    amount: fee,
-                    type: 'escrow_release',
-                    timestamp: new Date().toISOString(),
-                    status: 'completed',
-                    txHash: '0x' + Math.random().toString(16).substring(2, 42),
-                    taskId: n.id
-                  };
-
-                  updatedAgentWallets[agentId] = {
-                    ...wallet,
-                    balance: wallet.balance + fee,
-                    history: [agentTx, ...wallet.history]
-                  };
-                  releaseTransactions.push(agentTx);
-                });
-
-                userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
-                userWallet.history = [...releaseTransactions, ...userWallet.history];
-                
-                return {
-                  agentWallets: updatedAgentWallets,
-                  userWallet,
-                  isRunning: false,
-                  currentPhaseIndex: 9
-                };
+            // Fetch live task logs from the database
+            const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
+            if (logsRes.success && Array.isArray(logsRes.data)) {
+              logsRes.data.forEach((logItem: any) => {
+                const logKey = `${logItem.id}-${logItem.createdAt}`;
+                if (!loggedIds.has(logKey)) {
+                  loggedIds.add(logKey);
+                  const isVerify = logItem.message.toLowerCase().includes('verify');
+                  get().logExecution(
+                    isVerify ? 'verification' : 'execution',
+                    logItem.message,
+                    logItem.logLevel === 'error' ? 'error' : 'info'
+                  );
+                }
               });
+            }
+
+            if (computedStatus === 'completed' || computedStatus === 'failed' || computedStatus === 'cancelled') {
+              console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Terminal status ${computedStatus.toUpperCase()} reached)`);
+              isPolling = false;
               
-              get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
-            } else {
-              set({ isRunning: false, currentPhaseIndex: 0 });
-              get().logExecution('execution', 'Swarm execution failed!', 'error');
+              if (computedStatus === 'completed') {
+                // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
+                set({ currentPhaseIndex: 9 });
+                get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
+                await new Promise(r => setTimeout(r, 800));
+                
+                set(state => {
+                  const updatedAgentWallets = { ...state.agentWallets };
+                  const userWallet = { ...state.userWallet };
+                  const releaseTransactions: Transaction[] = [];
+
+                  updatedNodes.forEach(n => {
+                    const agentId = n.assignedAgentId!;
+                    const agent = state.agents.find(a => a.id === agentId)!;
+                    const fee = n.costEstimate;
+
+                    const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
+                    const agentTx: Transaction = {
+                      id: `tx-agent-release-${Date.now()}-${n.id}`,
+                      senderAddress: 'ESCROW_VAULT',
+                      receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
+                      amount: fee,
+                      type: 'escrow_release',
+                      timestamp: new Date().toISOString(),
+                      status: 'completed',
+                      txHash: '0x' + Math.random().toString(16).substring(2, 42),
+                      taskId: n.id
+                    };
+
+                    updatedAgentWallets[agentId] = {
+                      ...wallet,
+                      balance: wallet.balance + fee,
+                      history: [agentTx, ...wallet.history]
+                    };
+                    releaseTransactions.push(agentTx);
+                  });
+
+                  userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
+                  userWallet.history = [...releaseTransactions, ...userWallet.history];
+                  
+                  return {
+                    agentWallets: updatedAgentWallets,
+                    userWallet,
+                    isRunning: false,
+                    currentPhaseIndex: 9
+                  };
+                });
+                
+                get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
+              } else {
+                set({ isRunning: false, currentPhaseIndex: 0 });
+                get().logExecution('execution', 'Swarm execution failed!', 'error');
+              }
+            }
+          } else {
+            consecutiveErrors++;
+            console.warn(`[POLL] Fetch status was not successful (consecutive: ${consecutiveErrors})`);
+            if (consecutiveErrors >= 5) {
+              console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: 5 consecutive failed status requests)`);
+              isPolling = false;
+              
+              // Clear active workflow and return to builder to prevent infinite loading screen
+              console.log(`[CLEAR_WORKFLOW] Invalid/Stale workflow during polling. Clearing session.`);
+              set({
+                activeWorkflow: null,
+                isRunning: false,
+                currentPhaseIndex: 0,
+                executionLogs: [],
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                estimatedCost: 0
+              });
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('orbit_last_workflow_id');
+                localStorage.removeItem(`orbit_workflow_metadata_${workflow.id}`);
+                const params = new URLSearchParams(window.location.search);
+                params.delete('workflowId');
+                const searchStr = params.toString();
+                const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+              }
+            }
+          }
+        } catch (err) {
+          consecutiveErrors++;
+          console.warn(`[POLL] Exception in status polling (consecutive: ${consecutiveErrors}):`, err);
+          if (consecutiveErrors >= 5) {
+            console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: 5 consecutive status fetch exceptions)`);
+            isPolling = false;
+            
+            // Clear active workflow and return to builder to prevent infinite loading screen
+            console.log(`[CLEAR_WORKFLOW] Exception limit hit during polling. Clearing session.`);
+            set({
+              activeWorkflow: null,
+              isRunning: false,
+              currentPhaseIndex: 0,
+              executionLogs: [],
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0,
+              estimatedCost: 0
+            });
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('orbit_last_workflow_id');
+              localStorage.removeItem(`orbit_workflow_metadata_${workflow.id}`);
+              const params = new URLSearchParams(window.location.search);
+              params.delete('workflowId');
+              const searchStr = params.toString();
+              const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
+              window.history.pushState({ path: newUrl }, '', newUrl);
             }
           }
         }
