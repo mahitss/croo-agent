@@ -19,16 +19,26 @@ export default function MarketplacePage() {
   const initialize = useNexusStore((state) => state.initialize);
   const { toast } = useToast();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [marketplaceTab, setMarketplaceTab] = useState<'all' | 'trending' | 'featured' | 'verified'>('all');
+  
+  const marketplaceTab = useNexusStore((state) => state.marketplaceTab);
+  const setMarketplaceTab = useNexusStore((state) => state.setMarketplaceTab);
   
   // Search & Filters State
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [onlyVerified, setOnlyVerified] = useState(false);
-  const [minTrustScore, setMinTrustScore] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(0.5);
-  const [sortBy, setSortBy] = useState<string>('trustScore');
+  const searchTerm = useNexusStore((state) => state.marketplaceSearchTerm);
+  const setSearchTerm = useNexusStore((state) => state.setMarketplaceSearchTerm);
+  const selectedCategory = useNexusStore((state) => state.marketplaceCategory);
+  const setSelectedCategory = useNexusStore((state) => state.setMarketplaceCategory);
+  const selectedAgent = useNexusStore((state) => state.marketplaceSelectedAgent);
+  const setSelectedAgent = useNexusStore((state) => state.setMarketplaceSelectedAgent);
+  const onlyVerified = useNexusStore((state) => state.marketplaceOnlyVerified);
+  const setOnlyVerified = useNexusStore((state) => state.setMarketplaceOnlyVerified);
+  const minTrustScore = useNexusStore((state) => state.marketplaceMinTrustScore);
+  const setMinTrustScore = useNexusStore((state) => state.setMarketplaceMinTrustScore);
+  const maxPrice = useNexusStore((state) => state.marketplaceMaxPrice);
+  const setMaxPrice = useNexusStore((state) => state.setMarketplaceMaxPrice);
+  const sortBy = useNexusStore((state) => state.marketplaceSortBy);
+  const setSortBy = useNexusStore((state) => state.setMarketplaceSortBy);
+  
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
@@ -37,23 +47,11 @@ export default function MarketplacePage() {
   const itemsPerPage = 6;
 
   // Matchmaker State
-  const [matchmakerPrompt, setMatchmakerPrompt] = useState('');
+  const matchmakerPrompt = useNexusStore((state) => state.marketplaceMatchmakerPrompt);
+  const setMatchmakerPrompt = useNexusStore((state) => state.setMarketplaceMatchmakerPrompt);
   const [isMatching, setIsMatching] = useState(false);
-  const [matchedStack, setMatchedStack] = useState<{
-    chain: {
-      nodeId: string;
-      stageName: string;
-      capability: string;
-      agentId: string;
-      agentName: string;
-      reason: string;
-      cost: number;
-      time: string;
-      trustScore?: number;
-    }[];
-    cost: number;
-    time: string;
-  } | null>(null);
+  const matchedStack = useNexusStore((state) => state.marketplaceMatchedStack);
+  const setMatchedStack = useNexusStore((state) => state.setMarketplaceMatchedStack);
 
   const categories = ['All', 'Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'];
 
@@ -420,7 +418,7 @@ export default function MarketplacePage() {
         </div>
 
         {matchedStack && (() => {
-          const groupedAgents = matchedStack.chain.reduce((groups, step) => {
+          const groupedAgents = matchedStack.chain.reduce((groups: Record<string, any>, step: any) => {
             if (!groups[step.agentId]) {
               groups[step.agentId] = {
                 agentName: step.agentName,
@@ -479,7 +477,7 @@ export default function MarketplacePage() {
                     Sequence of Execution Stages
                   </h4>
                   <div className="flex flex-col gap-3">
-                    {matchedStack.chain.map((step, idx) => (
+                    {matchedStack.chain.map((step: any, idx: number) => (
                       <div key={step.nodeId || idx} className="flex flex-col gap-2 relative">
                         <div className="bg-white/5 border border-border-dark p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-primary-neon/20 transition-all">
                           <div className="flex flex-col gap-1">

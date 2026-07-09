@@ -44,9 +44,13 @@ export default function PortalPage() {
     { q: "Can I publish my own agent?", a: "Yes. Developers can register their agent nodes via the Developer Portal by specifying metadata, pricing structures, and an API handler endpoint." }
   ];
 
-  const handleLaunch = () => {
+  const handleLaunch = async () => {
     if (!userQuery.trim()) return;
-    startExecution(userQuery, routingMode, budget);
+    await startExecution(userQuery, routingMode, budget);
+    const active = useNexusStore.getState().activeWorkflow;
+    if (active) {
+      window.location.href = `/workflow?workflowId=${active.id}`;
+    }
   };
 
   return (
@@ -63,8 +67,8 @@ export default function PortalPage() {
         </div>
       )}
       
-      {/* 1. Landing Page Section (Rendered only when not running and no active workflow) */}
-      {!activeWorkflow && !isRunning && (
+      {/* 1. Landing Page Section (Always render in Portal mode) */}
+      {true && (
         <div className="max-w-7xl w-full mx-auto px-6 py-10 flex flex-col gap-16">
           
           {/* Hero Section */}
@@ -262,7 +266,7 @@ const workflow = await nexus.run({
 
       {/* 2. Interactive Prompt & Controller Panel */}
       <div id="launchpad" className="max-w-7xl w-full mx-auto p-6 flex flex-col gap-8">
-        {!activeWorkflow && !isRunning ? (
+        {true ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Left Column: Intention Workspace */}
@@ -393,23 +397,8 @@ const workflow = await nexus.run({
           </div>
         )}
 
-        {/* Output split dashboard sections (DAG Canvas & Log Timelines) */}
-        {(activeWorkflow || isRunning) && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-1 flex flex-col gap-4">
-              <h3 className="text-md font-bold uppercase tracking-wider text-gray-400">Collaborative DAG Diagram</h3>
-              <div className="h-[520px]">
-                <Canvas />
-              </div>
-            </div>
-            <div className="xl:col-span-2">
-              <ExecutionTracker />
-            </div>
-          </div>
-        )}
-
-        {/* Landing Accordion FAQ (Only when idle) */}
-        {!activeWorkflow && !isRunning && (
+        {/* Landing Accordion FAQ (Always render in Portal mode) */}
+        {true && (
           <div className="border-t border-border-dark pt-10 flex flex-col gap-4 max-w-2xl mx-auto w-full">
             <h3 className="text-sm font-bold uppercase tracking-wider text-center text-gray-400 font-mono">
               Frequently Asked Questions
@@ -441,8 +430,8 @@ const workflow = await nexus.run({
         <AgentDetailModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />
       )}
 
-      {/* Footer (Only shown when idle) */}
-      {!activeWorkflow && !isRunning && (
+      {/* Footer (Always render in Portal mode) */}
+      {true && (
         <footer className="border-t border-border-dark py-8 px-6 mt-12 bg-black/20 text-xs text-gray-500 font-mono">
           <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-6 gap-6">
             <div>

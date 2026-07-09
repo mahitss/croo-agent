@@ -27,6 +27,29 @@ interface NexusState {
   isWorkflowSaved: boolean;
   unsavedWorkflowTemplate: any | null;
   saveWorkflow: () => Promise<void>;
+
+  // Marketplace Persistent States
+  marketplaceTab: 'all' | 'trending' | 'featured' | 'verified';
+  marketplaceSearchTerm: string;
+  marketplaceCategory: string;
+  marketplaceSelectedAgent: Agent | null;
+  marketplaceOnlyVerified: boolean;
+  marketplaceMinTrustScore: number;
+  marketplaceMaxPrice: number;
+  marketplaceSortBy: string;
+  marketplaceMatchmakerPrompt: string;
+  marketplaceMatchedStack: any | null;
+
+  setMarketplaceTab: (tab: 'all' | 'trending' | 'featured' | 'verified') => void;
+  setMarketplaceSearchTerm: (term: string) => void;
+  setMarketplaceCategory: (cat: string) => void;
+  setMarketplaceSelectedAgent: (agent: Agent | null) => void;
+  setMarketplaceOnlyVerified: (val: boolean) => void;
+  setMarketplaceMinTrustScore: (val: number) => void;
+  setMarketplaceMaxPrice: (val: number) => void;
+  setMarketplaceSortBy: (val: string) => void;
+  setMarketplaceMatchmakerPrompt: (val: string) => void;
+  setMarketplaceMatchedStack: (stack: any) => void;
   
   // Actions
   setUserQuery: (query: string) => void;
@@ -320,6 +343,29 @@ export const useNexusStore = create<NexusState>((set, get) => {
     totalTokens: 0,
     estimatedCost: 0,
     appState: 'planning',
+    
+    // Marketplace Persistent Defaults
+    marketplaceTab: 'all',
+    marketplaceSearchTerm: '',
+    marketplaceCategory: 'All',
+    marketplaceSelectedAgent: null,
+    marketplaceOnlyVerified: false,
+    marketplaceMinTrustScore: 0,
+    marketplaceMaxPrice: 0.5,
+    marketplaceSortBy: 'trustScore',
+    marketplaceMatchmakerPrompt: '',
+    marketplaceMatchedStack: null,
+
+    setMarketplaceTab: (tab) => set({ marketplaceTab: tab }),
+    setMarketplaceSearchTerm: (term) => set({ marketplaceSearchTerm: term }),
+    setMarketplaceCategory: (cat) => set({ marketplaceCategory: cat }),
+    setMarketplaceSelectedAgent: (agent) => set({ marketplaceSelectedAgent: agent }),
+    setMarketplaceOnlyVerified: (val) => set({ marketplaceOnlyVerified: val }),
+    setMarketplaceMinTrustScore: (val) => set({ marketplaceMinTrustScore: val }),
+    setMarketplaceMaxPrice: (val) => set({ marketplaceMaxPrice: val }),
+    setMarketplaceSortBy: (val) => set({ marketplaceSortBy: val }),
+    setMarketplaceMatchmakerPrompt: (val) => set({ marketplaceMatchmakerPrompt: val }),
+    setMarketplaceMatchedStack: (stack) => set({ marketplaceMatchedStack: stack }),
     
     // Auth & Mode Defaults
     user: null,
@@ -1216,11 +1262,21 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }
         };
 
-        // Reconstruct workflow ONLY if ID is in URL query parameters (do not automatically restore from localStorage unless query param exists)
+        // Reconstruct workflow if ID is in URL or localStorage
         let workflowId = '';
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           workflowId = params.get('workflowId') || '';
+        }
+        if (!workflowId && typeof window !== 'undefined') {
+          workflowId = localStorage.getItem('orbit_last_workflow_id') || '';
+          if (workflowId) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('workflowId', workflowId);
+            const searchStr = params.toString();
+            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?${searchStr}`;
+            window.history.replaceState({ path: newUrl }, '', newUrl);
+          }
         }
 
         if (workflowId) {
@@ -1230,15 +1286,6 @@ export const useNexusStore = create<NexusState>((set, get) => {
             if (wfRes?.success && wfRes.data) {
               const dbWorkflow = wfRes.data;
               const dbAgents = get().agents.length > 0 ? get().agents : seedAgents;
-              
-              const isRestorable = dbWorkflow.status === 'running' || dbWorkflow.status === 'pending';
-              
-              if (!isRestorable) {
-                console.log('[CLEAR_WORKFLOW] Workflow status is terminal: ' + dbWorkflow.status + '. Clearing active workflow.');
-                console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + dbWorkflow.id + ' (Reason: Terminal status ' + dbWorkflow.status.toUpperCase() + ' reached)');
-                clearWorkflowSession(dbWorkflow.id);
-                return;
-              }
 
               let meta = {
                 query: dbWorkflow.title,
@@ -1302,23 +1349,27 @@ export const useNexusStore = create<NexusState>((set, get) => {
               console.log('[WORKFLOW_STATUS] Workflow ID: ' + workflow.id + ' | Status: ' + workflow.status.toUpperCase());
 
               const isRunning = workflow.status === 'running';
+              const isPending = workflow.status === 'pending';
+              const isTerminal = workflow.status === 'completed' || workflow.status === 'failed' || (workflow.status as any) === 'cancelled';
               if (isRunning) {
                 console.log('[WORKFLOW_RUNNING] Workflow ID: ' + workflow.id + ' is active/running.');
               }
               set({
                 activeWorkflow: workflow,
                 isRunning,
-                currentPhaseIndex: isRunning ? 7 : 0,
+                currentPhaseIndex: isRunning ? 7 : (workflow.status === 'completed' ? 9 : 0),
                 userQuery: meta.query,
                 promptTokens: meta.promptTokens,
                 completionTokens: meta.completionTokens,
                 totalTokens: meta.totalTokens,
                 estimatedCost: meta.estimatedCost,
-                appState: isRunning ? 'running' : 'draft'
+                appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft')
               });
 
-              console.log('[POLL] Starting status polling for workflow ID: ' + workflow.id);
-              get().pollActiveWorkflowStatus(workflow);
+              if (isRunning || isPending) {
+                console.log('[POLL] Starting status polling for workflow ID: ' + workflow.id);
+                get().pollActiveWorkflowStatus(workflow);
+              }
             } else {
               console.log('[CLEAR_WORKFLOW] Invalid or stale workflowId: ' + workflowId + '.');
               console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + workflowId + ' (Reason: Invalid/stale workflow ID)');
