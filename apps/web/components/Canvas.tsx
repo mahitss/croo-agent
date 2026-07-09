@@ -10,10 +10,49 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useNexusStore } from '../store/nexusStore';
 import AgentNode from './AgentNode';
+import dagre from '@dagrejs/dagre';
 
 interface CanvasProps {
   onSelectNode?: (nodeData: any) => void;
 }
+
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedElements = (nodes: any[], edges: any[], direction = 'TB') => {
+  const isHorizontal = direction === 'LR';
+  // Use professional vertical separation (260px center-to-center, leaving exactly 120px gap)
+  dagreGraph.setGraph({ 
+    rankdir: direction, 
+    ranksep: 260, 
+    nodesep: 120 
+  });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 240, height: 140 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      targetPosition: isHorizontal ? 'left' : 'top',
+      sourcePosition: isHorizontal ? 'right' : 'bottom',
+      position: {
+        x: nodeWithPosition.x - 120, // 240 / 2
+        y: nodeWithPosition.y - 70,  // 140 / 2
+      },
+    };
+  });
+
+  return { nodes: newNodes, edges };
+};
 
 export default function Canvas({ onSelectNode }: CanvasProps) {
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
@@ -25,81 +64,18 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
 
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
-  const [canvasHeight, setCanvasHeight] = useState(350);
+  const [canvasHeight, setCanvasHeight] = useState(450);
 
   // Sync state from Zustand activeWorkflow
   useEffect(() => {
-    if (!activeWorkflow) {
+    if (!activeWorkflow || activeWorkflow.nodes.length === 0) {
       setNodes([]);
       setEdges([]);
-      setCanvasHeight(350);
+      setCanvasHeight(450);
       return;
     }
 
-    // --- Dynamic Leveled Auto-Layout Algorithm (Parallel Flow Nodes Layout) ---
-    // 1. Calculate parents and indegrees
-    const indegree: Record<string, number> = {};
-    const parents: Record<string, string[]> = {};
-    
-    activeWorkflow.nodes.forEach(n => {
-      indegree[n.id] = 0;
-      parents[n.id] = [];
-    });
-
-    activeWorkflow.edges.forEach(e => {
-      indegree[e.target] = (indegree[e.target] || 0) + 1;
-      parents[e.target].push(e.source);
-    });
-
-    // 2. Assign nodes to levels topographically
-    const levels: Record<string, number> = {};
-    const queue: string[] = [];
-
-    activeWorkflow.nodes.forEach(n => {
-      if (indegree[n.id] === 0) {
-        levels[n.id] = 0;
-        queue.push(n.id);
-      }
-    });
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const currentLevel = levels[current];
-
-      activeWorkflow.edges.forEach(e => {
-        if (e.source === current) {
-          const nextLevel = Math.max(levels[e.target] || 0, currentLevel + 1);
-          levels[e.target] = nextLevel;
-          queue.push(e.target);
-        }
-      });
-    }
-
-    // 3. Group nodes by their levels
-    const nodesByLevel: Record<number, string[]> = {};
-    activeWorkflow.nodes.forEach(n => {
-      const lvl = levels[n.id] || 0;
-      if (!nodesByLevel[lvl]) {
-        nodesByLevel[lvl] = [];
-      }
-      nodesByLevel[lvl].push(n.id);
-    });
-
-    // 4. Calculate layouts coordinates
-    const spacingX = 240;
-    const spacingY = 160;
-    const centerX = 200;
-
     const mappedNodes = activeWorkflow.nodes.map((node, idx) => {
-      const lvl = levels[node.id] || 0;
-      const levelNodes = nodesByLevel[lvl];
-      const indexInLevel = levelNodes.indexOf(node.id);
-      
-      // Align horizontally relative to the center of the level
-      const totalWidth = (levelNodes.length - 1) * spacingX;
-      const x = centerX - totalWidth / 2 + indexInLevel * spacingX;
-      const y = 30 + lvl * spacingY;
-
       const nodeTask = node.task || node.name;
       const assignedAgent = node.assignedAgent || node.assignedAgentId;
 
@@ -108,7 +84,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       return {
         id: node.id,
         type: 'agentNode',
-        position: { x, y },
+        position: { x: 0, y: 0 },
         data: { 
           id: node.id,
           index: idx,
@@ -126,7 +102,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       };
     });
 
-    // Map workflow edges to React Flow edges with colored animation states
+    // Map workflow edges to React Flow edges with colored animation states and clean routing
     const mappedEdges = activeWorkflow.edges.map((edge) => {
       const sourceNode = activeWorkflow.nodes.find(n => n.id === edge.source);
       const isCompleted = sourceNode?.status === 'completed';
@@ -140,6 +116,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
+        type: 'smoothstep', // Orthogonal edge routing around cards
         animated: isRunning || isCompleted,
         style: { 
           stroke: strokeColor,
@@ -148,14 +125,20 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       };
     });
 
-    const maxLevel = activeWorkflow.nodes.length > 0
-      ? Math.max(...activeWorkflow.nodes.map(n => levels[n.id] || 0), 0)
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      mappedNodes,
+      mappedEdges,
+      'TB'
+    );
+
+    const maxY = layoutedNodes.length > 0
+      ? Math.max(...layoutedNodes.map(n => n.position.y), 0)
       : 0;
-    const computedHeight = Math.max(30 + maxLevel * 160 + 130, 350);
+    const computedHeight = Math.max(maxY + 220, 450);
     setCanvasHeight(computedHeight);
 
-    setNodes(mappedNodes);
-    setEdges(mappedEdges);
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
   }, [activeWorkflow]);
 
   const handleNodeClick = (_event: any, node: any) => {
@@ -167,7 +150,7 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
   return (
     <div 
       style={{ height: `${canvasHeight}px` }}
-      className="w-full min-h-[350px] bg-black/40 border border-border-dark rounded-xl relative overflow-hidden transition-all duration-300"
+      className="w-full min-h-[450px] bg-black/40 border border-border-dark rounded-xl relative overflow-hidden transition-all duration-300"
     >
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <span className="text-xs bg-black/60 border border-border-dark text-gray-400 px-2.5 py-1 rounded font-mono flex items-center gap-1.5">

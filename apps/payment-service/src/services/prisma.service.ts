@@ -104,7 +104,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     try {
       const parsed = new URL(modifiedUrl);
-      if (parsed.hostname.includes('.neon.tech') && !parsed.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+      if (process.platform !== 'win32' && parsed.hostname.includes('.neon.tech') && !parsed.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
         const { execSync } = require('child_process');
         const hostname = parsed.hostname;
         const endpointId = hostname.split('.')[0];
