@@ -55,6 +55,8 @@ export default function MarketplacePage() {
 
   const categories = ['All', 'Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'];
 
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+
   useEffect(() => {
     initialize();
     
@@ -76,8 +78,20 @@ export default function MarketplacePage() {
       }
     }
     const timer = setTimeout(() => setIsInitialLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, [initialize]);
+
+    const refreshData = () => {
+      initialize();
+    };
+
+    window.addEventListener('storage', refreshData);
+    window.addEventListener('nexus_store_update', refreshData);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('storage', refreshData);
+      window.removeEventListener('nexus_store_update', refreshData);
+    };
+  }, [initialize, isDemoMode]);
 
   useEffect(() => {
     setCurrentPage(1);

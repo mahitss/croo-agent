@@ -10,9 +10,19 @@ export default function WalletPage() {
   const withdrawUserWallet = useNexusStore((state) => state.withdrawUserWallet);
   const initialize = useNexusStore((state) => state.initialize);
 
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+
   useEffect(() => {
     initialize();
-  }, [initialize]);
+
+    window.addEventListener('storage', initialize);
+    window.addEventListener('nexus_store_update', initialize);
+
+    return () => {
+      window.removeEventListener('storage', initialize);
+      window.removeEventListener('nexus_store_update', initialize);
+    };
+  }, [initialize, isDemoMode]);
 
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');

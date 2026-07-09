@@ -48,6 +48,8 @@ export default function AnalyticsPage() {
   const [aiMetrics, setAiMetrics] = useState<any>({ avgPlanningLatencyMs: 0, tokensConsumed: 0 });
   const [systemMetrics, setSystemMetrics] = useState<any>({ cpuUsage: 0, memoryUsage: 0 });
 
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+
   useEffect(() => {
     initialize();
 
@@ -89,7 +91,15 @@ export default function AnalyticsPage() {
     };
 
     fetchAllData();
-  }, [initialize]);
+
+    window.addEventListener('storage', fetchAllData);
+    window.addEventListener('nexus_store_update', fetchAllData);
+
+    return () => {
+      window.removeEventListener('storage', fetchAllData);
+      window.removeEventListener('nexus_store_update', fetchAllData);
+    };
+  }, [initialize, isDemoMode]);
 
   const handleExport = () => {
     const exportPayload = {

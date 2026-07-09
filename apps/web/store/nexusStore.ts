@@ -1646,6 +1646,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const mode = !get().isDemoMode;
       set({ isDemoMode: mode });
       localStorage.setItem('orbit_demomode', String(mode));
+      get().initialize();
     },
 
     loginUser: async (usernameOrEmail, password) => {

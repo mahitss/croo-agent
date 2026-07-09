@@ -57,56 +57,70 @@ export default function DashboardPage() {
   const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+
   useEffect(() => {
     initialize();
     
-    apiService.getActivityFeed()
-      .then(res => {
-        if (res && res.success && Array.isArray(res.data)) {
-          setActivityFeed(res.data);
-        }
-      })
-      .catch(err => {
-        console.warn('Failed to load live activity feed:', err);
-      });
+    const fetchAllData = () => {
+      apiService.getActivityFeed()
+        .then(res => {
+          if (res && res.success && Array.isArray(res.data)) {
+            setActivityFeed(res.data);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load live activity feed:', err);
+        });
 
-    apiClient.get<any>('/api/v1/analytics/dashboard')
-      .then(res => {
-        if (res && res.success && res.data) {
-          setDashboardData(res.data);
-        }
-      })
-      .catch(err => console.warn('Failed to load dashboard statistics:', err))
-      .finally(() => setLoading(false));
+      apiClient.get<any>('/api/v1/analytics/dashboard')
+        .then(res => {
+          if (res && res.success && res.data) {
+            setDashboardData(res.data);
+          }
+        })
+        .catch(err => console.warn('Failed to load dashboard statistics:', err))
+        .finally(() => setLoading(false));
 
-    apiClient.get<any>('/api/v1/notifications')
-      .then(res => {
-        if (res && res.success && Array.isArray(res.data)) {
-          setNotifications(res.data);
-        }
-      })
-      .catch(err => console.warn('Failed to load notifications:', err));
+      apiClient.get<any>('/api/v1/notifications')
+        .then(res => {
+          if (res && res.success && Array.isArray(res.data)) {
+            setNotifications(res.data);
+          }
+        })
+        .catch(err => console.warn('Failed to load notifications:', err));
 
-    apiClient.get<any>('/api/v1/analytics/revenue')
-      .then(res => {
-        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-          const formatted = res.data.slice(-7).map((r: any) => ({
-            hour: r.date,
-            volume: Number(r.revenue)
-          }));
-          setRevenueChartData(formatted);
-        }
-      })
-      .catch(err => console.warn('Failed to load revenue analytics:', err));
+      apiClient.get<any>('/api/v1/analytics/revenue')
+        .then(res => {
+          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+            const formatted = res.data.slice(-7).map((r: any) => ({
+              hour: r.date,
+              volume: Number(r.revenue)
+            }));
+            setRevenueChartData(formatted);
+          }
+        })
+        .catch(err => console.warn('Failed to load revenue analytics:', err));
 
-    apiClient.get<any>('/api/v1/analytics/agents')
-      .then(res => {
-        if (res && res.success && Array.isArray(res.data)) {
-          setAgentMetrics(res.data);
-        }
-      })
-      .catch(err => console.warn('Failed to load agent metrics:', err));
-  }, [initialize]);
+      apiClient.get<any>('/api/v1/analytics/agents')
+        .then(res => {
+          if (res && res.success && Array.isArray(res.data)) {
+            setAgentMetrics(res.data);
+          }
+        })
+        .catch(err => console.warn('Failed to load agent metrics:', err));
+    };
+
+    fetchAllData();
+
+    window.addEventListener('storage', fetchAllData);
+    window.addEventListener('nexus_store_update', fetchAllData);
+
+    return () => {
+      window.removeEventListener('storage', fetchAllData);
+      window.removeEventListener('nexus_store_update', fetchAllData);
+    };
+  }, [initialize, isDemoMode]);
 
   // Leaderboard data calculation using database analytics values
   const leaderboard = [...agents]
