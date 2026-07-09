@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   ReactFlow, 
   Controls, 
   Background, 
-  BackgroundVariant 
+  BackgroundVariant,
+  ReactFlowProvider,
+  useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useNexusStore } from '../store/nexusStore';
@@ -21,7 +23,10 @@ dagreGraph.setDefaultEdgeLabel(() => ({}));
 
 const getLayoutedElements = (nodes: any[], edges: any[], direction = 'TB') => {
   const isHorizontal = direction === 'LR';
-  // Use professional vertical separation (180px center-to-center, leaving exactly 40px gap) and horizontal spacing (240px)
+  
+  console.log('[DEBUG] Layout execution - Nodes to arrange:', nodes.map(n => n.id));
+  console.log('[DEBUG] Layout execution - Edges connecting:', edges.map(e => `${e.source} -> ${e.target}`));
+
   dagreGraph.setGraph({ 
     rankdir: direction, 
     ranksep: 180, 
@@ -33,30 +38,48 @@ const getLayoutedElements = (nodes: any[], edges: any[], direction = 'TB') => {
   });
 
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+    const src = edge.source || (edge as any).sourceNode;
+    const tgt = edge.target || (edge as any).targetNode;
+    if (src && tgt) {
+      dagreGraph.setEdge(src, tgt);
+    }
   });
 
   dagre.layout(dagreGraph);
 
   const newNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
+    
+    // Safety checks against NaN/undefined layout coordinates
+    const x = nodeWithPosition && typeof nodeWithPosition.x === 'number' && !isNaN(nodeWithPosition.x)
+      ? nodeWithPosition.x - 120
+      : 0;
+    const y = nodeWithPosition && typeof nodeWithPosition.y === 'number' && !isNaN(nodeWithPosition.y)
+      ? nodeWithPosition.y - 70
+      : 0;
+
+    console.log(`[DEBUG] Node placement - Node ID: ${node.id} | Position: { x: ${x}, y: ${y} }`);
+
     return {
       ...node,
       targetPosition: isHorizontal ? 'left' : 'top',
       sourcePosition: isHorizontal ? 'right' : 'bottom',
-      position: {
-        x: nodeWithPosition.x - 120, // 240 / 2
-        y: nodeWithPosition.y - 70,  // 140 / 2
-      },
+      position: { x, y },
     };
   });
 
   return { nodes: newNodes, edges };
 };
 
-export default function Canvas({ onSelectNode }: CanvasProps) {
+function CanvasInner({ onSelectNode }: CanvasProps) {
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const { fitView } = useReactFlow();
   
+  // Render count tracking
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log(`[DEBUG] CanvasInner Render Count: ${renderCountRef.current}`);
+
   // Custom node types
   const nodeTypes = useMemo(() => ({
     agentNode: AgentNode
@@ -68,18 +91,22 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
 
   // Sync state from Zustand activeWorkflow
   useEffect(() => {
+    console.log('[DEBUG] activeWorkflow changed - state updated:', activeWorkflow);
+
     if (!activeWorkflow || activeWorkflow.nodes.length === 0) {
+      console.log('[DEBUG] Empty workflow state - clearing canvas elements');
       setNodes([]);
       setEdges([]);
       setCanvasHeight(450);
       return;
     }
 
-    const mappedNodes = activeWorkflow.nodes.map((node, idx) => {
-      const nodeTask = node.task || node.name;
-      const assignedAgent = node.assignedAgent || node.assignedAgentId;
+    console.log('[DEBUG] Planner nodes count:', activeWorkflow.nodes.length);
+    console.log('[DEBUG] Planner edges count:', activeWorkflow.edges.length);
 
-      console.log(`[DEBUG] Node ID: ${node.id} | Capability: ${node.capability} | Task: ${nodeTask} | Assigned Agent: ${assignedAgent} | Status: ${node.status}`);
+    const mappedNodes = activeWorkflow.nodes.map((node, idx) => {
+      const nodeTask = node.task || node.name || `Task ${idx + 1}`;
+      const assignedAgent = node.assignedAgent || node.assignedAgentId || 'no-agent';
 
       return {
         id: node.id,
@@ -88,11 +115,11 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         data: { 
           id: node.id,
           index: idx,
-          name: node.name, 
+          name: node.name || nodeTask, 
           task: nodeTask,
           assignedAgent: assignedAgent,
           capability: node.capability, 
-          status: node.status, 
+          status: node.status || 'pending', 
           costEstimate: node.costEstimate,
           assignedAgentId: node.assignedAgentId,
           output: node.output,
@@ -102,9 +129,13 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
       };
     });
 
+    console.log('[DEBUG] Converted React Flow Nodes:', mappedNodes);
+
     // Map workflow edges to React Flow edges with colored animation states and clean routing
     const mappedEdges = activeWorkflow.edges.map((edge) => {
-      const sourceNode = activeWorkflow.nodes.find(n => n.id === edge.source);
+      const src = edge.source || (edge as any).sourceNode;
+      const tgt = edge.target || (edge as any).targetNode;
+      const sourceNode = activeWorkflow.nodes.find(n => n.id === src);
       const isCompleted = sourceNode?.status === 'completed';
       const isRunning = sourceNode?.status === 'running';
       
@@ -114,8 +145,8 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
 
       return {
         id: edge.id,
-        source: edge.source,
-        target: edge.target,
+        source: src,
+        target: tgt,
         animated: isRunning || isCompleted,
         style: { 
           stroke: strokeColor,
@@ -123,6 +154,8 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         }
       };
     });
+
+    console.log('[DEBUG] Converted React Flow Edges:', mappedEdges);
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
       mappedNodes,
@@ -138,7 +171,17 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
 
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-  }, [activeWorkflow]);
+
+    // Run fitView asynchronously after elements have mounted
+    const timer = setTimeout(() => {
+      console.log('[DEBUG] Executing fitView on layouted elements');
+      fitView({ padding: 0.2, duration: 200 }).catch(err => {
+        console.warn('[DEBUG] fitView execution failed or was interrupted:', err);
+      });
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [activeWorkflow, fitView]);
 
   const handleNodeClick = (_event: any, node: any) => {
     if (onSelectNode) {
@@ -186,5 +229,13 @@ export default function Canvas({ onSelectNode }: CanvasProps) {
         />
       </ReactFlow>
     </div>
+  );
+}
+
+export default function Canvas(props: CanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <CanvasInner {...props} />
+    </ReactFlowProvider>
   );
 }
