@@ -195,8 +195,6 @@ export default function AuthModal() {
       style={{
         position: 'fixed',
         inset: '0',
-        width: '100vw',
-        height: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -206,10 +204,10 @@ export default function AuthModal() {
       <div 
         className="glass-card border border-border-dark p-6 rounded-2xl relative shadow-2xl"
         style={{
-          maxHeight: '90vh',
+          width: 'min(460px, calc(100vw - 32px))',
+          maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
-          maxWidth: '480px',
-          width: 'min(90vw, 480px)',
+          margin: '16px',
           position: 'relative',
         }}
       >
