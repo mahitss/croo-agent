@@ -1204,6 +1204,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
     initialize: async () => {
       // Rehydrate auth from localStorage
       if (typeof window !== 'undefined') {
+        if (!(window as any)._hasSessionExpiredListener) {
+          (window as any)._hasSessionExpiredListener = true;
+          window.addEventListener('nexus_session_expired', () => {
+            set({ user: null, token: null, isAuthModalOpen: true, authModalTab: 'login' });
+          });
+        }
+
         const storedToken = localStorage.getItem('orbit_token');
         const storedUser = localStorage.getItem('orbit_user');
         const storedDemoMode = localStorage.getItem('orbit_demomode');
@@ -1694,11 +1701,26 @@ export const useNexusStore = create<NexusState>((set, get) => {
       try {
         const res = await apiClient.post<any>('/api/v1/auth/login', { usernameOrEmail, password });
         if (res.success && res.data) {
+          // Clear any previous token sources in all contexts
+          localStorage.removeItem('orbit_token');
+          localStorage.removeItem('orbit_refreshtoken');
+          localStorage.removeItem('orbit_user');
+          sessionStorage.removeItem('orbit_token');
+          sessionStorage.removeItem('orbit_user');
+          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
           const profile = res.data.profile;
           const token = res.data.token;
+          const refreshToken = res.data.refreshToken;
           set({ user: profile, token });
           localStorage.setItem('orbit_token', token);
           localStorage.setItem('orbit_user', JSON.stringify(profile));
+          if (refreshToken) {
+            localStorage.setItem('orbit_refreshtoken', refreshToken);
+          }
           return true;
         } else {
           throw new Error(res.message || 'Login failed');
@@ -1723,11 +1745,26 @@ export const useNexusStore = create<NexusState>((set, get) => {
       try {
         const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role });
         if (res.success && res.data) {
+          // Clear any previous token sources in all contexts
+          localStorage.removeItem('orbit_token');
+          localStorage.removeItem('orbit_refreshtoken');
+          localStorage.removeItem('orbit_user');
+          sessionStorage.removeItem('orbit_token');
+          sessionStorage.removeItem('orbit_user');
+          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
           const profile = res.data.profile;
           const token = res.data.token;
+          const refreshToken = res.data.refreshToken;
           set({ user: profile, token });
           localStorage.setItem('orbit_token', token);
           localStorage.setItem('orbit_user', JSON.stringify(profile));
+          if (refreshToken) {
+            localStorage.setItem('orbit_refreshtoken', refreshToken);
+          }
           return true;
         } else {
           throw new Error(res.message || 'Registration failed');
@@ -1765,7 +1802,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
       });
       localStorage.removeItem('orbit_token');
+      localStorage.removeItem('orbit_refreshtoken');
       localStorage.removeItem('orbit_user');
+      sessionStorage.removeItem('orbit_token');
+      sessionStorage.removeItem('orbit_user');
+      document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     },
 
     loginOAuth: async (provider) => {
@@ -1788,11 +1832,26 @@ export const useNexusStore = create<NexusState>((set, get) => {
       try {
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
         if (res.success && res.data) {
+          // Clear any previous token sources in all contexts
+          localStorage.removeItem('orbit_token');
+          localStorage.removeItem('orbit_refreshtoken');
+          localStorage.removeItem('orbit_user');
+          sessionStorage.removeItem('orbit_token');
+          sessionStorage.removeItem('orbit_user');
+          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
           const profile = res.data.user;
           const token = res.data.accessToken;
+          const refreshToken = res.data.refreshToken;
           set({ user: profile, token });
           localStorage.setItem('orbit_token', token);
           localStorage.setItem('orbit_user', JSON.stringify(profile));
+          if (refreshToken) {
+            localStorage.setItem('orbit_refreshtoken', refreshToken);
+          }
           return true;
         } else {
           throw new Error(res.message || 'Google authentication failed');

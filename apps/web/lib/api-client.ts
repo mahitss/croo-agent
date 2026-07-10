@@ -746,6 +746,98 @@ async function fetchWithTimeout(
   }
 }
 
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    
+    // Decode base64url payload
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window.atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    
+    const payload = JSON.parse(jsonPayload);
+    const exp = payload.exp;
+    if (!exp) return false;
+    
+    const current = Math.floor(Date.now() / 1000);
+    return current > (exp - 10); // 10-second buffer
+  } catch (e) {
+    return true;
+  }
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.token) {
+        localStorage.setItem('orbit_token', data.token);
+        if (data.refreshToken) {
+          localStorage.setItem('orbit_refreshtoken', data.refreshToken);
+        }
+        return data.token;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to refresh access token:', e);
+  }
+  return null;
+}
+
+function handleSessionExpiration() {
+  localStorage.removeItem('orbit_token');
+  localStorage.removeItem('orbit_refreshtoken');
+  localStorage.removeItem('orbit_user');
+  sessionStorage.removeItem('orbit_token');
+  sessionStorage.removeItem('orbit_user');
+  document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('nexus_session_expired'));
+    if (window.location.pathname !== '/') {
+      window.location.href = '/?auth=login';
+    }
+  }
+}
+
+async function getValidToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  
+  const token = localStorage.getItem('orbit_token');
+  if (!token) return null;
+  
+  if (isJwtExpired(token)) {
+    console.warn('[API_CLIENT] Access token is expired. Attempting token refresh...');
+    const refreshToken = localStorage.getItem('orbit_refreshtoken');
+    if (refreshToken) {
+      const newToken = await refreshAccessToken(refreshToken);
+      if (newToken) {
+        console.log('[API_CLIENT] Token refreshed successfully.');
+        return newToken;
+      }
+    }
+    console.error('[API_CLIENT] Session expired and cannot be refreshed. Redirecting to login...');
+    handleSessionExpiration();
+    return null;
+  }
+  
+  return token;
+}
+
 export const apiClient = {
   async get<T>(
     url: string,
@@ -761,7 +853,7 @@ export const apiClient = {
     }
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+      const token = await getValidToken();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
@@ -820,7 +912,7 @@ export const apiClient = {
       });
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const token = await getValidToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -855,7 +947,7 @@ export const apiClient = {
       });
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const token = await getValidToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -883,7 +975,7 @@ export const apiClient = {
       });
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const token = await getValidToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -910,7 +1002,7 @@ export const apiClient = {
       });
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+    const token = await getValidToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
