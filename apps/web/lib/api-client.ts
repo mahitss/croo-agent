@@ -753,7 +753,10 @@ function isJwtExpired(token: string): boolean {
     
     // Decode base64url payload
     const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
     const jsonPayload = decodeURIComponent(
       window.atob(base64)
         .split('')
@@ -768,6 +771,7 @@ function isJwtExpired(token: string): boolean {
     const current = Math.floor(Date.now() / 1000);
     return current > (exp - 10); // 10-second buffer
   } catch (e) {
+    console.error('[API_CLIENT] Failed to decode JWT token:', e);
     return true;
   }
 }
@@ -818,9 +822,12 @@ async function getValidToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   
   const token = localStorage.getItem('orbit_token');
+  console.log(`[API_CLIENT_DEBUG] Current JWT exists in localStorage? ${!!token}`);
   if (!token) return null;
   
-  if (isJwtExpired(token)) {
+  const expired = isJwtExpired(token);
+  console.log(`[API_CLIENT_DEBUG] Is token expired? ${expired}`);
+  if (expired) {
     console.warn('[API_CLIENT] Access token is expired. Attempting token refresh...');
     const refreshToken = localStorage.getItem('orbit_refreshtoken');
     if (refreshToken) {
@@ -854,6 +861,10 @@ export const apiClient = {
 
     try {
       const token = await getValidToken();
+      console.log(`[API_CLIENT_DEBUG] GET request path: ${url}`);
+      console.log(`[API_CLIENT_DEBUG] Is user authenticated? ${!!token}`);
+      console.log(`[API_CLIENT_DEBUG] Authorization header being attached? ${token ? 'yes' : 'no'}`);
+
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
@@ -913,6 +924,10 @@ export const apiClient = {
     }
 
     const token = await getValidToken();
+    console.log(`[API_CLIENT_DEBUG] POST request path: ${url}`);
+    console.log(`[API_CLIENT_DEBUG] Is user authenticated? ${!!token}`);
+    console.log(`[API_CLIENT_DEBUG] Authorization header being attached? ${token ? 'yes' : 'no'}`);
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -948,6 +963,10 @@ export const apiClient = {
     }
 
     const token = await getValidToken();
+    console.log(`[API_CLIENT_DEBUG] PUT request path: ${url}`);
+    console.log(`[API_CLIENT_DEBUG] Is user authenticated? ${!!token}`);
+    console.log(`[API_CLIENT_DEBUG] Authorization header being attached? ${token ? 'yes' : 'no'}`);
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -976,6 +995,10 @@ export const apiClient = {
     }
 
     const token = await getValidToken();
+    console.log(`[API_CLIENT_DEBUG] DELETE request path: ${url}`);
+    console.log(`[API_CLIENT_DEBUG] Is user authenticated? ${!!token}`);
+    console.log(`[API_CLIENT_DEBUG] Authorization header being attached? ${token ? 'yes' : 'no'}`);
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -1003,6 +1026,10 @@ export const apiClient = {
     }
 
     const token = await getValidToken();
+    console.log(`[API_CLIENT_DEBUG] PATCH request path: ${url}`);
+    console.log(`[API_CLIENT_DEBUG] Is user authenticated? ${!!token}`);
+    console.log(`[API_CLIENT_DEBUG] Authorization header being attached? ${token ? 'yes' : 'no'}`);
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
