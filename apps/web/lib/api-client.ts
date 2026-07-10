@@ -851,7 +851,7 @@ export const apiClient = {
     retries = 3,
     delay = 1000
   ): Promise<T> {
-    if (DemoModeManager.isDemoMode()) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(DemoModeManager.handleGet(url) as T);
@@ -915,7 +915,7 @@ export const apiClient = {
   },
 
   async post<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode()) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(DemoModeManager.handlePost(url, body) as T);
@@ -956,7 +956,7 @@ export const apiClient = {
   },
 
   async put<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode()) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
       return new Promise((resolve) => {
         resolve({ success: true } as any as T);
       });
@@ -988,7 +988,7 @@ export const apiClient = {
   },
 
   async delete<T>(url: string): Promise<T> {
-    if (DemoModeManager.isDemoMode()) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
       return new Promise((resolve) => {
         resolve(DemoModeManager.handleDelete(url) as T);
       });
@@ -1019,7 +1019,7 @@ export const apiClient = {
   },
 
   async patch<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode()) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
       return new Promise((resolve) => {
         resolve(DemoModeManager.handlePatch(url, body) as T);
       });

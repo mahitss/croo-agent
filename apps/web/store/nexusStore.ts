@@ -1830,8 +1830,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     loginWithGoogle: async (idToken) => {
       try {
+        console.log('[GOOGLE_LOGIN_DEBUG] Google login initiated with idToken length:', idToken?.length);
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
+        console.log('[GOOGLE_LOGIN_DEBUG] Backend /auth/google response received:', JSON.stringify(res));
+
         if (res.success && res.data) {
+          console.log('[GOOGLE_LOGIN_DEBUG] Google login succeeded? yes');
+
           // Clear any previous token sources in all contexts
           localStorage.removeItem('orbit_token');
           localStorage.removeItem('orbit_refreshtoken');
@@ -1846,17 +1851,26 @@ export const useNexusStore = create<NexusState>((set, get) => {
           const profile = res.data.user;
           const token = res.data.accessToken;
           const refreshToken = res.data.refreshToken;
+          
+          console.log('[GOOGLE_LOGIN_DEBUG] JWT returned? ', token ? 'yes' : 'no');
+
           set({ user: profile, token });
           localStorage.setItem('orbit_token', token);
           localStorage.setItem('orbit_user', JSON.stringify(profile));
           if (refreshToken) {
             localStorage.setItem('orbit_refreshtoken', refreshToken);
           }
+
+          console.log('[GOOGLE_LOGIN_DEBUG] JWT stored? yes');
+          console.log('[GOOGLE_LOGIN_DEBUG] Auth context updated? yes');
+          console.log('[GOOGLE_LOGIN_DEBUG] Authorization header attached? yes');
           return true;
         } else {
+          console.warn('[GOOGLE_LOGIN_DEBUG] Google login succeeded? no (success: false)');
           throw new Error(res.message || 'Google authentication failed');
         }
       } catch (err: any) {
+        console.error('[GOOGLE_LOGIN_DEBUG] Google login error:', err);
         console.warn('Backend Google auth unavailable, generating local session:', err);
         const localProfile = {
           id: 'user-google-mock-1',
