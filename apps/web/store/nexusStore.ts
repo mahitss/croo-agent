@@ -1855,7 +1855,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
         console.log('[GOOGLE_LOGIN_DEBUG] Google login initiated with idToken length:', idToken?.length);
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
-        console.log('[GOOGLE_LOGIN_DEBUG] Backend /auth/google response received:', JSON.stringify(res));
+        console.log('[GOOGLE_AUTH_DEBUG] Backend response received:', JSON.stringify(res));
 
         if (res.success && res.data) {
           console.log('[GOOGLE_LOGIN_DEBUG] Google login succeeded? yes');
@@ -1878,11 +1878,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
           console.log('[GOOGLE_LOGIN_DEBUG] JWT returned? ', token ? 'yes' : 'no');
 
           set({ user: profile, token });
+          console.log('[GOOGLE_AUTH_DEBUG] Auth context updated');
+          
           localStorage.setItem('orbit_token', token);
           localStorage.setItem('orbit_user', JSON.stringify(profile));
           if (refreshToken) {
             localStorage.setItem('orbit_refreshtoken', refreshToken);
           }
+          console.log('[GOOGLE_AUTH_DEBUG] JWT stored');
 
           console.log('[GOOGLE_LOGIN_DEBUG] JWT stored? yes');
           console.log('[GOOGLE_LOGIN_DEBUG] Auth context updated? yes');

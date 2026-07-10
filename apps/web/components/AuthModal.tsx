@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNexusStore } from '../store/nexusStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
@@ -27,83 +27,107 @@ export default function AuthModal() {
   const [verifyCode, setVerifyCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const tokenClientRef = useRef<any>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && isAuthModalOpen) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
+      const scriptId = 'google-gsi-client-script';
+      let script = document.getElementById(scriptId) as HTMLScriptElement;
+      
+      const handleScriptLoad = () => {
+        console.log('[GOOGLE_AUTH_DEBUG] Google SDK loaded');
         const google = (window as any).google;
-        if (google?.accounts?.id) {
-          google.accounts.id.initialize({
-            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com',
-            callback: (res: any) => {
-              if (res.credential) {
-                handleGoogleLoginSuccess(res.credential);
+        if (google?.accounts?.oauth2 && !tokenClientRef.current) {
+          const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+          if (!googleClientId) {
+            throw new Error('Missing Google Client ID environment variable (NEXT_PUBLIC_GOOGLE_CLIENT_ID)');
+          }
+
+          tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+            client_id: googleClientId,
+            scope: 'openid email profile',
+            prompt: 'select_account',
+            callback: async (tokenResponse: any) => {
+              if (tokenResponse && tokenResponse.access_token) {
+                console.log('[GOOGLE_AUTH_DEBUG] Account selected');
+                console.log('[GOOGLE_AUTH_DEBUG] Authorization code/token received');
+                
+                setIsLoading(true);
+                try {
+                  console.log('[GOOGLE_AUTH_DEBUG] Fetching user profile from Google...');
+                  const userinfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${tokenResponse.access_token}`);
+                  if (!userinfoRes.ok) {
+                    throw new Error('Failed to fetch user profile from Google');
+                  }
+                  const userinfo = await userinfoRes.json();
+                  
+                  const mockPayload = {
+                    sub: userinfo.sub,
+                    email: userinfo.email,
+                    name: userinfo.name || userinfo.given_name || 'Google User',
+                    picture: userinfo.picture || ''
+                  };
+                  
+                  const idToken = `mock-google-token-${Buffer.from(JSON.stringify(mockPayload)).toString('base64')}`;
+                  
+                  console.log('[GOOGLE_AUTH_DEBUG] POST /api/v1/auth/google request');
+                  const ok = await loginWithGoogle(idToken);
+                  if (ok) {
+                    console.log('[GOOGLE_AUTH_DEBUG] Login completed');
+                    const msg = isDemoMode 
+                      ? 'Successfully signed in with Google (Demo Mode)!' 
+                      : 'Successfully signed in with Google!';
+                    toast(msg, 'success');
+                    setAuthModal(false);
+                  }
+                } catch (err: any) {
+                  toast(`Google login failed: ${err.message}`, 'error');
+                } finally {
+                  setIsLoading(false);
+                }
               }
             }
           });
+          console.log('[GOOGLE_AUTH_DEBUG] OAuth client initialized');
         }
       };
-      document.head.appendChild(script);
-    }
-  }, [isAuthModalOpen]);
 
-  const handleGoogleLoginSuccess = async (credential: string) => {
-    console.log('[GSI] Received credential:', credential);
-    setIsLoading(true);
-    try {
-      const ok = await loginWithGoogle(credential);
-      if (ok) {
-        const msg = isDemoMode 
-          ? 'Successfully signed in with Google (Demo Mode)!' 
-          : 'Successfully signed in with Google!';
-        toast(msg, 'success');
-        setAuthModal(false);
+      if (!script) {
+        script = document.createElement('script');
+        script.id = scriptId;
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = handleScriptLoad;
+        document.head.appendChild(script);
+      } else {
+        const google = (window as any).google;
+        if (google?.accounts?.oauth2) {
+          handleScriptLoad();
+        } else {
+          script.addEventListener('load', handleScriptLoad);
+        }
       }
-    } catch (err: any) {
-      toast(`Google login failed: ${err.message}`, 'error');
-    } finally {
-      setIsLoading(false);
+
+      return () => {
+        if (script) {
+          script.removeEventListener('load', handleScriptLoad);
+        }
+      };
     }
-  };
+  }, [isAuthModalOpen, isDemoMode, loginWithGoogle, setAuthModal, toast]);
 
   const handleGoogleOAuthClick = () => {
-    const google = (window as any).google;
-    if (google?.accounts?.id) {
-      google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          triggerMockGoogleLogin();
-        }
-      });
-    } else {
-      triggerMockGoogleLogin();
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      throw new Error('Missing Google Client ID environment variable (NEXT_PUBLIC_GOOGLE_CLIENT_ID)');
     }
-  };
 
-  const triggerMockGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const mockPayload = {
-        sub: `google-mock-${Date.now()}`,
-        email: `google.user.${Math.floor(Math.random() * 1000)}@gmail.com`,
-        name: 'Nexus Google User',
-        picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150'
-      };
-      const idToken = `mock-google-token-${Buffer.from(JSON.stringify(mockPayload)).toString('base64')}`;
-      const ok = await loginWithGoogle(idToken);
-      if (ok) {
-        const msg = isDemoMode 
-          ? 'Successfully signed in with Google (Demo Mode)!' 
-          : 'Successfully signed in with Google!';
-        toast(msg, 'success');
-        setAuthModal(false);
-      }
-    } catch (err: any) {
-      toast(`Google login failed: ${err.message}`, 'error');
-    } finally {
-      setIsLoading(false);
+    if (tokenClientRef.current) {
+      console.log('[GOOGLE_AUTH_DEBUG] Popup opened');
+      tokenClientRef.current.requestAccessToken();
+    } else {
+      toast('Google Sign-In is initializing. Please try again in a moment.', 'info');
     }
   };
 
