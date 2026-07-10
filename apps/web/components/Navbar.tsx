@@ -107,24 +107,26 @@ export default function Navbar() {
 
   return (
     <nav 
-      className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50"
+      className="glass-card border-b border-border-dark py-4 px-4 sticky top-0 z-50 box-border"
       style={{
         maxWidth: '100%',
-        overflowX: 'clip',
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
       <div 
-        className="max-w-7xl mx-auto flex items-center justify-between"
+        className="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-4"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/" className="flex items-center gap-1.5 lg:gap-2 group flex-shrink-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
             O
           </div>
@@ -134,7 +136,7 @@ export default function Navbar() {
         </Link>
 
         {/* Links */}
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-1 lg:gap-2 xl:gap-4 flex-shrink min-w-0">
           {links.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -142,21 +144,24 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-1.5 text-sm font-medium transition-colors py-1.5 px-3 rounded-md ${
+                className={`flex items-center gap-1 text-xs lg:text-sm font-medium transition-colors py-1 px-1.5 lg:py-1.5 lg:px-2.5 rounded-md flex-shrink-0 ${
                   isActive
                     ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
                     : 'text-gray-400 hover:text-white hover:bg-white/2'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {link.label}
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">{link.label}</span>
+                <span className="inline xl:hidden">
+                  {link.label === 'Workflow Builder' ? 'Builder' : link.label === 'Publish Agent' ? 'Publish' : link.label === 'USDC Wallet' ? 'Wallet' : link.label}
+                </span>
               </Link>
             );
           })}
         </div>
 
         {/* Status, Demo Mode, Wallet & Auth Dropdown */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
           
           {/* Status Indicator */}
           <div className="hidden lg:flex items-center gap-2">
@@ -176,21 +181,21 @@ export default function Navbar() {
           {/* Demo Mode Toggle */}
           <button
             onClick={toggleDemoMode}
-            className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
+            className={`text-[10px] font-mono font-extrabold uppercase px-2 py-1 rounded-md border tracking-wider transition-all duration-300 ${
               isDemoMode
                 ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
                 : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
             }`}
             title="Toggle between demo simulated execution and production live payment mode"
           >
-            {isDemoMode ? 'Demo Mode' : 'Live Mode'}
+            <span>{isDemoMode ? 'Demo Mode' : 'Live Mode'}</span>
           </button>
 
           {/* Wallet Link */}
-          <Link href="/wallet" className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300">
-            <Wallet className="w-4 h-4 text-primary-neon" />
-            <span className="text-sm font-mono font-bold text-white">
-              {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-xs">USDC</span>
+          <Link href="/wallet" className="flex items-center gap-1.5 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-2.5 py-1.5 rounded-full transition-all duration-300">
+            <Wallet className="w-3.5 h-3.5 text-primary-neon" />
+            <span className="text-xs lg:text-sm font-mono font-bold text-white">
+              {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-[10px]">USDC</span>
             </span>
           </Link>
 
