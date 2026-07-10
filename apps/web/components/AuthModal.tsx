@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNexusStore } from '../store/nexusStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
@@ -26,8 +27,13 @@ export default function AuthModal() {
   const [role, setRole] = useState<'user' | 'creator' | 'admin'>('user');
   const [verifyCode, setVerifyCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const tokenClientRef = useRef<any>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && isAuthModalOpen) {
@@ -131,7 +137,7 @@ export default function AuthModal() {
     }
   };
 
-  if (!isAuthModalOpen) return null;
+  if (!mounted || !isAuthModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,9 +184,35 @@ export default function AuthModal() {
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="glass-card border border-border-dark w-full max-w-md p-6 rounded-2xl relative shadow-2xl overflow-hidden">
+  return createPortal(
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setAuthModal(false);
+        }
+      }}
+      className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      style={{
+        position: 'fixed',
+        inset: '0',
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+      }}
+    >
+      <div 
+        className="glass-card border border-border-dark p-6 rounded-2xl relative shadow-2xl"
+        style={{
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          maxWidth: '480px',
+          width: 'min(90vw, 480px)',
+          position: 'relative',
+        }}
+      >
         
         {/* Glow Effects */}
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary-neon/10 rounded-full blur-3xl"></div>
@@ -392,6 +424,7 @@ export default function AuthModal() {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
