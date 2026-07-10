@@ -1211,12 +1211,32 @@ export const useNexusStore = create<NexusState>((set, get) => {
           });
         }
 
+        const isTokenExpired = (t: string | null): boolean => {
+          if (!t) return true;
+          try {
+            const parts = t.split('.');
+            if (parts.length !== 3) return true;
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (payload && typeof payload.exp === 'number') {
+              return payload.exp < Math.floor(Date.now() / 1000);
+            }
+            return false;
+          } catch (e) {
+            return true;
+          }
+        };
+
         const storedToken = localStorage.getItem('orbit_token');
         const storedUser = localStorage.getItem('orbit_user');
         const storedDemoMode = localStorage.getItem('orbit_demomode');
-        if (storedToken && storedUser) {
+        if (storedToken && storedUser && !isTokenExpired(storedToken)) {
           set({ token: storedToken, user: JSON.parse(storedUser) });
         } else {
+          localStorage.removeItem('orbit_token');
+          localStorage.removeItem('orbit_user');
+          localStorage.removeItem('orbit_refreshtoken');
+          sessionStorage.removeItem('orbit_token');
+          sessionStorage.removeItem('orbit_user');
           set({ token: null, user: null });
         }
         if (storedDemoMode !== null) {

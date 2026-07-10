@@ -30,12 +30,50 @@ export default function Navbar() {
   
   // Auth states & actions
   const user = useNexusStore((state) => state.user);
+  const token = useNexusStore((state) => state.token);
   const logoutUser = useNexusStore((state) => state.logoutUser);
   const setAuthModal = useNexusStore((state) => state.setAuthModal);
   
   // Demo Mode state & actions
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
+
+  // Runtime JWT Expiration Audit
+  useEffect(() => {
+    if (token) {
+      const isExpired = () => {
+        try {
+          const parts = token.split('.');
+          if (parts.length !== 3) return true;
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload && typeof payload.exp === 'number') {
+            return payload.exp < Math.floor(Date.now() / 1000);
+          }
+          return false;
+        } catch (e) {
+          return true;
+        }
+      };
+
+      if (isExpired()) {
+        console.warn('[JWT_CHECK] Token has expired. Logging out.');
+        logoutUser();
+      }
+    }
+  }, [token, logoutUser]);
+
+  // Debug state logging before rendering
+  console.log('[NAVBAR_AUTH_DEBUG] Current State:', {
+    isAuthenticated: !!token && !!user,
+    currentUser: user,
+    jwt: token,
+    token: token,
+    accessToken: token,
+    'authStore.user': user,
+    'authStore.token': token,
+    demoMode: isDemoMode,
+    audienceMode: isDemoMode ? 'demo' : 'live'
+  });
 
   const links = [
     { href: '/', label: 'Portal', icon: Cpu },
@@ -137,7 +175,15 @@ export default function Navbar() {
                 </button>
                 
                 {/* Dropdown Menu Wrapper (Bridges the hover gap and secures high z-index & pointer-events) */}
-                <div className="absolute right-0 top-full pt-2 w-48 hidden group-hover:block hover:block z-[9999] pointer-events-auto animate-in fade-in duration-100">
+                <div 
+                  className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                    zIndex: 9999,
+                  }}
+                >
                   <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
                     <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
                       Role: <span className="text-primary-neon font-bold">{user.role}</span>
