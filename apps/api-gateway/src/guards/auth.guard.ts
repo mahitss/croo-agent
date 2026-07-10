@@ -41,6 +41,7 @@ export class GatewayAuthGuard implements CanActivate {
         throw new Error('JWT token has expired');
       }
 
+      decodedPayload.id = decodedPayload.sub || decodedPayload.id;
       request.user = decodedPayload;
       return true;
     } catch (err: any) {

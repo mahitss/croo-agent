@@ -182,6 +182,12 @@ export class WalletController {
     }
   }
 
+  @Post('payments/create-order')
+  @UseGuards(GatewayAuthGuard)
+  async createOrderAlternative(@Req() req: any, @Body() body: any) {
+    return this.createRazorpayOrder(req, body);
+  }
+
   @Post('payments/razorpay/verify')
   @UseGuards(GatewayAuthGuard)
   async verifyRazorpayPayment(@Req() req: any, @Body() body: any) {
@@ -198,18 +204,34 @@ export class WalletController {
     }
   }
 
+  @Post('payments/verify')
+  @UseGuards(GatewayAuthGuard)
+  async verifyPaymentAlternative(@Req() req: any, @Body() body: any) {
+    return this.verifyRazorpayPayment(req, body);
+  }
+
   @Post('payments/razorpay/webhook')
-  async handleRazorpayWebhook(@Body() body: any) {
+  async handleRazorpayWebhook(@Req() req: any, @Body() body: any) {
     try {
+      const signature = req.headers['x-razorpay-signature'];
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (signature) {
+        headers['x-razorpay-signature'] = signature as string;
+      }
       const res = await fetch(`${this.paymentUrl}/payments/razorpay/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Payment service unreachable: ${err.message}` };
     }
+  }
+
+  @Post('payments/webhook')
+  async handleWebhookAlternative(@Req() req: any, @Body() body: any) {
+    return this.handleRazorpayWebhook(req, body);
   }
 
   @Post('wallet/deposit-credits')

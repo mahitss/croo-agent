@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, HttpCode, HttpStatus, Query, Req } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
 import { CAPPaymentService } from '../services/cap-payment.service';
 import * as crypto from 'crypto';
@@ -214,7 +214,10 @@ export class PaymentController {
           body: JSON.stringify({
             amount: amountInPaise,
             currency,
-            receipt: `rcpt_${Date.now()}`
+            receipt: `rcpt_${Date.now()}`,
+            notes: {
+              userId: body.userId
+            }
           })
         });
         const data = await res.json();
@@ -240,7 +243,8 @@ export class PaymentController {
         orderId,
         paymentId: payment.id,
         amount: body.amount,
-        currency
+        currency,
+        key_id: keyId
       };
     } catch (error: any) {
       return { success: false, message: `Error creating Razorpay order: ${error.message}` };
@@ -278,10 +282,31 @@ export class PaymentController {
       });
 
       if (payment) {
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'completed' }
-        });
+        if (payment.status !== 'completed') {
+          await this.prisma.payment.update({
+            where: { id: payment.id },
+            data: { status: 'completed' }
+          });
+
+          // Call wallet-service to update user balance and store transaction
+          try {
+            const walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
+            const depositRes = await fetch(`${walletUrl}/wallet/deposit-credits`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: body.userId,
+                amount: Number(body.amount),
+                reference: `Razorpay Deposit | Method: Razorpay Checkout | ID: ${body.razorpayPaymentId}`
+              })
+            });
+            if (!depositRes.ok) {
+              console.error('[RAZORPAY_VERIFY] Failed to deposit credits to wallet-service:', await depositRes.text());
+            }
+          } catch (e) {
+            console.error('[RAZORPAY_VERIFY] Wallet deposit call failed:', e);
+          }
+        }
       }
 
       return {
@@ -300,9 +325,77 @@ export class PaymentController {
 
   @Post('payments/razorpay/webhook')
   @HttpCode(HttpStatus.OK)
-  async handleRazorpayWebhook(@Body() body: any) {
-    console.log('[RAZORPAY_WEBHOOK] Event received:', body.event);
-    return { success: true };
+  async handleRazorpayWebhook(@Req() req: any, @Body() body: any) {
+    console.log('[RAZORPAY_WEBHOOK] Event received:', body?.event);
+    
+    const signature = req.headers['x-razorpay-signature'];
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    if (webhookSecret && signature) {
+      const generatedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(JSON.stringify(body))
+        .digest('hex');
+      
+      if (generatedSignature !== signature) {
+        console.warn('[RAZORPAY_WEBHOOK] Invalid webhook signature detected!');
+        return { success: false, message: 'Invalid webhook signature' };
+      }
+    }
+
+    try {
+      if (body?.event === 'payment.captured') {
+        const entity = body.payload?.payment?.entity;
+        const orderId = entity?.order_id;
+        const paymentId = entity?.id;
+        const amount = entity?.amount ? (Number(entity.amount) / 100) : 0;
+
+        const payment = await this.prisma.payment.findFirst({
+          where: { workflowId: `razorpay_${orderId}` }
+        });
+
+        if (payment && payment.status !== 'completed') {
+          await this.prisma.payment.update({
+            where: { id: payment.id },
+            data: { status: 'completed' }
+          });
+
+          // Call wallet-service to deposit credits
+          try {
+            const walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
+            const depositRes = await fetch(`${walletUrl}/wallet/deposit-credits`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: payment.payerWallet,
+                amount: Number(payment.total),
+                reference: `Razorpay Deposit | Method: Razorpay Webhook | ID: ${paymentId}`
+              })
+            });
+            if (!depositRes.ok) {
+              console.error('[RAZORPAY_WEBHOOK] Failed to deposit credits to wallet-service:', await depositRes.text());
+            }
+          } catch (e) {
+            console.error('[RAZORPAY_WEBHOOK] Wallet deposit call failed:', e);
+          }
+        }
+      } else if (body?.event === 'payment.failed') {
+        const orderId = body.payload?.payment?.entity?.order_id;
+        const payment = await this.prisma.payment.findFirst({
+          where: { workflowId: `razorpay_${orderId}` }
+        });
+        if (payment && payment.status !== 'completed') {
+          await this.prisma.payment.update({
+            where: { id: payment.id },
+            data: { status: 'failed' }
+          });
+        }
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.error('[RAZORPAY_WEBHOOK_ERROR]', err);
+      return { success: false, message: err.message };
+    }
   }
 
   // ─── CROO Agent Protocol (CAP) Payments Endpoints ───────────────────────

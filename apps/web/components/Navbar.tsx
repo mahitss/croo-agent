@@ -136,24 +136,26 @@ export default function Navbar() {
                   </span>
                 </button>
                 
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-48 bg-black border border-border-dark rounded-xl shadow-xl p-1.5 hidden group-hover:block hover:block z-50 animate-in fade-in duration-100 font-mono text-xs">
-                  <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
-                    Role: <span className="text-primary-neon font-bold">{user.role}</span>
+                {/* Dropdown Menu Wrapper (Bridges the hover gap and secures high z-index & pointer-events) */}
+                <div className="absolute right-0 top-full pt-2 w-48 hidden group-hover:block hover:block z-[9999] pointer-events-auto animate-in fade-in duration-100">
+                  <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
+                    <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
+                      Role: <span className="text-primary-neon font-bold">{user.role}</span>
+                    </div>
+                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                      Dashboard
+                    </Link>
+                    <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                      Wallet ({userWallet.balance.toFixed(2)} USDC)
+                    </Link>
+                    <button
+                      onClick={logoutUser}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Logout
+                    </button>
                   </div>
-                  <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                    Dashboard
-                  </Link>
-                  <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                    Wallet ({userWallet.balance.toFixed(2)} USDC)
-                  </Link>
-                  <button
-                    onClick={logoutUser}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Logout
-                  </button>
                 </div>
               </div>
             ) : (

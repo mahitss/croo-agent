@@ -85,6 +85,11 @@ async function main() {
 
   const authHeader = userToken ? { 'Authorization': `Bearer ${userToken}` } : {};
 
+  // Deposit test credits to allow workflow planning and execution
+  results.push(await runTest("Deposit Verification Credits", `${BASE_URL}/wallet/deposit-credits`, 'POST', {
+    amount: 100.0
+  }, authHeader));
+
   // 3. Swarm Directory
   results.push(await runTest("List Capabilities & Agents Discovery", `${BASE_URL}/agents`));
 
@@ -93,7 +98,7 @@ async function main() {
     query: 'Audit ledger payments and report compliance status',
     routingMode: 'speed',
     budget: 5.0
-  }));
+  }, authHeader));
 
   // 5. Workflows Engine
   const wfRes = await runTest("Create Workflow Template", `${BASE_URL}/workflows`, 'POST', {
@@ -103,14 +108,14 @@ async function main() {
       { capability: 'verify', agentId: 'agent-verify-1' }
     ],
     edges: []
-  });
+  }, authHeader);
   results.push(wfRes);
   if (wfRes.success && wfRes.data && wfRes.data.data) {
     createdWorkflowId = wfRes.data.data.id;
   }
 
   if (createdWorkflowId) {
-    results.push(await runTest("Execute Workflow Run", `${BASE_URL}/workflows/${createdWorkflowId}/run`, 'POST'));
+    results.push(await runTest("Execute Workflow Run", `${BASE_URL}/workflows/${createdWorkflowId}/run`, 'POST', null, authHeader));
   }
 
   // 6. Wallets & Payments Ledger

@@ -63,7 +63,7 @@ interface NexusState {
   retryNode: (nodeId: string) => void;
   cancelWorkflow: () => void;
   registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => Promise<void>;
-  depositUserWallet: (amount: number) => Promise<void>;
+  depositUserWallet: (amount: number) => Promise<{ success: boolean; message?: string }>;
   withdrawUserWallet: (amount: number) => Promise<void>;
   initialize: () => Promise<void>;
   resetDemoMode: () => void;
@@ -501,10 +501,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
           });
           if (res.success) {
             await get().initialize();
+            return { success: true };
           } else {
             throw new Error(res.message);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.warn('Fallback local credit increment in Demo Mode:', err);
           const tx: Transaction = {
             id: `tx-deposit-${Date.now()}`,
@@ -523,81 +524,88 @@ export const useNexusStore = create<NexusState>((set, get) => {
               history: [tx, ...state.userWallet.history]
             }
           });
+          return { success: true };
         }
-        return;
       }
 
       // ─── LIVE MODE (Razorpay Checkout) ────────────────────────────────────
-      try {
-        const loadScript = (src: string) => {
-          return new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = () => resolve(true);
-            script.onerror = () => resolve(false);
-            document.body.appendChild(script);
-          });
-        };
+      return new Promise<{ success: boolean; message?: string }>(async (resolve) => {
+        try {
+          const loadScript = (src: string) => {
+            return new Promise((r) => {
+              const script = document.createElement('script');
+              script.src = src;
+              script.onload = () => r(true);
+              script.onerror = () => r(false);
+              document.body.appendChild(script);
+            });
+          };
 
-        const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
-        if (!scriptLoaded) {
-          throw new Error('Razorpay SDK failed to load. Are you offline?');
-        }
-
-        const orderRes = await apiClient.post<any>('/api/v1/payments/razorpay/order', {
-          amount,
-          userId: state.user?.id || 'user-1'
-        });
-
-        if (!orderRes.success) {
-          throw new Error(orderRes.message || 'Failed to create Razorpay Order');
-        }
-
-        const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_mockkey123',
-          amount: orderRes.amount * 100,
-          currency: orderRes.currency,
-          name: 'Orbit AI Operating System',
-          description: 'Sandbox/Live Credits Deposit',
-          order_id: orderRes.orderId,
-          handler: async (response: any) => {
-            try {
-              const verifyRes = await apiClient.post<any>('/api/v1/payments/razorpay/verify', {
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                userId: state.user?.id || 'user-1',
-                amount
-              });
-
-              if (verifyRes.success) {
-                await apiClient.post<any>('/api/v1/wallet/deposit-credits', {
-                  amount,
-                  userId: state.user?.id || 'user-1',
-                  address: state.userWallet.address
-                });
-                await get().initialize();
-              } else {
-                throw new Error(verifyRes.message || 'Signature validation failed');
-              }
-            } catch (err: any) {
-              console.error('Razorpay verification error:', err);
-            }
-          },
-          prefill: {
-            name: state.user?.displayName || 'Orbit User',
-            email: state.user?.email || 'user@orbitai.dev'
-          },
-          theme: {
-            color: '#00ffcc'
+          const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+          if (!scriptLoaded) {
+            resolve({ success: false, message: 'Razorpay SDK failed to load. Are you offline?' });
+            return;
           }
-        };
 
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-      } catch (err: any) {
-        console.error('Failed to initiate Razorpay payment checkout flow:', err);
-      }
+          const orderRes = await apiClient.post<any>('/api/v1/payments/create-order', {
+            amount,
+            userId: state.user?.id || 'user-1'
+          });
+
+          if (!orderRes.success) {
+            resolve({ success: false, message: orderRes.message || 'Failed to create Razorpay Order' });
+            return;
+          }
+
+          const options = {
+            key: orderRes.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TBsVCd1MfWIKnW',
+            amount: orderRes.amount * 100,
+            currency: orderRes.currency,
+            name: 'Orbit AI Operating System',
+            description: 'Sandbox/Live Credits Deposit',
+            order_id: orderRes.orderId,
+            handler: async (response: any) => {
+              try {
+                const verifyRes = await apiClient.post<any>('/api/v1/payments/verify', {
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                  userId: state.user?.id || 'user-1',
+                  amount
+                });
+
+                if (verifyRes.success) {
+                  await get().initialize();
+                  resolve({ success: true });
+                } else {
+                  resolve({ success: false, message: verifyRes.message || 'Signature validation failed' });
+                }
+              } catch (err: any) {
+                console.error('Razorpay verification error:', err);
+                resolve({ success: false, message: err.message || 'Verification request failed' });
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                resolve({ success: false, message: 'Payment cancelled by user' });
+              }
+            },
+            prefill: {
+              name: state.user?.displayName || state.user?.username || 'Orbit User',
+              email: state.user?.email || 'user@orbitai.dev'
+            },
+            theme: {
+              color: '#00ffcc'
+            }
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        } catch (err: any) {
+          console.error('Failed to initiate Razorpay payment checkout flow:', err);
+          resolve({ success: false, message: err.message || 'Failed to initialize checkout' });
+        }
+      });
     },
 
     withdrawUserWallet: async (amount) => {
@@ -657,11 +665,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
           console.log("fetch reference type:", typeof fetch);
           console.log("fetch reference string:", String(fetch));
 
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json"
+          };
+          if (state.token) {
+            headers["Authorization"] = `Bearer ${state.token}`;
+          }
+
           const response = await fetch(url,{
               method:"POST",
-              headers:{
-                  "Content-Type":"application/json"
-              },
+              headers,
               body:JSON.stringify({
                   query,
                   routingMode,
@@ -690,7 +703,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
 
       if (!planRes || !planRes.success || !planRes.data) {
-        throw new Error(`Planner failure: ${planRes?.message || 'AI Planner failed to generate DAG'}`);
+        throw new Error(planRes?.message || 'AI Planner failed to generate DAG');
       }
 
       console.log('[STRUCTURED_LOG] PLAN_SUCCESS', { nodesCount: planRes.data.nodes?.length });

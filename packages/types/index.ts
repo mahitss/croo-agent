@@ -73,6 +73,8 @@ export interface Transaction {
   status: 'pending' | 'completed' | 'failed';
   txHash: string;
   taskId?: string;
+  reference?: string;
+  createdAt?: string;
 }
 
 export interface WalletState {

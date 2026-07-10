@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
+import { useToast } from '../../components/Toast';
 import { Wallet, ArrowDownLeft, ArrowUpRight, ShieldCheck, History, ExternalLink, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function WalletPage() {
@@ -11,6 +12,7 @@ export default function WalletPage() {
   const initialize = useNexusStore((state) => state.initialize);
 
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const { toast } = useToast();
 
   useEffect(() => {
     initialize();
@@ -27,26 +29,32 @@ export default function WalletPage() {
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isDepositing, setIsDepositing] = useState(false);
 
-  const handleDeposit = (e: React.FormEvent) => {
+  const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) return;
-    depositUserWallet(amount);
-    setDepositAmount('');
+    
+    setIsDepositing(true);
+    try {
+      const result = await depositUserWallet(amount);
+      if (result && result.success) {
+        toast(`Successfully deposited ${amount.toFixed(2)} USDC`, 'success');
+      } else {
+        toast(result?.message || 'Payment deposit failed', 'error');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Deposit error occurred', 'error');
+    } finally {
+      setIsDepositing(false);
+      setDepositAmount('');
+    }
   };
 
   const handleWithdraw = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) return;
-    if (userWallet.balance < amount) {
-      setErrorMessage('Insufficient available balance.');
-      return;
-    }
-    withdrawUserWallet(amount);
-    setWithdrawAmount('');
-    setErrorMessage('');
+    // Disabled for now
   };
 
   // Mock flow steps for the WOW Feature
@@ -139,7 +147,7 @@ export default function WalletPage() {
               Deposit Funds
             </h3>
             <p className="text-[11px] text-gray-400 mt-1 leading-normal">
-              Credit your decentralized sandbox wallet with mock USDC.
+              {isDemoMode ? 'Credit your decentralized sandbox wallet with mock USDC.' : 'Credit your live wallet with real USDC using Razorpay Checkout.'}
             </p>
           </div>
 
@@ -151,19 +159,25 @@ export default function WalletPage() {
                 min="1"
                 placeholder="Amount (USDC)"
                 value={depositAmount}
+                disabled={isDepositing}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                className="flex-1 bg-black/40 border border-border-dark focus:border-primary-neon/40 px-3 py-2.5 rounded-xl text-xs text-white outline-none"
+                className="flex-1 bg-black/40 border border-border-dark focus:border-primary-neon/40 px-3 py-2.5 rounded-xl text-xs text-white outline-none disabled:opacity-50"
                 required
               />
               <button 
                 type="submit"
-                className="bg-primary-neon text-black font-extrabold text-xs px-5 rounded-xl hover:brightness-110 transition-all font-mono"
+                disabled={isDepositing}
+                className="bg-primary-neon text-black font-extrabold text-xs px-5 rounded-xl hover:brightness-110 transition-all font-mono flex items-center justify-center min-w-[85px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Deposit
+                {isDepositing ? (
+                  <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  'Deposit'
+                )}
               </button>
             </div>
           </form>
-          <div className="text-[10px] text-gray-500 italic">No network gas fees are charged on sandbox networks.</div>
+          <div className="text-[10px] text-gray-500 italic">{isDemoMode ? 'No network gas fees are charged on sandbox networks.' : 'Live transaction processing. Funds are credited instantly.'}</div>
         </div>
 
         {/* Withdraw Panel */}
@@ -186,13 +200,15 @@ export default function WalletPage() {
                 min="1"
                 placeholder="Amount (USDC)"
                 value={withdrawAmount}
+                disabled
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="flex-1 bg-black/40 border border-border-dark focus:border-secondary-neon/40 px-3 py-2.5 rounded-xl text-xs text-white outline-none"
+                className="flex-1 bg-black/40 border border-border-dark focus:border-secondary-neon/40 px-3 py-2.5 rounded-xl text-xs text-white outline-none disabled:opacity-50"
                 required
               />
               <button 
                 type="submit"
-                className="bg-secondary-neon text-white font-extrabold text-xs px-5 rounded-xl hover:brightness-110 transition-all font-mono"
+                disabled
+                className="bg-secondary-neon/30 text-white/50 cursor-not-allowed font-extrabold text-xs px-5 rounded-xl transition-all font-mono disabled:opacity-50"
               >
                 Withdraw
               </button>
@@ -223,45 +239,77 @@ export default function WalletPage() {
                 <table className="w-full text-left">
                   <thead className="bg-white/2 text-[10px] text-gray-500 font-mono uppercase border-b border-border-dark">
                     <tr>
-                      <th className="py-2.5 px-3">Tx Hash</th>
+                      <th className="py-2.5 px-3">Transaction ID</th>
+                      <th className="py-2.5 px-3">Date</th>
                       <th className="py-2.5 px-3">Type</th>
-                      <th className="py-2.5 px-3">Flow</th>
+                      <th className="py-2.5 px-3">Payment Method</th>
+                      <th className="py-2.5 px-3">Razorpay Payment ID</th>
                       <th className="py-2.5 px-3">Amount</th>
                       <th className="py-2.5 px-3 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-dark">
                     {userWallet.history.map((tx) => {
-                      const isIncoming = tx.receiverAddress === userWallet.address;
+                      const isIncoming = tx.receiverAddress === userWallet.address || tx.type === 'deposit';
                       const isRelease = tx.type === 'escrow_release';
                       
                       let typeLabel: string = tx.type;
                       let typeColor = 'text-gray-400';
                       if (tx.type === 'escrow_hold') { typeLabel = 'Escrow Lock'; typeColor = 'text-yellow-400'; }
                       if (tx.type === 'escrow_release') { typeLabel = 'Agent payout'; typeColor = 'text-primary-neon'; }
-                      if (tx.type === 'deposit') { typeLabel = 'Bank Deposit'; typeColor = 'text-accent-blue'; }
+                      if (tx.type === 'deposit') { typeLabel = 'Deposit'; typeColor = 'text-accent-blue'; }
                       if (tx.type === 'withdrawal') { typeLabel = 'Withdrawal'; typeColor = 'text-secondary-neon'; }
+
+                      // Parse payment method and razorpay payment ID from reference field
+                      let paymentMethod = 'Mock Credits';
+                      let razorpayPaymentId = 'N/A';
+                      
+                      if (tx.reference) {
+                        if (tx.reference.includes('Method:')) {
+                          const parts = tx.reference.split('|');
+                          for (const part of parts) {
+                            if (part.includes('Method:')) {
+                              paymentMethod = part.replace('Method:', '').trim();
+                            }
+                            if (part.includes('ID:')) {
+                              razorpayPaymentId = part.replace('ID:', '').trim();
+                            }
+                          }
+                        } else {
+                          paymentMethod = tx.reference;
+                          if (tx.reference.includes('ID:')) {
+                            razorpayPaymentId = tx.reference.split('ID:')[1]?.trim();
+                          }
+                        }
+                      }
 
                       return (
                         <tr key={tx.id} className="hover:bg-white/1 transition-colors">
-                          <td className="py-3 px-3 font-mono text-[11px] text-gray-400 flex items-center gap-1.5">
-                            <span className="text-white font-bold">{tx.txHash.substr(0, 14)}...</span>
-                            <ExternalLink className="w-3.5 h-3.5 text-gray-600 hover:text-white cursor-pointer" />
+                          <td className="py-3 px-3 font-mono text-[11px] text-gray-400">
+                            <span className="text-white font-bold" title={tx.id}>
+                              {tx.id.substring(0, 8)}...
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[10px] text-gray-400">
+                            {new Date(tx.timestamp || tx.createdAt || Date.now()).toLocaleDateString()} {new Date(tx.timestamp || tx.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="py-3 px-3 font-mono">
                             <span className={`text-[10px] font-bold ${typeColor}`}>
                               {typeLabel}
                             </span>
                           </td>
+                          <td className="py-3 px-3 font-mono text-[10px] text-gray-400">
+                            {paymentMethod}
+                          </td>
                           <td className="py-3 px-3 font-mono text-[10px] text-gray-500">
-                            {tx.senderAddress.substr(0, 6)}... → {tx.receiverAddress.substr(0, 6)}...
+                            {razorpayPaymentId}
                           </td>
                           <td className="py-3 px-3 font-mono font-bold text-white">
-                            {isIncoming || isRelease ? '+' : '-'}{tx.amount.toFixed(2)} USDC
+                            {isIncoming || isRelease ? '+' : '-'}{Number(tx.amount).toFixed(2)} USDC
                           </td>
                           <td className="py-3 px-3 text-right">
                             <span className="bg-primary-neon/10 border border-primary-neon/20 text-primary-neon text-[9px] font-bold font-mono px-2 py-0.5 rounded">
-                              SUCCESSFUL
+                              {tx.status?.toUpperCase() || 'SUCCESSFUL'}
                             </span>
                           </td>
                         </tr>

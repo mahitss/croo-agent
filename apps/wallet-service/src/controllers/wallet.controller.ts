@@ -12,22 +12,23 @@ export class WalletController {
   @Get('wallet')
   async getWallet(@Query('address') address?: string, @Query('userId') userId?: string) {
     try {
-      const searchAddress = address || '0xUserWalletAddress789c';
-      const searchUserId = userId || 'user-1';
-
-      let wallet = await this.prisma.wallet.findFirst({
-        where: {
-          OR: [
-            { address: searchAddress },
-            { userId: searchUserId }
-          ]
-        },
-        include: {
-          balances: true,
-        },
-      });
-  
+      let wallet = null;
+      if (userId) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { userId },
+          include: { balances: true }
+        });
+      }
+      if (!wallet && address) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { address },
+          include: { balances: true }
+        });
+      }
       if (!wallet) {
+        const searchUserId = userId || 'user-1';
+        const randomHex = Math.random().toString(16).substring(2, 10);
+        const searchAddress = address || `0xUserWallet${randomHex}`;
         wallet = await this.prisma.wallet.create({
           data: {
             userId: searchUserId,
@@ -47,6 +48,11 @@ export class WalletController {
             reserved: 0.0,
             pending: 0.0,
           },
+        });
+
+        wallet = await this.prisma.wallet.findUnique({
+          where: { id: wallet.id },
+          include: { balances: true }
         });
       }
   
@@ -69,19 +75,21 @@ export class WalletController {
   @Get('wallet/balance')
   async getBalance(@Query('address') address?: string, @Query('userId') userId?: string) {
     try {
-      const searchAddress = address || '0xUserWalletAddress789c';
-      const searchUserId = userId || 'user-1';
-
-      let wallet = await this.prisma.wallet.findFirst({
-        where: {
-          OR: [
-            { address: searchAddress },
-            { userId: searchUserId }
-          ]
-        }
-      });
-
+      let wallet = null;
+      if (userId) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { userId }
+        });
+      }
+      if (!wallet && address) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { address }
+        });
+      }
       if (!wallet) {
+        const searchUserId = userId || 'user-1';
+        const randomHex = Math.random().toString(16).substring(2, 10);
+        const searchAddress = address || `0xUserWallet${randomHex}`;
         wallet = await this.prisma.wallet.create({
           data: {
             userId: searchUserId,
@@ -229,18 +237,17 @@ export class WalletController {
   @Get('wallet/transactions')
   async getTransactions(@Query('address') address?: string, @Query('userId') userId?: string) {
     try {
-      const searchAddress = address || '0xUserWalletAddress789c';
-      const searchUserId = userId || 'user-1';
-
-      const wallet = await this.prisma.wallet.findFirst({
-        where: {
-          OR: [
-            { address: searchAddress },
-            { userId: searchUserId }
-          ]
-        }
-      });
-
+      let wallet = null;
+      if (userId) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { userId }
+        });
+      }
+      if (!wallet && address) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { address }
+        });
+      }
       if (!wallet) {
         return {
           success: true,
@@ -392,18 +399,22 @@ export class WalletController {
 
   @Post('wallet/deposit-credits')
   @HttpCode(HttpStatus.OK)
-  async depositCredits(@Body() body: { address?: string; userId?: string; amount: number }) {
+  async depositCredits(@Body() body: { address?: string; userId?: string; amount: number; reference?: string }) {
     try {
-      const address = body.address || '0xUserWalletAddress789c';
-      let wallet = await this.prisma.wallet.findFirst({
-        where: { address }
-      });
-      if (!wallet && body.userId) {
+      let wallet = null;
+      if (body.userId) {
         wallet = await this.prisma.wallet.findFirst({
           where: { userId: body.userId }
         });
       }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({
+          where: { address: body.address }
+        });
+      }
       if (!wallet) {
+        const randomHex = Math.random().toString(16).substring(2, 10);
+        const address = body.address || `0xUserWallet${randomHex}`;
         wallet = await this.prisma.wallet.create({
           data: {
             userId: body.userId || 'user-1',
@@ -440,7 +451,7 @@ export class WalletController {
           type: 'deposit',
           amount: body.amount,
           status: 'completed',
-          reference: 'Razorpay Deposit',
+          reference: body.reference || 'Razorpay Deposit',
         }
       });
       

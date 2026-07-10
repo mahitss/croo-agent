@@ -1,20 +1,48 @@
-import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UseGuards, Req, HttpException } from '@nestjs/common';
 import { handleGatewayError } from '../utils/gateway-error';
+import { GatewayAuthGuard } from '../guards/auth.guard';
 
 @Controller('api/v1')
 export class WorkflowsController {
   private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 'http://127.0.0.1:5003/api/v1';
   private readonly aiUrl = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
+  private readonly walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
 
   @Post('workflows')
+  @UseGuards(GatewayAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  async createWorkflow(@Body() body: any) {
+  async createWorkflow(@Req() req: any, @Body() body: any) {
+    const userId = req.user.id;
     const start = Date.now();
+
+    // 1. Fetch user wallet balance
+    let balance = 0;
+    try {
+      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+        balance = Number(rawAvail);
+      }
+    } catch (e) {
+      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for template creation:', e);
+    }
+
+    const estimatedCost = Number(body.estimatedCost || 0);
+
+    // 2. Reject if balance < estimatedCost
+    if (balance < estimatedCost) {
+      throw new HttpException({
+        success: false,
+        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
+      }, HttpStatus.PAYMENT_REQUIRED);
+    }
+
     try {
       const res = await fetch(`${this.workflowUrl}/workflows`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, userId }),
       });
       return await res.json();
     } catch (err: any) {
@@ -38,8 +66,46 @@ export class WorkflowsController {
   }
 
   @Post('workflows/:id/run')
-  async runWorkflow(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async runWorkflow(@Req() req: any, @Param('id') id: string) {
+    const userId = req.user.id;
     const start = Date.now();
+
+    // 1. Fetch workflow template to get estimatedCost
+    let estimatedCost = 0;
+    try {
+      const wfRes = await fetch(`${this.workflowUrl}/workflows/${id}`);
+      if (wfRes.ok) {
+        const wfData = await wfRes.json();
+        if (wfData.success && wfData.data) {
+          estimatedCost = Number(wfData.data.estimatedCost || 0);
+        }
+      }
+    } catch (e) {
+      console.error('[WORKFLOW_CHECK_ERROR] Failed to fetch workflow estimatedCost:', e);
+    }
+
+    // 2. Fetch user wallet balance
+    let balance = 0;
+    try {
+      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+        balance = Number(rawAvail);
+      }
+    } catch (e) {
+      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for workflow run:', e);
+    }
+
+    // 3. Reject if balance < estimatedCost
+    if (balance < estimatedCost) {
+      throw new HttpException({
+        success: false,
+        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
+      }, HttpStatus.PAYMENT_REQUIRED);
+    }
+
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
         method: 'POST',
@@ -144,8 +210,32 @@ export class WorkflowsController {
 
   // --- AI ORCHESTRATION ---
   @Post('ai/plan')
-  async planWorkflow(@Body() body: any) {
+  @UseGuards(GatewayAuthGuard)
+  async planWorkflow(@Req() req: any, @Body() body: any) {
+    const userId = req.user.id;
     const start = Date.now();
+
+    // 1. Fetch user wallet balance
+    let balance = 0;
+    try {
+      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+        balance = Number(rawAvail);
+      }
+    } catch (e) {
+      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for planning:', e);
+    }
+
+    // 2. Reject immediately if balance <= 0
+    if (balance <= 0) {
+      throw new HttpException({
+        success: false,
+        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
+      }, HttpStatus.PAYMENT_REQUIRED);
+    }
+
     let rawResponse: Response | undefined;
     let responseBody = '';
     try {
@@ -162,6 +252,16 @@ export class WorkflowsController {
           success: false,
           message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${rawResponse.status})`
         };
+      }
+
+      const estimatedCost = Number(data.estimated_cost || 0);
+
+      // 3. Verify balance is sufficient to run this specific plan
+      if (balance < estimatedCost) {
+        throw new HttpException({
+          success: false,
+          message: `Insufficient wallet balance. Workflow requires ${estimatedCost.toFixed(2)} USDC, but you only have ${balance.toFixed(2)} USDC. Please deposit funds before running a workflow.`
+        }, HttpStatus.PAYMENT_REQUIRED);
       }
       
       return {
@@ -196,6 +296,7 @@ export class WorkflowsController {
         },
       };
     } catch (err: any) {
+      if (err instanceof HttpException) throw err;
       return handleGatewayError(err, 'AI Service', 'POST /plan', start, rawResponse, responseBody);
     }
   }

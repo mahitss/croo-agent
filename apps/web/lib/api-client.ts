@@ -835,7 +835,14 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status}`);
+      let msg = `HTTP Error: ${response.status}`;
+      try {
+        const errBody = await response.json();
+        if (errBody && errBody.message) {
+          msg = errBody.message;
+        }
+      } catch (e) {}
+      throw new Error(msg);
     }
 
     return response.json() as Promise<T>;
