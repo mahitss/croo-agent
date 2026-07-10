@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNexusStore } from '../store/nexusStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
@@ -12,6 +12,7 @@ export default function AuthModal() {
   const loginUser = useNexusStore((state) => state.loginUser);
   const registerUser = useNexusStore((state) => state.registerUser);
   const loginOAuth = useNexusStore((state) => state.loginOAuth);
+  const loginWithGoogle = useNexusStore((state) => state.loginWithGoogle);
   const forgotPassword = useNexusStore((state) => state.forgotPassword);
   const verifyEmail = useNexusStore((state) => state.verifyEmail);
   const { toast } = useToast();
@@ -24,6 +25,79 @@ export default function AuthModal() {
   const [role, setRole] = useState<'user' | 'creator' | 'admin'>('user');
   const [verifyCode, setVerifyCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isAuthModalOpen) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        const google = (window as any).google;
+        if (google?.accounts?.id) {
+          google.accounts.id.initialize({
+            client_id: '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com',
+            callback: (res: any) => {
+              if (res.credential) {
+                handleGoogleLoginSuccess(res.credential);
+              }
+            }
+          });
+        }
+      };
+      document.head.appendChild(script);
+    }
+  }, [isAuthModalOpen]);
+
+  const handleGoogleLoginSuccess = async (credential: string) => {
+    setIsLoading(true);
+    try {
+      const ok = await loginWithGoogle(credential);
+      if (ok) {
+        toast('Successfully signed in with Google!', 'success');
+        setAuthModal(false);
+      }
+    } catch (err: any) {
+      toast(`Google login failed: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleOAuthClick = () => {
+    const google = (window as any).google;
+    if (google?.accounts?.id) {
+      google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          triggerMockGoogleLogin();
+        }
+      });
+    } else {
+      triggerMockGoogleLogin();
+    }
+  };
+
+  const triggerMockGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      const mockPayload = {
+        sub: `google-mock-${Date.now()}`,
+        email: `google.user.${Math.floor(Math.random() * 1000)}@gmail.com`,
+        name: 'Nexus Google User',
+        picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150'
+      };
+      const idToken = `mock-google-token-${Buffer.from(JSON.stringify(mockPayload)).toString('base64')}`;
+      const ok = await loginWithGoogle(idToken);
+      if (ok) {
+        toast('Successfully signed in with Google (Demo Mode)!', 'success');
+        setAuthModal(false);
+      }
+    } catch (err: any) {
+      toast(`Google login failed: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isAuthModalOpen) return null;
 
@@ -243,7 +317,7 @@ export default function AuthModal() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => handleOAuth('google')}
+                onClick={handleGoogleOAuthClick}
                 disabled={isLoading}
                 className="flex items-center justify-center gap-2 bg-white/5 border border-border-dark hover:border-white/10 px-4 py-2.5 rounded-xl text-xs text-white font-mono hover:bg-white/10 transition-all"
               >

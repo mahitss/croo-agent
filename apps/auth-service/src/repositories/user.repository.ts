@@ -11,6 +11,7 @@ export class UserRepository {
     username: string;
     passwordHash: string;
     displayName?: string;
+    avatarUrl?: string;
     role?: Role;
   }): Promise<User> {
     return this.prisma.user.create({
@@ -19,6 +20,7 @@ export class UserRepository {
         username: data.username,
         passwordHash: data.passwordHash,
         displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
         role: data.role || Role.user,
       },
     });

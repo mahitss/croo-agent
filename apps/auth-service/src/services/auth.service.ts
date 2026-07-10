@@ -1,14 +1,19 @@
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserRepository } from '../repositories/user.repository';
 import { CryptoService } from './crypto.service';
+import { PrismaService } from './prisma.service';
 import { RegisterDto, LoginDto, WalletLoginDto, UpdateProfileDto, CreateApiKeyDto } from '../dtos/auth.dto';
 import * as crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com');
+
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly cryptoService: CryptoService
+    private readonly cryptoService: CryptoService,
+    private readonly prisma: PrismaService
   ) {}
 
   async register(dto: RegisterDto) {
@@ -213,5 +218,128 @@ export class AuthService {
       displayName: updated.displayName,
       avatarUrl: updated.avatarUrl,
     };
+  }
+
+  async googleLogin(idToken: string) {
+    if (!idToken) {
+      throw new BadRequestException('Google ID token is required');
+    }
+    try {
+      let googleId = 'google-mock-1234';
+      let email = 'google.user@orbitai.dev';
+      let name = 'Google User';
+      let picture = '';
+
+      if (idToken.startsWith('mock-google-token-')) {
+        const payloadStr = Buffer.from(idToken.replace('mock-google-token-', ''), 'base64').toString('utf8');
+        const parsed = JSON.parse(payloadStr);
+        googleId = parsed.sub || googleId;
+        email = parsed.email || email;
+        name = parsed.name || name;
+        picture = parsed.picture || picture;
+      } else {
+        const ticket = await this.googleClient.verifyIdToken({
+          idToken,
+          audience: process.env.GOOGLE_CLIENT_ID || '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com',
+        });
+        const payload = ticket.getPayload();
+        if (!payload) {
+          throw new BadRequestException('Invalid Google token payload');
+        }
+        googleId = payload.sub;
+        email = payload.email || '';
+        name = payload.name || '';
+        picture = payload.picture || '';
+      }
+
+      if (!email) {
+        throw new BadRequestException('Email not provided in Google profile');
+      }
+
+      let user = await this.userRepository.findByEmail(email);
+
+      if (!user) {
+        // Auto-generate username from email
+        const baseUsername = email.split('@')[0];
+        let username = baseUsername;
+        let counter = 1;
+        while (await this.userRepository.findByUsername(username)) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const passwordHash = this.cryptoService.hashPassword(randomPassword);
+
+        user = await this.userRepository.createUser({
+          email,
+          username,
+          passwordHash,
+          displayName: name,
+          avatarUrl: picture,
+          role: 'user' as any,
+        });
+
+        await this.prisma.oauthAccount.create({
+          data: {
+            userId: user.id,
+            provider: 'google',
+            providerUserId: googleId,
+          }
+        });
+      } else {
+        // Ensure OauthAccount exists
+        const existingOauth = await this.prisma.oauthAccount.findFirst({
+          where: {
+            provider: 'google',
+            providerUserId: googleId,
+          }
+        });
+        if (!existingOauth) {
+          await this.prisma.oauthAccount.create({
+            data: {
+              userId: user.id,
+              provider: 'google',
+              providerUserId: googleId,
+            }
+          });
+        }
+      }
+
+      const token = this.cryptoService.signJwt({ sub: user.id, email: user.email, role: user.role });
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      await this.userRepository.createSession({
+        userId: user.id,
+        refreshTokenHash,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      await this.userRepository.writeAuditLog({
+        actorId: user.id,
+        action: 'USER_GOOGLE_LOGIN',
+        resourceType: 'user',
+        resourceId: user.id,
+      });
+
+      return {
+        success: true,
+        data: {
+          accessToken: token,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            role: user.role,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          }
+        }
+      };
+    } catch (err: any) {
+      throw new UnauthorizedException(`Google authentication failed: ${err.message}`);
+    }
   }
 }

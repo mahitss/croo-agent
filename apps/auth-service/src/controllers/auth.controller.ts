@@ -118,4 +118,15 @@ export class AuthController {
       return { success: false, message: `Profile update database error: ${error.message}` };
     }
   }
+
+  @Post('auth/google')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(@Body('idToken') idToken: string) {
+    try {
+      return await this.authService.googleLogin(idToken);
+    } catch (error: any) {
+      if (error.status) throw error;
+      return { success: false, message: `Google login error: ${error.message}` };
+    }
+  }
 }

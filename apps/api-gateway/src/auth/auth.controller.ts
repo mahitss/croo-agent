@@ -42,6 +42,21 @@ export class AuthController {
     return { success: true, message: 'Redirect to Google OAuth' };
   }
 
+  @Post('auth/google')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(@Body() body: any) {
+    try {
+      const res = await fetch(`${this.authUrl}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Auth service unreachable: ${err.message}` };
+    }
+  }
+
   @Get('auth/github')
   githubAuth() {
     return { success: true, message: 'Redirect to GitHub OAuth' };
