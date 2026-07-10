@@ -339,6 +339,7 @@ export class AuthService {
         }
       };
     } catch (err: any) {
+      console.error('[GOOGLE_OAUTH_ERROR] Google auth flow failed with error:', err.message, err.stack);
       throw new UnauthorizedException(`Google authentication failed: ${err.message}`);
     }
   }

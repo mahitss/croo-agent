@@ -1773,7 +1773,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     loginWithGoogle: async (idToken) => {
       try {
-        const res = await apiClient.post<any>('/api/v1/auth/google', { idToken });
+        const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
         if (res.success && res.data) {
           const profile = res.data.user;
           const token = res.data.accessToken;

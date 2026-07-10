@@ -61,3 +61,13 @@ export class CreateApiKeyDto {
   @IsString()
   expiresAt?: string;
 }
+
+export class GoogleLoginDto {
+  @IsOptional()
+  @IsString()
+  idToken?: string;
+
+  @IsOptional()
+  @IsString()
+  credential?: string;
+}

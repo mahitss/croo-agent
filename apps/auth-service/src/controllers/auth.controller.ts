@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
-import { RegisterDto, LoginDto, WalletLoginDto, UpdateProfileDto, CreateApiKeyDto } from '../dtos/auth.dto';
+import { RegisterDto, LoginDto, WalletLoginDto, UpdateProfileDto, CreateApiKeyDto, GoogleLoginDto } from '../dtos/auth.dto';
 import { AuthGuard } from '../guards/auth.guard';
 
 @Controller('api/v1')
@@ -121,9 +121,11 @@ export class AuthController {
 
   @Post('auth/google')
   @HttpCode(HttpStatus.OK)
-  async googleLogin(@Body('idToken') idToken: string) {
+  async googleLogin(@Body() dto: GoogleLoginDto) {
+    const token = dto.idToken || dto.credential;
+    console.log('[GOOGLE_OAUTH_BACKEND] Received google login request body:', JSON.stringify(dto));
     try {
-      return await this.authService.googleLogin(idToken);
+      return await this.authService.googleLogin(token);
     } catch (error: any) {
       if (error.status) throw error;
       return { success: false, message: `Google login error: ${error.message}` };

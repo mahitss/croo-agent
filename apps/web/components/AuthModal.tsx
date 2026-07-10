@@ -50,6 +50,7 @@ export default function AuthModal() {
   }, [isAuthModalOpen]);
 
   const handleGoogleLoginSuccess = async (credential: string) => {
+    console.log('[GSI] Received credential:', credential);
     setIsLoading(true);
     try {
       const ok = await loginWithGoogle(credential);
