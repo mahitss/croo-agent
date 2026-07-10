@@ -15,6 +15,7 @@ export default function AuthModal() {
   const loginWithGoogle = useNexusStore((state) => state.loginWithGoogle);
   const forgotPassword = useNexusStore((state) => state.forgotPassword);
   const verifyEmail = useNexusStore((state) => state.verifyEmail);
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const { toast } = useToast();
 
   const [tab, setTab] = useState<'login' | 'register' | 'forgot' | 'verify'>(authModalTab as any);
@@ -55,7 +56,10 @@ export default function AuthModal() {
     try {
       const ok = await loginWithGoogle(credential);
       if (ok) {
-        toast('Successfully signed in with Google!', 'success');
+        const msg = isDemoMode 
+          ? 'Successfully signed in with Google (Demo Mode)!' 
+          : 'Successfully signed in with Google!';
+        toast(msg, 'success');
         setAuthModal(false);
       }
     } catch (err: any) {
@@ -90,7 +94,10 @@ export default function AuthModal() {
       const idToken = `mock-google-token-${Buffer.from(JSON.stringify(mockPayload)).toString('base64')}`;
       const ok = await loginWithGoogle(idToken);
       if (ok) {
-        toast('Successfully signed in with Google (Demo Mode)!', 'success');
+        const msg = isDemoMode 
+          ? 'Successfully signed in with Google (Demo Mode)!' 
+          : 'Successfully signed in with Google!';
+        toast(msg, 'success');
         setAuthModal(false);
       }
     } catch (err: any) {

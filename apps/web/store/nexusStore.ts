@@ -1694,6 +1694,15 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const mode = !get().isDemoMode;
       set({ isDemoMode: mode });
       localStorage.setItem('orbit_demomode', String(mode));
+      if (!mode) {
+        // Switching to Live Mode: clear any legacy flags
+        localStorage.removeItem('orbit_demo_wallet');
+        localStorage.removeItem('orbit_demo_transactions');
+        localStorage.removeItem('orbit_demo_notifications');
+        localStorage.removeItem('orbit_demo_activity');
+        localStorage.removeItem('orbit_demo_workflows');
+        sessionStorage.removeItem('orbit_demomode');
+      }
       get().initialize();
     },
 
@@ -1726,6 +1735,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
           throw new Error(res.message || 'Login failed');
         }
       } catch (err: any) {
+        if (!get().isDemoMode) {
+          throw err;
+        }
         console.warn('Backend auth unavailable, generating local session:', err);
         const localProfile = {
           id: 'user-mock-1',
@@ -1770,6 +1782,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
           throw new Error(res.message || 'Registration failed');
         }
       } catch (err: any) {
+        if (!get().isDemoMode) {
+          throw err;
+        }
         console.warn('Backend registration unavailable, generating local session:', err);
         const localProfile = {
           id: 'user-mock-1',
@@ -1830,6 +1845,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     loginWithGoogle: async (idToken) => {
       try {
+        const isDemo = get().isDemoMode;
+        const localFlag = typeof window !== 'undefined' ? localStorage.getItem('orbit_demomode') : null;
+        console.log('[GOOGLE_LOGIN_DEBUG] Before executing loginWithGoogle:');
+        console.log(`[GOOGLE_LOGIN_DEBUG] - isDemoMode: ${isDemo}`);
+        console.log(`[GOOGLE_LOGIN_DEBUG] - audienceMode: ${isDemo ? 'demo' : 'live'}`);
+        console.log(`[GOOGLE_LOGIN_DEBUG] - localStorage demo flag: ${localFlag}`);
+        console.log(`[GOOGLE_LOGIN_DEBUG] - zustand demo state: ${isDemo}`);
+
         console.log('[GOOGLE_LOGIN_DEBUG] Google login initiated with idToken length:', idToken?.length);
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
         console.log('[GOOGLE_LOGIN_DEBUG] Backend /auth/google response received:', JSON.stringify(res));
@@ -1871,6 +1894,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
       } catch (err: any) {
         console.error('[GOOGLE_LOGIN_DEBUG] Google login error:', err);
+        if (!get().isDemoMode) {
+          throw err;
+        }
         console.warn('Backend Google auth unavailable, generating local session:', err);
         const localProfile = {
           id: 'user-google-mock-1',
