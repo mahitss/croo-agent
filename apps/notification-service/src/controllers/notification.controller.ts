@@ -1,28 +1,16 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../services/prisma.service';
 
 @Controller('api/v1')
 export class NotificationController {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async seedIfEmpty() {
-    const count = await this.prisma.notification.count();
-    if (count === 0) {
-      await this.prisma.notification.createMany({
-        data: [
-          { userId: 'user-1', type: 'warning', title: 'SLA Warning', body: 'QuickScan latency exceeded 800ms limit threshold', read: false },
-          { userId: 'user-1', type: 'success', title: 'Escrow Deposited', body: 'Reserved 1.25 USDC for Tesla Q1 intention', read: false },
-        ]
-      });
-    }
-  }
-
   @Get('notifications')
-  async getNotifications() {
+  async getNotifications(@Query('userId') userId?: string) {
     try {
-      await this.seedIfEmpty();
+      const targetUserId = userId || 'user-1';
       const notifs = await this.prisma.notification.findMany({
-        where: { userId: 'user-1' },
+        where: { userId: targetUserId },
         orderBy: { createdAt: 'desc' }
       });
       return {
@@ -59,27 +47,30 @@ export class NotificationController {
   @Patch('notifications/:id/read')
   async markRead(@Param('id') id: string) {
     try {
-      await this.prisma.notification.update({
+      const updated = await this.prisma.notification.update({
         where: { id },
         data: { read: true }
       });
-      return { success: true, message: `Notification ${id} marked as read` };
+      return {
+        success: true,
+        data: updated
+      };
     } catch (err: any) {
-      return { success: false, message: `Failed to mark notification: ${err.message}` };
+      return { success: false, message: `Failed to mark notification as read: ${err.message}` };
     }
   }
 
   @Post('notifications/read-all')
-  @HttpCode(HttpStatus.OK)
-  async markAllRead() {
+  async readAll(@Query('userId') userId?: string) {
     try {
+      const targetUserId = userId || 'user-1';
       await this.prisma.notification.updateMany({
-        where: { userId: 'user-1', read: false },
+        where: { userId: targetUserId, read: false },
         data: { read: true }
       });
-      return { success: true, message: 'All in-app alerts marked as read' };
+      return { success: true, message: 'All notifications marked as read' };
     } catch (err: any) {
-      return { success: false, message: `Failed to update notification alerts: ${err.message}` };
+      return { success: false, message: `Failed to mark read all: ${err.message}` };
     }
   }
 
@@ -89,22 +80,12 @@ export class NotificationController {
       await this.prisma.notification.delete({
         where: { id }
       });
-      return { success: true, message: `Notification ${id} archived` };
+      return {
+        success: true,
+        message: 'Notification deleted successfully'
+      };
     } catch (err: any) {
-      return { success: false, message: `Failed to archive notification: ${err.message}` };
+      return { success: false, message: `Failed to delete notification: ${err.message}` };
     }
-  }
-
-  @Get('preferences')
-  getPreferences() {
-    return {
-      success: true,
-      data: { email: true, realtime: true, security: true, payments: true, workflowUpdates: true }
-    };
-  }
-
-  @Patch('preferences')
-  updatePreferences(@Body() body: any) {
-    return { success: true, message: 'Notification preferences updated', data: body };
   }
 }

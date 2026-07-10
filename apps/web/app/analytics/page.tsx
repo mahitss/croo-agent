@@ -53,10 +53,40 @@ export default function AnalyticsPage() {
   useEffect(() => {
     initialize();
 
+    if (isDemoMode) {
+      setRevenueData([
+        { date: '2026-06-25', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
+        { date: '2026-06-26', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
+        { date: '2026-06-27', revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
+        { date: '2026-06-28', revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
+        { date: '2026-06-29', revenue: 620.0, expenses: 180.0, platformFee: 62.0 },
+        { date: '2026-06-30', revenue: 780.0, expenses: 220.0, platformFee: 78.0 },
+        { date: '2026-07-01', revenue: 710.0, expenses: 200.0, platformFee: 71.0 }
+      ]);
+      setPlatformMetrics({ apiRequestsCount: 92837, successRate: 99.92, queueDepth: 2 });
+      setMarketplaceMetrics({ publishedAgents: 8, verifiedAgents: 8, topCategory: 'Research' });
+      setWorkflowMetrics({ created: 1420, completed: 1402, failed: 18, avgDurationMs: 45231 });
+      setAgentMetrics([
+        { agentId: 'agent-research-1', invocations: 1402, revenueUsdc: 210.50, avgLatencyMs: 820 }
+      ]);
+      setAiMetrics({ avgPlanningLatencyMs: 1240, tokensConsumed: 4892300 });
+      setSystemMetrics({ cpuUsage: 12, memoryUsage: 45 });
+      setLoading(false);
+      return;
+    }
+
+    // --- LIVE MODE: Start clean, query backend APIs directly ---
+    setRevenueData([]);
+    setPlatformMetrics({ apiRequestsCount: 0, successRate: 0, queueDepth: 0 });
+    setMarketplaceMetrics({ publishedAgents: 0, verifiedAgents: 0, topCategory: 'None' });
+    setWorkflowMetrics({ created: 0, completed: 0, failed: 0, avgDurationMs: 0 });
+    setAgentMetrics([]);
+    setAiMetrics({ avgPlanningLatencyMs: 0, tokensConsumed: 0 });
+    setSystemMetrics({ cpuUsage: 0, memoryUsage: 0 });
+    setLoading(true);
+
     const fetchAllData = async () => {
       try {
-        setLoading(true);
-
         const [
           revRes,
           platRes,
@@ -75,13 +105,13 @@ export default function AnalyticsPage() {
           apiService.getSystemMetrics()
         ]) as any[];
 
-        if (revRes?.success) setRevenueData(revRes.data);
-        if (platRes?.success) setPlatformMetrics(platRes.data);
-        if (mktRes?.success) setMarketplaceMetrics(mktRes.data);
-        if (flowRes?.success) setWorkflowMetrics(flowRes.data);
-        if (agRes?.success) setAgentMetrics(agRes.data);
-        if (aiRes?.success) setAiMetrics(aiRes.data);
-        if (sysRes?.success) setSystemMetrics(sysRes.data);
+        if (revRes?.success && Array.isArray(revRes.data)) setRevenueData(revRes.data);
+        if (platRes?.success && platRes.data) setPlatformMetrics(platRes.data);
+        if (mktRes?.success && mktRes.data) setMarketplaceMetrics(mktRes.data);
+        if (flowRes?.success && flowRes.data) setWorkflowMetrics(flowRes.data);
+        if (agRes?.success && Array.isArray(agRes.data)) setAgentMetrics(agRes.data);
+        if (aiRes?.success && aiRes.data) setAiMetrics(aiRes.data);
+        if (sysRes?.success && sysRes.data) setSystemMetrics(sysRes.data);
 
       } catch (err) {
         console.error('Error fetching analytics from backend microservices:', err);
@@ -129,7 +159,7 @@ export default function AnalyticsPage() {
   const totalCompleted = workflowMetrics.completed || 0;
   const totalFailed = workflowMetrics.failed || 0;
   const totalRuns = totalCompleted + totalFailed;
-  const successRatio = totalRuns > 0 ? ((totalCompleted / totalRuns) * 100).toFixed(1) : '99.2';
+  const successRatio = totalRuns > 0 ? ((totalCompleted / totalRuns) * 100).toFixed(1) : '0.0';
   const totalFeesCollected = revenueData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
 
   // Mapping Agent Metrics with Names from Registry
@@ -139,15 +169,15 @@ export default function AnalyticsPage() {
       name: match ? match.name : u.agentId.split('-')[1] || u.agentId,
       invocations: u.invocations || 0,
       revenue: u.revenueUsdc || 0,
-      avgLatencyMs: u.avgLatencyMs || 820
+      avgLatencyMs: Math.round(u.avgLatencyMs) || 0
     };
   });
 
   // Pie chart variables
-  const workflowStatusData = [
-    { name: 'Completed Runs', value: totalCompleted || 95, color: '#00ffcc' },
-    { name: 'Failed Runs', value: totalFailed || 5, color: '#ff007f' }
-  ];
+  const workflowStatusData = totalRuns > 0 ? [
+    { name: 'Completed Runs', value: totalCompleted, color: '#00ffcc' },
+    { name: 'Failed Runs', value: totalFailed, color: '#ff007f' }
+  ] : [];
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
@@ -205,10 +235,10 @@ export default function AnalyticsPage() {
           {/* KPI Panel */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { label: 'Cumulative Earnings', val: `${totalFeesCollected.toFixed(2)} USDC`, change: 'Live platforms payouts', color: 'text-primary-neon', icon: DollarSign },
+              { label: 'Cumulative Earnings', val: `${totalFeesCollected.toFixed(2)} USDC`, change: 'Live platform payouts', color: 'text-primary-neon', icon: DollarSign },
               { label: 'Workflow Success Rate', val: `${successRatio}%`, change: `${totalRuns} completed workflows`, color: 'text-green-400', icon: ShieldCheck },
-              { label: 'Total Tokens Expended', val: `${aiMetrics.tokensConsumed?.toLocaleString() || '4,892,300'}`, change: 'Average planning logs', color: 'text-secondary-neon', icon: Cpu },
-              { label: 'Developer Balance', val: `${userWallet?.balance?.toFixed(2) || '100.00'} USDC`, change: 'Locked network keys', color: 'text-accent-blue', icon: Wallet }
+              { label: 'Total Tokens Expended', val: `${Number(aiMetrics.tokensConsumed || 0).toLocaleString()}`, change: 'Average planning logs', color: 'text-secondary-neon', icon: Cpu },
+              { label: 'Developer Balance', val: `${(userWallet?.balance || 0).toFixed(2)} USDC`, change: 'Locked network keys', color: 'text-accent-blue', icon: Wallet }
             ].map((kpi, idx) => {
               const Icon = kpi.icon;
               return (
@@ -233,68 +263,84 @@ export default function AnalyticsPage() {
                 <DollarSign className="w-4 h-4 text-primary-neon" />
                 Earnings vs Expenses Platform Margins (USDC)
               </h3>
-              <div className="flex-grow text-xs">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00ffcc" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#00ffcc" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff007f" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#ff007f" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" stroke="#4b5563" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
-                      labelStyle={{ color: '#9ca3af', fontFamily: 'monospace' }}
-                    />
-                    <Area type="monotone" dataKey="revenue" stroke="#00ffcc" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2} name="Earnings" />
-                    <Area type="monotone" dataKey="expenses" stroke="#ff007f" fillOpacity={1} fill="url(#colorCost)" strokeWidth={2} name="Spend" />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="flex-grow text-xs flex items-center justify-center">
+                {revenueData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#00ffcc" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#00ffcc" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ff007f" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#ff007f" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" stroke="#4b5563" fontSize={10} tickLine={false} />
+                      <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
+                        labelStyle={{ color: '#9ca3af', fontFamily: 'monospace' }}
+                      />
+                      <Area type="monotone" dataKey="revenue" stroke="#00ffcc" fillOpacity={1} fill="url(#colorRev)" strokeWidth={2} name="Earnings" />
+                      <Area type="monotone" dataKey="expenses" stroke="#ff007f" fillOpacity={1} fill="url(#colorCost)" strokeWidth={2} name="Spend" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-gray-500 italic text-xs font-mono">
+                    No data available
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Workflow status Donut Pie Chart */}
             <div className="lg:col-span-1 glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between h-[340px]">
               <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 font-mono">
-                <Activity className="w-4 h-4 text-accent-blue" />
+                <Activity className="w-4.5 h-4.5 text-accent-blue" />
                 Workflow Execution Health
               </h3>
               <div className="flex-grow flex justify-center items-center">
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie
-                      data={workflowStatusData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {workflowStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {totalRuns > 0 ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={workflowStatusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {workflowStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-gray-500 italic text-xs font-mono">
+                    No data available
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5 font-mono text-[10px] text-gray-400">
-                {workflowStatusData.map((status, idx) => (
-                  <div key={idx} className="flex justify-between items-center">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
-                      {status.name}
-                    </span>
-                    <span className="text-white font-bold">{status.value} runs</span>
-                  </div>
-                ))}
+                {totalRuns > 0 ? (
+                  workflowStatusData.map((status, idx) => (
+                    <div key={idx} className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
+                        {status.name}
+                      </span>
+                      <span className="text-white font-bold">{status.value} runs</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-gray-600">0 total runs recorded</div>
+                )}
               </div>
             </div>
 
@@ -322,14 +368,22 @@ export default function AnalyticsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-dark font-mono">
-                      {mappedAgentUsage.map((agent, idx) => (
-                        <tr key={idx} className="hover:bg-white/1 transition-colors text-gray-300">
-                          <td className="py-3 px-3 text-white font-bold">{agent.name}</td>
-                          <td className="py-3 px-3">{agent.invocations} runs</td>
-                          <td className="py-3 px-3 text-primary-neon">{agent.avgLatencyMs}ms</td>
-                          <td className="py-3 px-3 text-right text-white font-bold">{agent.revenue.toFixed(2)} USDC</td>
+                      {mappedAgentUsage.length > 0 ? (
+                        mappedAgentUsage.map((agent, idx) => (
+                          <tr key={idx} className="hover:bg-white/1 transition-colors text-gray-300">
+                            <td className="py-3 px-3 text-white font-bold">{agent.name}</td>
+                            <td className="py-3 px-3">{agent.invocations} runs</td>
+                            <td className="py-3 px-3 text-primary-neon">{agent.avgLatencyMs}ms</td>
+                            <td className="py-3 px-3 text-right text-white font-bold">{agent.revenue.toFixed(2)} USDC</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-gray-500 italic font-mono">
+                            No recent activity
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -347,42 +401,42 @@ export default function AnalyticsPage() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between text-gray-400">
                     <span>CPU Allocation</span>
-                    <span className="text-white">{systemMetrics.cpuUsage || 12}%</span>
+                    <span className="text-white">{systemMetrics.cpuUsage}%</span>
                   </div>
                   <div className="w-full bg-border-dark h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-primary-neon h-full" style={{ width: `${systemMetrics.cpuUsage || 12}%` }}></div>
+                    <div className="bg-primary-neon h-full" style={{ width: `${systemMetrics.cpuUsage}%` }}></div>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between text-gray-400">
                     <span>Memory Allocation</span>
-                    <span className="text-white">{systemMetrics.memoryUsage || 45}%</span>
+                    <span className="text-white">{systemMetrics.memoryUsage}%</span>
                   </div>
                   <div className="w-full bg-border-dark h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-secondary-neon h-full" style={{ width: `${systemMetrics.memoryUsage || 45}%` }}></div>
+                    <div className="bg-secondary-neon h-full" style={{ width: `${systemMetrics.memoryUsage}%` }}></div>
                   </div>
                 </div>
 
                 <div className="flex flex-col border-t border-border-dark pt-3 text-[10px] text-gray-500 gap-1.5">
                   <div className="flex justify-between">
                     <span>API Success Rate</span>
-                    <span className="text-primary-neon font-bold">99.98%</span>
+                    <span className="text-primary-neon font-bold">100.00%</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Active Escrows</span>
-                    <span className="text-white">{platformMetrics.queueDepth || 0} active</span>
+                    <span className="text-white">{platformMetrics.queueDepth} active</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Avg AI Planner Latency</span>
-                    <span className="text-white">{aiMetrics.avgPlanningLatencyMs || 1240}ms</span>
+                    <span className="text-white">{aiMetrics.avgPlanningLatencyMs}ms</span>
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-border-dark pt-3 flex items-center justify-between text-[10px] font-mono text-gray-500">
-                <span>Active Swarms: {marketplaceMetrics.publishedAgents || 8}</span>
-                <span>Verified: {marketplaceMetrics.verifiedAgents || 8}</span>
+                <span>Active Swarms: {marketplaceMetrics.publishedAgents}</span>
+                <span>Verified: {marketplaceMetrics.verifiedAgents}</span>
               </div>
             </div>
 

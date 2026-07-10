@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { GatewayAuthGuard } from '../guards/auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
@@ -10,9 +10,10 @@ export class AnalyticsController {
   private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 'http://127.0.0.1:5003/api/v1';
 
   @Get('notifications')
-  async getNotifications() {
+  @UseGuards(GatewayAuthGuard)
+  async getNotifications(@Req() req: any) {
     try {
-      const res = await fetch(`${this.notificationUrl}/notifications`);
+      const res = await fetch(`${this.notificationUrl}/notifications?userId=${req.user.id}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Notification service unreachable: ${err.message}` };
@@ -20,9 +21,10 @@ export class AnalyticsController {
   }
 
   @Patch('notifications/:id')
-  async readNotification(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async readNotification(@Req() req: any, @Param('id') id: string) {
     try {
-      const res = await fetch(`${this.notificationUrl}/notifications/${id}`, { method: 'PATCH' });
+      const res = await fetch(`${this.notificationUrl}/notifications/${id}/read`, { method: 'Patch' });
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Notification service unreachable: ${err.message}` };
@@ -30,9 +32,10 @@ export class AnalyticsController {
   }
 
   @Post('notifications/read-all')
-  async readAllNotifications() {
+  @UseGuards(GatewayAuthGuard)
+  async readAllNotifications(@Req() req: any) {
     try {
-      const res = await fetch(`${this.notificationUrl}/notifications/read-all`, { method: 'POST' });
+      const res = await fetch(`${this.notificationUrl}/notifications/read-all?userId=${req.user.id}`, { method: 'POST' });
       return await res.json();
     } catch (err: any) {
       return { success: false, message: `Notification service unreachable: ${err.message}` };
@@ -186,14 +189,6 @@ export class AnalyticsController {
             timestamp: new Date(wf.createdAt).getTime(),
           });
         });
-      }
-
-      if (feedEvents.length === 0) {
-        feedEvents.push(
-          { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago', timestamp: Date.now() - 1000 },
-          { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago', timestamp: Date.now() - 4000 },
-          { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago', timestamp: Date.now() - 12000 }
-        );
       }
 
       feedEvents.sort((a, b) => b.timestamp - a.timestamp);

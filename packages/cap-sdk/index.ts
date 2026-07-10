@@ -447,8 +447,6 @@ export class CAPClient {
   }
 }
 
-// ─── Singleton Export ────────────────────────────────────────────────────────
-
 let _instance: CAPClient | null = null;
 
 export function getCAPClient(config?: Partial<CAPConfig>): CAPClient {

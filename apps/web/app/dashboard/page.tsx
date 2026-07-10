@@ -45,15 +45,7 @@ export default function DashboardPage() {
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [revenueChartData, setRevenueChartData] = useState<any[]>([
-    { hour: '08:00', volume: 4.2 },
-    { hour: '09:00', volume: 8.5 },
-    { hour: '10:00', volume: 14.8 },
-    { hour: '11:00', volume: 22.1 },
-    { hour: '12:00', volume: 32.5 },
-    { hour: '13:00', volume: 45.3 },
-    { hour: '14:00', volume: 55.7 }
-  ]);
+  const [revenueChartData, setRevenueChartData] = useState<any[]>([]);
   const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,6 +54,52 @@ export default function DashboardPage() {
   useEffect(() => {
     initialize();
     
+    if (isDemoMode) {
+      setActivityFeed([
+        { time: '1s ago', type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro' },
+        { time: '4s ago', type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica' },
+        { time: '12s ago', type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet' }
+      ]);
+      setDashboardData({
+        activeWorkflows: 1,
+        completedWorkflows: 1402,
+        failedWorkflows: 18,
+        publishedAgents: 8,
+        walletBalance: 100.0,
+        todayTokens: 1489200,
+        todayInferenceCost: 0.89,
+        averageLatency: 820,
+        platformRevenue: 15.0,
+        recentWorkflows: []
+      });
+      setNotifications([
+        { id: 'notif-1', title: 'Welcome to ORBIT AI', message: 'Nexus Swarm networks are active and listening.', type: 'info' },
+        { id: 'notif-2', title: 'SLA Latency Stagger', message: 'Agent research-1 had a minor latency delay.', type: 'warning' }
+      ]);
+      setRevenueChartData([
+        { hour: '08:00', volume: 4.2 },
+        { hour: '09:00', volume: 8.5 },
+        { hour: '10:00', volume: 14.8 },
+        { hour: '11:00', volume: 22.1 },
+        { hour: '12:00', volume: 32.5 },
+        { hour: '13:00', volume: 45.3 },
+        { hour: '14:00', volume: 55.7 }
+      ]);
+      setAgentMetrics([
+        { agentId: 'agent-research-1', revenueUsdc: 210.50, invocations: 1402, avgLatencyMs: 820 }
+      ]);
+      setLoading(false);
+      return;
+    }
+
+    // --- LIVE MODE: Start clean, query backend APIs directly ---
+    setActivityFeed([]);
+    setDashboardData(null);
+    setNotifications([]);
+    setRevenueChartData([]);
+    setAgentMetrics([]);
+    setLoading(true);
+
     const fetchAllData = () => {
       apiService.getActivityFeed()
         .then(res => {
@@ -161,7 +199,7 @@ export default function DashboardPage() {
       label: 'Published Agents', 
       value: dashboardData?.publishedAgents !== undefined
         ? `${dashboardData.publishedAgents} Nodes`
-        : `${agents.length} Nodes`, 
+        : (isDemoMode ? `${agents.length} Nodes` : '0 Nodes'), 
       icon: Cpu, 
       color: 'text-secondary-neon' 
     },
@@ -182,10 +220,10 @@ export default function DashboardPage() {
       <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
-            👋 Welcome back, {user?.displayName || user?.username || 'Mahit'}
+            👋 Welcome back, {user?.displayName || user?.username || 'User'}
           </h1>
           <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
-            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : agents.length} published agents, and ${dashboardData?.walletBalance !== undefined ? Number(dashboardData.walletBalance).toFixed(2) : userWallet.balance.toFixed(2)} USDC available in your wallet.
+            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : (isDemoMode ? agents.length : 0)} published agents, and ${dashboardData?.walletBalance !== undefined ? Number(dashboardData.walletBalance).toFixed(2) : userWallet.balance.toFixed(2)} USDC available in your wallet.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -311,7 +349,7 @@ export default function DashboardPage() {
               <span className="text-white font-mono">
                 {dashboardData?.todayTokens !== undefined 
                   ? Number(dashboardData.todayTokens).toLocaleString() 
-                  : '1,489,200'}
+                  : '0'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -319,7 +357,7 @@ export default function DashboardPage() {
               <span className="text-secondary-neon font-mono font-bold">
                 {dashboardData?.todayInferenceCost !== undefined 
                   ? `${Number(dashboardData.todayInferenceCost).toFixed(2)} USDC` 
-                  : '0.89 USDC'}
+                  : '0.00 USDC'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -327,16 +365,16 @@ export default function DashboardPage() {
               <span className="text-white font-mono">
                 {dashboardData?.averageLatency !== undefined 
                   ? `${dashboardData.averageLatency}ms` 
-                  : '820ms'}
+                  : '0ms'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Primary Model</span>
-              <span className="text-accent-blue font-mono font-bold">Gemini-1.5-Pro</span>
+              <span className="text-accent-blue font-mono font-bold">Gemini-2.0-Flash</span>
             </div>
           </div>
           <div className="text-[10px] text-gray-500 font-mono text-center pt-2 border-t border-border-dark">
-            ▲ 12% token velocity change today
+            ▲ active telemetry channels
           </div>
         </div>
 
@@ -366,8 +404,8 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : (
-              <div className="text-center py-12 text-gray-500 italic text-xs font-mono">
-                No recent platform activity recorded.
+              <div className="text-center py-12 text-gray-500 italic text-xs font-mono flex items-center justify-center h-full">
+                No recent activity
               </div>
             )}
           </div>
@@ -391,8 +429,8 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : (
-              <div className="text-center py-12 text-gray-500 italic text-xs font-mono">
-                No new notifications.
+              <div className="text-center py-12 text-gray-500 italic text-xs font-mono flex items-center justify-center h-full">
+                No notifications
               </div>
             )}
           </div>
@@ -409,50 +447,62 @@ export default function DashboardPage() {
             <TrendingUp className="w-4 h-4 text-primary-neon" />
             Swarm Volume Flow (Past 6 Hours)
           </h3>
-          <div className="flex-grow text-xs">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00ffcc" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#00ffcc" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="hour" stroke="#4b5563" fontSize={10} tickLine={false} />
-                <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
-                  labelStyle={{ color: '#9ca3af', fontFamily: 'monospace' }}
-                  itemStyle={{ color: '#00ffcc' }}
-                />
-                <Area type="monotone" dataKey="volume" stroke="#00ffcc" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="flex-grow text-xs min-h-[220px] flex items-center justify-center">
+            {revenueChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00ffcc" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#00ffcc" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="hour" stroke="#4b5563" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
+                    labelStyle={{ color: '#9ca3af', fontFamily: 'monospace' }}
+                    itemStyle={{ color: '#00ffcc' }}
+                  />
+                  <Area type="monotone" dataKey="volume" stroke="#00ffcc" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-gray-500 italic text-xs font-mono">
+                No data available
+              </div>
+            )}
           </div>
         </div>
 
         {/* Top Agent Earners */}
         <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col h-[320px]">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-1.5 font-mono">
-            <DollarSign className="w-4 h-4 text-secondary-neon" />
+            <DollarSign className="w-4.5 h-4.5 text-secondary-neon" />
             Top Earning Agent Nodes (Current Session)
           </h3>
-          <div className="flex-grow text-xs">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={earningsChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <XAxis dataKey="name" stroke="#4b5563" fontSize={10} tickLine={false} />
-                <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
-                  itemStyle={{ color: '#ff007f' }}
-                />
-                <Bar dataKey="earnings" fill="#ff007f" radius={[4, 4, 0, 0]}>
-                  {earningsChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#ff007f' : '#ff007fcc'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex-grow text-xs min-h-[220px] flex items-center justify-center">
+            {earningsChartData.length > 0 && totalAgentEarnings > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={earningsChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <XAxis dataKey="name" stroke="#4b5563" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#4b5563" fontSize={10} tickLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f1115', borderColor: '#1b1e25', borderRadius: '8px' }}
+                    itemStyle={{ color: '#ff007f' }}
+                  />
+                  <Bar dataKey="earnings" fill="#ff007f" radius={[4, 4, 0, 0]}>
+                    {earningsChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#ff007f' : '#ff007fcc'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-gray-500 italic text-xs font-mono">
+                No data available
+              </div>
+            )}
           </div>
         </div>
 
@@ -480,38 +530,46 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-dark">
-              {leaderboard.map((agent, index) => (
-                <tr key={agent.id} className="hover:bg-white/1 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-white">
-                    #{index + 1}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-white flex flex-col">
-                    <span>{agent.name}</span>
-                    <span className="text-[9px] text-gray-400 font-mono italic font-normal">Role: {agent.category} Agent</span>
-                    <span className="text-[9px] text-gray-500 font-normal font-mono">{agent.id}</span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="bg-white/3 border border-border-dark px-2 py-0.5 rounded text-gray-300">
-                      {agent.category}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-primary-neon font-bold">
-                    {agent.trustScore}%
-                  </td>
-                  <td className="py-3.5 px-4 font-mono">
-                    {agent.latency}ms
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-white">
-                    {agent.accuracy}%
-                  </td>
-                  <td className="py-3.5 px-4">
-                    {agent.rating}⭐ ({agent.reviewsCount})
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
-                    {agent.earnings.toFixed(2)} USDC
+              {leaderboard.length > 0 ? (
+                leaderboard.map((agent, index) => (
+                  <tr key={agent.id} className="hover:bg-white/1 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-white">
+                      #{index + 1}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-white flex flex-col">
+                      <span>{agent.name}</span>
+                      <span className="text-[9px] text-gray-400 font-mono italic font-normal">Role: {agent.category} Agent</span>
+                      <span className="text-[9px] text-gray-500 font-normal font-mono">{agent.id}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="bg-white/3 border border-border-dark px-2 py-0.5 rounded text-gray-300">
+                        {agent.category}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-primary-neon font-bold">
+                      {agent.trustScore}%
+                    </td>
+                    <td className="py-3.5 px-4 font-mono">
+                      {agent.latency}ms
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-white">
+                      {agent.accuracy}%
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {agent.rating}⭐ ({agent.reviewsCount})
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
+                      {agent.earnings.toFixed(2)} USDC
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-gray-500 italic font-mono">
+                    No agents yet
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
