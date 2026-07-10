@@ -36,7 +36,7 @@ export default function AuthModal() {
         const google = (window as any).google;
         if (google?.accounts?.id) {
           google.accounts.id.initialize({
-            client_id: '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com',
+            client_id: '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com',
             callback: (res: any) => {
               if (res.credential) {
                 handleGoogleLoginSuccess(res.credential);

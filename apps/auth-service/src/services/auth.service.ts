@@ -8,7 +8,7 @@ import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
-  private readonly googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com');
+  private readonly googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com');
 
   constructor(
     private readonly userRepository: UserRepository,
@@ -240,7 +240,7 @@ export class AuthService {
       } else {
         const ticket = await this.googleClient.verifyIdToken({
           idToken,
-          audience: process.env.GOOGLE_CLIENT_ID || '1084209538416-g2uh2qbf3p8q2eb2e84vhrghf477n6q8.apps.googleusercontent.com',
+          audience: process.env.GOOGLE_CLIENT_ID || '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com',
         });
         const payload = ticket.getPayload();
         if (!payload) {
