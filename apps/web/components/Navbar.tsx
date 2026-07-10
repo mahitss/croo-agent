@@ -1,7 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useNexusStore } from '../store/nexusStore';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { 
+  Cpu, 
+  Layers, 
+  TrendingUp, 
+  Wallet, 
+  PlusCircle, 
+  Shuffle, 
+  ShieldCheck,
+  LogOut,
+  User,
+  ChevronDown
+} from 'lucide-react';
 
 const isProd = process.env.NODE_ENV === 'production';
 const console = {
@@ -21,43 +36,34 @@ const console = {
     if (!isProd) globalThis.console.info(...args);
   }
 };
-import { usePathname } from 'next/navigation';
-import { useNexusStore } from '../store/nexusStore';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { 
-  Cpu, 
-  Layers, 
-  TrendingUp, 
-  Wallet, 
-  PlusCircle, 
-  Shuffle, 
-  ShieldCheck,
-  LogOut,
-  User
-} from 'lucide-react';
 
 export default function Navbar() {
   useKeyboardShortcuts();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  const [isLargeDesktop, setIsLargeDesktop] = useState(true);
   
   useEffect(() => {
-    console.log(`[PAGE_ROUTE] Navigating to: ${pathname}`);
-  }, [pathname]);
+    setMounted(true);
+    const handleResize = () => {
+      setIsLargeDesktop(window.innerWidth >= 1400);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const userWallet = useNexusStore((state) => state.userWallet);
   const isRunning = useNexusStore((state) => state.isRunning);
   
-  // Auth states & actions
   const user = useNexusStore((state) => state.user);
   const token = useNexusStore((state) => state.token);
   const logoutUser = useNexusStore((state) => state.logoutUser);
   const setAuthModal = useNexusStore((state) => state.setAuthModal);
   
-  // Demo Mode state & actions
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
 
-  // Runtime JWT Expiration Audit
   useEffect(() => {
     if (token) {
       const isExpired = () => {
@@ -81,7 +87,6 @@ export default function Navbar() {
     }
   }, [token, logoutUser]);
 
-  // Debug state logging before rendering
   console.log('[NAVBAR_AUTH_DEBUG] Current State:', {
     isAuthenticated: !!token && !!user,
     currentUser: user,
@@ -94,12 +99,15 @@ export default function Navbar() {
     audienceMode: isDemoMode ? 'demo' : 'live'
   });
 
-  const links = [
+  const leftLinks = [
     { href: '/', label: 'Portal', icon: Cpu },
     { href: '/marketplace', label: 'Marketplace', icon: Shuffle },
     { href: '/workflow', label: 'Workflow Builder', icon: Layers },
     { href: '/dashboard', label: 'Dashboard', icon: TrendingUp },
     { href: '/analytics', label: 'Analytics', icon: TrendingUp },
+  ];
+
+  const rightLinks = [
     { href: '/wallet', label: 'USDC Wallet', icon: Wallet },
     { href: '/registry', label: 'Publish Agent', icon: PlusCircle },
     { href: '/admin', label: 'Admin', icon: ShieldCheck },
@@ -107,7 +115,7 @@ export default function Navbar() {
 
   return (
     <nav 
-      className="glass-card border-b border-border-dark py-4 px-4 sticky top-0 z-50 box-border"
+      className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50 box-border"
       style={{
         maxWidth: '100%',
         overflowX: 'hidden',
@@ -115,7 +123,7 @@ export default function Navbar() {
       }}
     >
       <div 
-        className="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-4"
+        className="max-w-7xl mx-auto flex items-center justify-between"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -125,45 +133,116 @@ export default function Navbar() {
         }}
       >
         
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-1.5 lg:gap-2 group flex-shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
-            O
-          </div>
-          <span className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-            ORBIT <span className="text-primary-neon font-normal text-sm tracking-widest ml-1 bg-none text-shadow-glow">AI</span>
-          </span>
-        </Link>
+        {/* LEFT SECTION */}
+        <div className="flex items-center gap-6 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
+              O
+            </div>
+            <span className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+              ORBIT <span className="text-primary-neon font-normal text-sm tracking-widest ml-1 bg-none text-shadow-glow">AI</span>
+            </span>
+          </Link>
 
-        {/* Links */}
-        <div className="hidden md:flex items-center gap-1 lg:gap-2 xl:gap-4 flex-shrink min-w-0">
-          {links.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-1 text-xs lg:text-sm font-medium transition-colors py-1 px-1.5 lg:py-1.5 lg:px-2.5 rounded-md flex-shrink-0 ${
-                  isActive
-                    ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
-                    : 'text-gray-400 hover:text-white hover:bg-white/2'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline">{link.label}</span>
-                <span className="inline xl:hidden">
-                  {link.label === 'Workflow Builder' ? 'Builder' : link.label === 'Publish Agent' ? 'Publish' : link.label === 'USDC Wallet' ? 'Wallet' : link.label}
-                </span>
-              </Link>
-            );
-          })}
+          <div className="hidden md:flex items-center gap-2 lg:gap-3">
+            {leftLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-1.5 text-xs lg:text-sm font-medium transition-colors py-1.5 px-3 rounded-md flex-shrink-0 ${
+                    isActive
+                      ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
+                      : 'text-gray-400 hover:text-white hover:bg-white/2'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Status, Demo Mode, Wallet & Auth Dropdown */}
-        <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
-          
-          {/* Status Indicator */}
+        {/* CENTER SECTION */}
+        <div className="flex-1" />
+
+        {/* RIGHT SECTION */}
+        <div 
+          className="flex items-center gap-4 flex-shrink-0"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {isLargeDesktop && mounted && (
+            <div className="hidden md:flex items-center gap-2 lg:gap-3">
+              {rightLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 text-xs lg:text-sm font-medium transition-colors py-1.5 px-3 rounded-md flex-shrink-0 ${
+                      isActive
+                        ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
+                        : 'text-gray-400 hover:text-white hover:bg-white/2'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {(!isLargeDesktop && mounted) && (
+            <div className="relative group" style={{ position: 'relative' }}>
+              <button className="flex items-center gap-1 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-md text-xs font-mono font-bold text-gray-300 hover:text-white transition-all duration-300 focus:outline-none">
+                <span>More</span>
+                <ChevronDown className="w-3.5 h-3.5 text-primary-neon" />
+              </button>
+              
+              <div 
+                className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: '0',
+                  zIndex: 9999,
+                }}
+              >
+                <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
+                  {rightLinks.map((link) => {
+                    const Icon = link.icon;
+                    const isActive = pathname === link.href;
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                          isActive
+                            ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
+                            : 'text-gray-300 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="hidden lg:flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -178,10 +257,9 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* Demo Mode Toggle */}
           <button
             onClick={toggleDemoMode}
-            className={`text-[10px] font-mono font-extrabold uppercase px-2 py-1 rounded-md border tracking-wider transition-all duration-300 ${
+            className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
               isDemoMode
                 ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
                 : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
@@ -191,15 +269,13 @@ export default function Navbar() {
             <span>{isDemoMode ? 'Demo Mode' : 'Live Mode'}</span>
           </button>
 
-          {/* Wallet Link */}
-          <Link href="/wallet" className="flex items-center gap-1.5 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-2.5 py-1.5 rounded-full transition-all duration-300">
-            <Wallet className="w-3.5 h-3.5 text-primary-neon" />
-            <span className="text-xs lg:text-sm font-mono font-bold text-white">
-              {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-[10px]">USDC</span>
+          <Link href="/wallet" className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300">
+            <Wallet className="w-4 h-4 text-primary-neon" />
+            <span className="text-sm font-mono font-bold text-white">
+              {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-xs">USDC</span>
             </span>
           </Link>
 
-          {/* Auth Section */}
           <div 
             className="flex items-center gap-2 border-l border-border-dark pl-4"
             style={{ position: 'relative' }}
