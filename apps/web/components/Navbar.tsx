@@ -87,8 +87,22 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <nav 
+      className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50"
+      style={{
+        maxWidth: '100%',
+        overflowX: 'clip',
+      }}
+    >
+      <div 
+        className="max-w-7xl mx-auto flex items-center justify-between"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          width: '100%',
+        }}
+      >
         
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
@@ -162,9 +176,12 @@ export default function Navbar() {
           </Link>
 
           {/* Auth Section */}
-          <div className="flex items-center gap-2 border-l border-border-dark pl-4">
+          <div 
+            className="flex items-center gap-2 border-l border-border-dark pl-4"
+            style={{ position: 'relative' }}
+          >
             {user ? (
-              <div className="relative group">
+              <div className="relative group" style={{ position: 'relative' }}>
                 <button className="flex items-center gap-1.5 focus:outline-none">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
                     {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : user.username.substring(0, 2).toUpperCase()}
