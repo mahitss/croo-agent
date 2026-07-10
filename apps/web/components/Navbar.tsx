@@ -2,6 +2,25 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+
+const isProd = process.env.NODE_ENV === 'production';
+const console = {
+  log: (...args: any[]) => {
+    if (!isProd) globalThis.console.log(...args);
+  },
+  warn: (...args: any[]) => {
+    if (!isProd) globalThis.console.warn(...args);
+  },
+  error: (...args: any[]) => {
+    globalThis.console.error(...args);
+  },
+  debug: (...args: any[]) => {
+    if (!isProd) globalThis.console.debug(...args);
+  },
+  info: (...args: any[]) => {
+    if (!isProd) globalThis.console.info(...args);
+  }
+};
 import { usePathname } from 'next/navigation';
 import { useNexusStore } from '../store/nexusStore';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -180,7 +199,7 @@ export default function Navbar() {
             className="flex items-center gap-2 border-l border-border-dark pl-4"
             style={{ position: 'relative' }}
           >
-            {user ? (
+            {(user && token) ? (
               <div className="relative group" style={{ position: 'relative' }}>
                 <button className="flex items-center gap-1.5 focus:outline-none">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">

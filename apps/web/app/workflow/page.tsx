@@ -1,6 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+const isProd = process.env.NODE_ENV === 'production';
+const console = {
+  log: (...args: any[]) => {
+    if (!isProd) globalThis.console.log(...args);
+  },
+  warn: (...args: any[]) => {
+    if (!isProd) globalThis.console.warn(...args);
+  },
+  error: (...args: any[]) => {
+    globalThis.console.error(...args);
+  },
+  debug: (...args: any[]) => {
+    if (!isProd) globalThis.console.debug(...args);
+  },
+  info: (...args: any[]) => {
+    if (!isProd) globalThis.console.info(...args);
+  }
+};
 import Canvas from '../../components/Canvas';
 import { useNexusStore } from '../../store/nexusStore';
 import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';

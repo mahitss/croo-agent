@@ -2,6 +2,25 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+
+const isProd = process.env.NODE_ENV === 'production';
+const console = {
+  log: (...args: any[]) => {
+    if (!isProd) globalThis.console.log(...args);
+  },
+  warn: (...args: any[]) => {
+    if (!isProd) globalThis.console.warn(...args);
+  },
+  error: (...args: any[]) => {
+    globalThis.console.error(...args);
+  },
+  debug: (...args: any[]) => {
+    if (!isProd) globalThis.console.debug(...args);
+  },
+  info: (...args: any[]) => {
+    if (!isProd) globalThis.console.info(...args);
+  }
+};
 import { useNexusStore } from '../store/nexusStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
