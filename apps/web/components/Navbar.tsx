@@ -133,7 +133,6 @@ export default function Navbar() {
       style={{
         maxWidth: '100%',
         boxSizing: 'border-box',
-        outline: '2px solid red',
       }}
     >
       <div 
@@ -181,16 +180,7 @@ export default function Navbar() {
         </div>
 
         {/* CENTER SECTION */}
-        <div 
-          className="flex-1" 
-          style={{
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            minWidth: 0,
-            outline: '2px solid blue',
-          }}
-        />
+        <div className="flex-grow" />
 
         {/* RIGHT SECTION */}
         <div 
@@ -201,7 +191,6 @@ export default function Navbar() {
             gap: '12px',
             flexShrink: 0,
             whiteSpace: 'nowrap',
-            outline: '2px solid green',
           }}
         >
           {isLargeDesktop && mounted && isAuthenticated && user && (
@@ -299,7 +288,9 @@ export default function Navbar() {
           )}
 
           <div 
-            className="flex items-center gap-2 border-l border-border-dark pl-4"
+            className={`flex items-center gap-2 ${
+              isAuthenticated && user ? 'border-l border-border-dark pl-4' : ''
+            }`}
             style={{ 
               position: 'relative',
               flexShrink: 0,
