@@ -693,7 +693,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
           console.log("fetch reference string:", String(fetch));
 
           const headers: Record<string, string> = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "x-execution-mode": state.isDemoMode ? "DEMO" : "LIVE"
           };
           if (state.token) {
             headers["Authorization"] = `Bearer ${state.token}`;
@@ -1165,40 +1166,49 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
         // --- PHASE 6: Payment (SLA Escrow Hold) ---
         set({ currentPhaseIndex: 6 });
-        log('payment', `Locking SLA execution budget escrow of ${totalCost.toFixed(2)} USDC...`);
-        await new Promise(r => setTimeout(r, 600));
-        
-        if (get().userWallet.balance < totalCost) {
-          log('payment', 'SLA Escrow holding failed: Insufficient funds in User Wallet! Aborting run.', 'error');
-          set({ isRunning: false, currentPhaseIndex: 0 });
-          return;
-        }
+        if (!state.isDemoMode) {
+          log('payment', `Locking SLA execution budget escrow of ${totalCost.toFixed(2)} USDC...`);
+          await new Promise(r => setTimeout(r, 600));
+          
+          if (get().userWallet.balance < totalCost) {
+            log('payment', 'SLA Escrow holding failed: Insufficient funds in User Wallet! Aborting run.', 'error');
+            set({ isRunning: false, currentPhaseIndex: 0 });
+            return;
+          }
 
-        set(state => {
-          const escrowTx: Transaction = {
-            id: `tx-escrow-${Date.now()}`,
-            senderAddress: state.userWallet.address,
-            receiverAddress: 'ESCROW_VAULT',
-            amount: totalCost,
-            type: 'escrow_hold',
-            timestamp: new Date().toISOString(),
-            status: 'completed',
-            txHash: '0x' + Math.random().toString(16).substring(2, 42)
-          };
-          return {
-            userWallet: {
-              ...state.userWallet,
-              balance: state.userWallet.balance - totalCost,
-              escrowBalance: state.userWallet.escrowBalance + totalCost,
-              history: [escrowTx, ...state.userWallet.history]
-            }
-          };
-        });
-        log('payment', 'Budget reserved in database escrow vault record.', 'success');
+          set(state => {
+            const escrowTx: Transaction = {
+              id: `tx-escrow-${Date.now()}`,
+              senderAddress: state.userWallet.address,
+              receiverAddress: 'ESCROW_VAULT',
+              amount: totalCost,
+              type: 'escrow_hold',
+              timestamp: new Date().toISOString(),
+              status: 'completed',
+              txHash: '0x' + Math.random().toString(16).substring(2, 42)
+            };
+            return {
+              userWallet: {
+                ...state.userWallet,
+                balance: state.userWallet.balance - totalCost,
+                escrowBalance: state.userWallet.escrowBalance + totalCost,
+                history: [escrowTx, ...state.userWallet.history]
+              }
+            };
+          });
+          log('payment', 'Budget reserved in database escrow vault record.', 'success');
+        } else {
+          log('payment', 'Demo Mode - Escrow hold bypassed (No funds required)', 'success');
+          await new Promise(r => setTimeout(r, 400));
+        }
 
         // --- PHASE 7: Run Swarm & Poll logs ---
         set({ currentPhaseIndex: 7 });
-        log('execution', 'Triggering backend execution pipeline...');
+        if (state.isDemoMode) {
+          log('execution', 'Running simulated workflow...');
+        } else {
+          log('execution', 'Triggering backend execution pipeline...');
+        }
         
         const runRes = await apiClient.post<any>(`/api/v1/workflows/${workflow.id}/run`, {});
         if (!runRes.success) {
@@ -1612,61 +1622,70 @@ export const useNexusStore = create<NexusState>((set, get) => {
               });
             }
 
-            if (computedStatus === 'completed' || computedStatus === 'failed' || computedStatus === 'cancelled') {
+            if (computedStatus === 'completed' || computedStatus === 'Demo Completed' || computedStatus === 'failed' || computedStatus === 'cancelled') {
               console.log(`[WORKFLOW_COMPLETED] Workflow ID: ${workflow.id} execution completed.`);
               console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Terminal status ${computedStatus.toUpperCase()} reached)`);
               isPolling = false;
               
-              if (computedStatus === 'completed') {
-                // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
-                set({ currentPhaseIndex: 9 });
-                get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
-                await new Promise(r => setTimeout(r, 800));
-                
-                set(state => {
-                  const updatedAgentWallets = { ...state.agentWallets };
-                  const userWallet = { ...state.userWallet };
-                  const releaseTransactions: Transaction[] = [];
-
-                  updatedNodes.forEach(n => {
-                    const agentId = n.assignedAgentId!;
-                    const agent = state.agents.find(a => a.id === agentId)!;
-                    const fee = n.costEstimate;
-
-                    const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
-                    const agentTx: Transaction = {
-                      id: `tx-agent-release-${Date.now()}-${n.id}`,
-                      senderAddress: 'ESCROW_VAULT',
-                      receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
-                      amount: fee,
-                      type: 'escrow_release',
-                      timestamp: new Date().toISOString(),
-                      status: 'completed',
-                      txHash: '0x' + Math.random().toString(16).substring(2, 42),
-                      taskId: n.id
-                    };
-
-                    updatedAgentWallets[agentId] = {
-                      ...wallet,
-                      balance: wallet.balance + fee,
-                      history: [agentTx, ...wallet.history]
-                    };
-                    releaseTransactions.push(agentTx);
-                  });
-
-                  userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
-                  userWallet.history = [...releaseTransactions, ...userWallet.history];
-                  
-                  return {
-                    agentWallets: updatedAgentWallets,
-                    userWallet,
+              if (computedStatus === 'completed' || computedStatus === 'Demo Completed') {
+                if (get().isDemoMode) {
+                  set({
                     isRunning: false,
                     currentPhaseIndex: 9,
                     appState: 'completed'
-                  };
-                });
-                
-                get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
+                  });
+                  get().logExecution('settlement', 'Demo completed successfully. Simulated workflow finished.', 'success');
+                } else {
+                  // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
+                  set({ currentPhaseIndex: 9 });
+                  get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
+                  await new Promise(r => setTimeout(r, 800));
+                  
+                  set(state => {
+                    const updatedAgentWallets = { ...state.agentWallets };
+                    const userWallet = { ...state.userWallet };
+                    const releaseTransactions: Transaction[] = [];
+
+                    updatedNodes.forEach(n => {
+                      const agentId = n.assignedAgentId!;
+                      const agent = state.agents.find(a => a.id === agentId)!;
+                      const fee = n.costEstimate;
+
+                      const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
+                      const agentTx: Transaction = {
+                        id: `tx-agent-release-${Date.now()}-${n.id}`,
+                        senderAddress: 'ESCROW_VAULT',
+                        receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
+                        amount: fee,
+                        type: 'escrow_release',
+                        timestamp: new Date().toISOString(),
+                        status: 'completed',
+                        txHash: '0x' + Math.random().toString(16).substring(2, 42),
+                        taskId: n.id
+                      };
+
+                      updatedAgentWallets[agentId] = {
+                        ...wallet,
+                        balance: wallet.balance + fee,
+                        history: [agentTx, ...wallet.history]
+                      };
+                      releaseTransactions.push(agentTx);
+                    });
+
+                    userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
+                    userWallet.history = [...releaseTransactions, ...userWallet.history];
+                    
+                    return {
+                      agentWallets: updatedAgentWallets,
+                      userWallet,
+                      isRunning: false,
+                      currentPhaseIndex: 9,
+                      appState: 'completed'
+                    };
+                  });
+                  
+                  get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
+                }
               } else {
                 set({ isRunning: false, currentPhaseIndex: 0, appState: 'completed' });
                 get().logExecution('execution', 'Swarm execution failed!', 'error');

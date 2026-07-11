@@ -845,13 +845,23 @@ async function getValidToken(): Promise<string | null> {
   return token;
 }
 
+const shouldBypassMock = (url: string): boolean => {
+  if (typeof window === 'undefined') return true;
+  const token = localStorage.getItem('orbit_token');
+  if (!token) return false;
+  return url === '/api/v1/ai/plan' || 
+         url.startsWith('/api/v1/workflows') || 
+         url.startsWith('/api/v1/analytics') || 
+         url.startsWith('/api/v1/wallet');
+};
+
 export const apiClient = {
   async get<T>(
     url: string,
     retries = 3,
     delay = 1000
   ): Promise<T> {
-    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/') && !shouldBypassMock(url)) {
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(DemoModeManager.handleGet(url) as T);
@@ -867,6 +877,7 @@ export const apiClient = {
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "x-execution-mode": DemoModeManager.isDemoMode() ? "DEMO" : "LIVE"
       };
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -915,7 +926,7 @@ export const apiClient = {
   },
 
   async post<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/') && !shouldBypassMock(url)) {
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(DemoModeManager.handlePost(url, body) as T);
@@ -930,6 +941,7 @@ export const apiClient = {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-execution-mode": DemoModeManager.isDemoMode() ? "DEMO" : "LIVE"
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -956,7 +968,7 @@ export const apiClient = {
   },
 
   async put<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/') && !shouldBypassMock(url)) {
       return new Promise((resolve) => {
         resolve({ success: true } as any as T);
       });
@@ -969,6 +981,7 @@ export const apiClient = {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-execution-mode": DemoModeManager.isDemoMode() ? "DEMO" : "LIVE"
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -988,7 +1001,7 @@ export const apiClient = {
   },
 
   async delete<T>(url: string): Promise<T> {
-    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/') && !shouldBypassMock(url)) {
       return new Promise((resolve) => {
         resolve(DemoModeManager.handleDelete(url) as T);
       });
@@ -1001,6 +1014,7 @@ export const apiClient = {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-execution-mode": DemoModeManager.isDemoMode() ? "DEMO" : "LIVE"
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -1019,7 +1033,7 @@ export const apiClient = {
   },
 
   async patch<T>(url: string, body: any): Promise<T> {
-    if (DemoModeManager.isDemoMode() && !url.includes('/auth/')) {
+    if (DemoModeManager.isDemoMode() && !url.includes('/auth/') && !shouldBypassMock(url)) {
       return new Promise((resolve) => {
         resolve(DemoModeManager.handlePatch(url, body) as T);
       });
@@ -1032,6 +1046,7 @@ export const apiClient = {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-execution-mode": DemoModeManager.isDemoMode() ? "DEMO" : "LIVE"
     };
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;

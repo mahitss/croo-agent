@@ -38,6 +38,7 @@ const PLANNING_STAGES = [
 
 export default function WorkflowPage() {
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const isRunning = useNexusStore((state) => state.isRunning);
   const resetExecution = useNexusStore((state) => state.resetExecution);
   const generateWorkflow = useNexusStore((state) => state.generateWorkflow);
@@ -529,6 +530,12 @@ export default function WorkflowPage() {
 
                 {activeWorkflow ? (
                   <div className="flex flex-col gap-3 font-mono">
+                    {isDemoMode && (
+                      <div className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_8px_rgba(0,255,204,0.05)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary-neon animate-pulse" />
+                        <span>Demo Mode - No funds required</span>
+                      </div>
+                    )}
                     <div className="flex flex-col">
                       <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
                       <span className="text-white font-bold truncate">{activeWorkflow.name}</span>
@@ -544,14 +551,20 @@ export default function WorkflowPage() {
                     <div className="flex flex-col">
                       <span className="text-[10px] text-gray-500 uppercase">Status</span>
                       <span className={`font-bold capitalize ${
-                        activeWorkflow.status === 'completed' 
+                        activeWorkflow.status === 'completed' || activeWorkflow.status === 'Demo Completed'
                           ? 'text-primary-neon' 
                           : activeWorkflow.status === 'failed'
                             ? 'text-red-500'
                             : activeWorkflow.status === 'running'
                               ? 'text-blue-400'
                               : 'text-yellow-400'
-                      }`}>{activeWorkflow.status}</span>
+                      }`}>
+                        {isDemoMode && activeWorkflow.status === 'running'
+                          ? 'Running simulated workflow...'
+                          : activeWorkflow.status === 'Demo Completed'
+                            ? 'Demo completed successfully'
+                            : activeWorkflow.status}
+                      </span>
                     </div>
                   </div>
                 ) : (

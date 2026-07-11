@@ -8,34 +8,51 @@ export class WorkflowsController {
   private readonly aiUrl = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
   private readonly walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
 
+  private getMode(req: any, body?: any): 'LIVE' | 'DEMO' {
+    const modeHeader = req.headers['x-execution-mode'];
+    if (modeHeader === 'DEMO' || modeHeader === 'demo') return 'DEMO';
+    if (modeHeader === 'LIVE' || modeHeader === 'live') return 'LIVE';
+    
+    if (body && (body.mode === 'DEMO' || body.mode === 'demo')) return 'DEMO';
+    if (body && (body.mode === 'LIVE' || body.mode === 'live')) return 'LIVE';
+    
+    if (req.query && (req.query.mode === 'DEMO' || req.query.mode === 'demo')) return 'DEMO';
+    if (req.query && (req.query.mode === 'LIVE' || req.query.mode === 'live')) return 'LIVE';
+    
+    return 'LIVE';
+  }
+
   @Post('workflows')
   @UseGuards(GatewayAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createWorkflow(@Req() req: any, @Body() body: any) {
     const userId = req.user.id;
     const start = Date.now();
+    const mode = this.getMode(req, body);
 
-    // 1. Fetch user wallet balance
-    let balance = 0;
-    try {
-      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
-        balance = Number(rawAvail);
+    if (mode === 'LIVE') {
+      // 1. Fetch user wallet balance
+      let balance = 0;
+      try {
+        const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json();
+          const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+          balance = Number(rawAvail);
+        }
+      } catch (e) {
+        console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for template creation:', e);
       }
-    } catch (e) {
-      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for template creation:', e);
-    }
 
-    const estimatedCost = Number(body.estimatedCost || 0);
+      const estimatedCost = Number(body.estimatedCost || 0);
 
-    // 2. Reject if balance < estimatedCost
-    if (balance < estimatedCost) {
-      throw new HttpException({
-        success: false,
-        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
-      }, HttpStatus.PAYMENT_REQUIRED);
+      // 2. Reject if balance < estimatedCost
+      if (balance < estimatedCost) {
+        throw new HttpException({
+          success: false,
+          message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
+        }, HttpStatus.PAYMENT_REQUIRED);
+      }
     }
 
     try {
@@ -70,49 +87,73 @@ export class WorkflowsController {
   async runWorkflow(@Req() req: any, @Param('id') id: string) {
     const userId = req.user.id;
     const start = Date.now();
+    const mode = this.getMode(req);
 
-    // 1. Fetch workflow template to get estimatedCost
-    let estimatedCost = 0;
-    try {
-      const wfRes = await fetch(`${this.workflowUrl}/workflows/${id}`);
-      if (wfRes.ok) {
-        const wfData = await wfRes.json();
-        if (wfData.success && wfData.data) {
-          estimatedCost = Number(wfData.data.estimatedCost || 0);
+    if (mode === 'LIVE') {
+      // 1. Fetch workflow template to get estimatedCost
+      let estimatedCost = 0;
+      try {
+        const wfRes = await fetch(`${this.workflowUrl}/workflows/${id}`);
+        if (wfRes.ok) {
+          const wfData = await wfRes.json();
+          if (wfData.success && wfData.data) {
+            estimatedCost = Number(wfData.data.estimatedCost || 0);
+          }
         }
+      } catch (e) {
+        console.error('[WORKFLOW_CHECK_ERROR] Failed to fetch workflow estimatedCost:', e);
       }
-    } catch (e) {
-      console.error('[WORKFLOW_CHECK_ERROR] Failed to fetch workflow estimatedCost:', e);
-    }
 
-    // 2. Fetch user wallet balance
-    let balance = 0;
-    try {
-      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
-        balance = Number(rawAvail);
+      // 2. Fetch user wallet balance
+      let balance = 0;
+      try {
+        const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json();
+          const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+          balance = Number(rawAvail);
+        }
+      } catch (e) {
+        console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for workflow run:', e);
       }
-    } catch (e) {
-      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for workflow run:', e);
-    }
 
-    // 3. Reject if balance < estimatedCost
-    if (balance < estimatedCost) {
-      throw new HttpException({
-        success: false,
-        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
-      }, HttpStatus.PAYMENT_REQUIRED);
-    }
+      // 3. Reject if balance < estimatedCost
+      if (balance < estimatedCost) {
+        throw new HttpException({
+          success: false,
+          message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
+        }, HttpStatus.PAYMENT_REQUIRED);
+      }
 
-    try {
-      const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
-        method: 'POST',
-      });
-      return await res.json();
-    } catch (err: any) {
-      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/run`, start);
+      try {
+        const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
+          method: 'POST',
+        });
+        return await res.json();
+      } catch (err: any) {
+        return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/run`, start);
+      }
+    } else {
+      // DEMO mode:
+      // Update workflow status to completed in workflow-service
+      try {
+        await fetch(`${this.workflowUrl}/workflows/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+      } catch (e) {
+        console.error('Failed to update status for demo run:', e);
+      }
+
+      return {
+        success: true,
+        message: 'Simulated workflow completed successfully (Demo Mode)',
+        data: {
+          id,
+          status: 'Demo Completed',
+        }
+      };
     }
   }
 
@@ -161,24 +202,36 @@ export class WorkflowsController {
   }
 
   @Get('workflows/:id')
-  async getWorkflow(@Param('id') id: string) {
+  async getWorkflow(@Req() req: any, @Param('id') id: string) {
     const start = Date.now();
+    const mode = this.getMode(req);
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}`);
-      return await res.json();
+      const data = await res.json();
+      if (data.success && data.data) {
+        if (mode === 'DEMO' && data.data.status === 'completed') {
+          data.data.status = 'Demo Completed';
+        }
+      }
+      return data;
     } catch (err: any) {
       return handleGatewayError(err, 'Workflow Service', `GET /workflows/${id}`, start);
     }
   }
 
   @Get('workflows/:id/status')
-  async getWorkflowStatus(@Param('id') id: string) {
+  async getWorkflowStatus(@Req() req: any, @Param('id') id: string) {
     const start = Date.now();
+    const mode = this.getMode(req);
     try {
       const res = await fetch(`${this.workflowUrl}/workflows/${id}`);
       const data = await res.json();
       if (data && data.success && data.data) {
-        return { success: true, status: data.data.status, data: { status: data.data.status } };
+        let status = data.data.status;
+        if (mode === 'DEMO' && status === 'completed') {
+          status = 'Demo Completed';
+        }
+        return { success: true, status, data: { status } };
       }
       return data;
     } catch (err: any) {
@@ -214,90 +267,113 @@ export class WorkflowsController {
   async planWorkflow(@Req() req: any, @Body() body: any) {
     const userId = req.user.id;
     const start = Date.now();
+    const mode = this.getMode(req, body);
 
-    // 1. Fetch user wallet balance
-    let balance = 0;
-    try {
-      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
-        balance = Number(rawAvail);
-      }
-    } catch (e) {
-      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for planning:', e);
-    }
-
-    // 2. Reject immediately if balance <= 0
-    if (balance <= 0) {
-      throw new HttpException({
-        success: false,
-        message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
-      }, HttpStatus.PAYMENT_REQUIRED);
-    }
-
-    let rawResponse: Response | undefined;
-    let responseBody = '';
-    try {
-      rawResponse = await fetch(`${this.aiUrl}/plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
-      });
-      
-      responseBody = await rawResponse.text();
-      const data = JSON.parse(responseBody);
-      if (!rawResponse.ok || !data || !data.workflow) {
-        return {
-          success: false,
-          message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${rawResponse.status})`
-        };
+    if (mode === 'LIVE') {
+      // 1. Fetch user wallet balance
+      let balance = 0;
+      try {
+        const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+        if (balanceRes.ok) {
+          const balanceData = await balanceRes.json();
+          const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+          balance = Number(rawAvail);
+        }
+      } catch (e) {
+        console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for planning:', e);
       }
 
-      const estimatedCost = Number(data.estimated_cost || 0);
-
-      // 3. Verify balance is sufficient to run this specific plan
-      if (balance < estimatedCost) {
+      // 2. Reject immediately if balance <= 0
+      if (balance <= 0) {
         throw new HttpException({
           success: false,
-          message: `Insufficient wallet balance. Workflow requires ${estimatedCost.toFixed(2)} USDC, but you only have ${balance.toFixed(2)} USDC. Please deposit funds before running a workflow.`
+          message: 'Insufficient wallet balance. Please deposit funds before running a workflow.'
         }, HttpStatus.PAYMENT_REQUIRED);
       }
-      
+
+      let rawResponse: Response | undefined;
+      let responseBody = '';
+      try {
+        rawResponse = await fetch(`${this.aiUrl}/plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
+        });
+        
+        responseBody = await rawResponse.text();
+        const data = JSON.parse(responseBody);
+        if (!rawResponse.ok || !data || !data.workflow) {
+          return {
+            success: false,
+            message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${rawResponse.status})`
+          };
+        }
+
+        const estimatedCost = Number(data.estimated_cost || 0);
+
+        // 3. Verify balance is sufficient to run this specific plan
+        if (balance < estimatedCost) {
+          throw new HttpException({
+            success: false,
+            message: `Insufficient wallet balance. Workflow requires ${estimatedCost.toFixed(2)} USDC, but you only have ${balance.toFixed(2)} USDC. Please deposit funds before running a workflow.`
+          }, HttpStatus.PAYMENT_REQUIRED);
+        }
+        
+        return {
+          success: true,
+          message: 'Intention plan generated successfully',
+          data: {
+            nodes: data.workflow.map((node: any) => ({
+              id: node.id,
+              capability: node.capability,
+              label: node.task || node.id.toUpperCase(),
+              task: node.task || node.id.toUpperCase(),
+            })),
+            edges: (() => {
+              const list: any[] = [];
+              let edgeIdx = 0;
+              data.workflow.forEach((node: any) => {
+                if (node.dependencies && Array.isArray(node.dependencies)) {
+                  node.dependencies.forEach((dep: string) => {
+                    list.push({
+                      id: `edge-${edgeIdx++}`,
+                      source: dep,
+                      target: node.id,
+                    });
+                  });
+                }
+              });
+              return list;
+            })(),
+            prompt_tokens: data.prompt_tokens || 0,
+            completion_tokens: data.completion_tokens || 0,
+            estimated_cost: data.estimated_cost || 0,
+          },
+        };
+      } catch (err: any) {
+        if (err instanceof HttpException) throw err;
+        return handleGatewayError(err, 'AI Service', 'POST /plan', start, rawResponse, responseBody);
+      }
+    } else {
+      // DEMO mode planning
       return {
         success: true,
-        message: 'Intention plan generated successfully',
+        message: 'Intention plan generated successfully (Demo Mode)',
         data: {
-          nodes: data.workflow.map((node: any) => ({
-            id: node.id,
-            capability: node.capability,
-            label: node.task || node.id.toUpperCase(),
-            task: node.task || node.id.toUpperCase(),
-          })),
-          edges: (() => {
-            const list: any[] = [];
-            let edgeIdx = 0;
-            data.workflow.forEach((node: any) => {
-              if (node.dependencies && Array.isArray(node.dependencies)) {
-                node.dependencies.forEach((dep: string) => {
-                  list.push({
-                    id: `edge-${edgeIdx++}`,
-                    source: dep,
-                    target: node.id,
-                  });
-                });
-              }
-            });
-            return list;
-          })(),
-          prompt_tokens: data.prompt_tokens || 0,
-          completion_tokens: data.completion_tokens || 0,
-          estimated_cost: data.estimated_cost || 0,
-        },
+          prompt_tokens: 1040,
+          completion_tokens: 320,
+          estimated_cost: 0.0,
+          nodes: [
+            { id: 'research', capability: 'research', label: 'InsightFinder Pro analysis', task: 'InsightFinder Pro analysis' },
+            { id: 'finance', capability: 'finance', label: 'FinAnalytica asset valuation', task: 'FinAnalytica asset valuation' },
+            { id: 'legal', capability: 'legal', label: 'LexGuard contract audit', task: 'LexGuard contract audit' }
+          ],
+          edges: [
+            { id: 'edge-0', source: 'research', target: 'finance' },
+            { id: 'edge-1', source: 'finance', target: 'legal' }
+          ]
+        }
       };
-    } catch (err: any) {
-      if (err instanceof HttpException) throw err;
-      return handleGatewayError(err, 'AI Service', 'POST /plan', start, rawResponse, responseBody);
     }
   }
 
