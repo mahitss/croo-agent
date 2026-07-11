@@ -141,6 +141,7 @@ function CanvasInner({ onSelectNode }: CanvasProps) {
           status: node.status || 'pending', 
           costEstimate: node.costEstimate,
           assignedAgentId: node.assignedAgentId,
+          trustScore: (node as any).trustScore,
           output: node.output,
           error: node.error,
           retryCount: node.status === 'failed' ? 2 : 0,

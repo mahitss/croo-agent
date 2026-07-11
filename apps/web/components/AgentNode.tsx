@@ -130,7 +130,7 @@ export default function AgentNode({ data }: { data: any }) {
         roleName: getAgentDisplayInfo(data.assignedAgent || data.assignedAgentId).name,
         emoji: getAgentDisplayInfo(data.assignedAgent || data.assignedAgentId).emoji,
         agentId: data.assignedAgent || data.assignedAgentId,
-        trustScore: 90, 
+        trustScore: data.trustScore || 90, 
         costEstimate: Number(data.costEstimate || 0.15).toFixed(2),
         latency: `${data.timeEstimate || 1000}ms`
       }

@@ -61,6 +61,8 @@ interface NexusState {
   isWorkflowSaved: boolean;
   unsavedWorkflowTemplate: any | null;
   saveWorkflow: () => Promise<void>;
+  generateLocalDemoWorkflow: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Workflow;
+  runLocalDemoSimulation: (workflow: Workflow) => Promise<void>;
   isSidebarCollapsed: boolean;
   isMobileSidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -361,6 +363,210 @@ function logWorkflowStatusChange(workflowId: string, status: string, nodes: Task
   const pending = nodes.filter(n => n.status === 'pending').length;
   console.log(`[STATUS_CHANGE] Workflow ID: ${workflowId} | Workflow Status: ${status.toUpperCase()} | Completed Nodes: ${completed} | Running Nodes: ${running} | Failed Nodes: ${failed} | Pending Nodes: ${pending}`);
 }
+
+const demoRoles = [
+  { category: 'Research', name: 'InsightFinder Pro', skill: 'research' },
+  { category: 'Finance', name: 'FinAnalytica', skill: 'finance' },
+  { category: 'Legal', name: 'LexGuard Compliance', skill: 'legal' },
+  { category: 'Marketing', name: 'PromoPulse AI', skill: 'marketing' },
+  { category: 'QA', name: 'CodeVerify QA', skill: 'qa' },
+  { category: 'Security', name: 'SentriScan Security', skill: 'security' },
+  { category: 'Sales', name: 'LeadSphere Conversions', skill: 'sales' },
+  { category: 'Data', name: 'SchemaSync Data Engine', skill: 'data' },
+  { category: 'Operations', name: 'OptimaSwarm Ops', skill: 'operations' },
+  { category: 'Compliance', name: 'ReguRadar Audit', skill: 'compliance' },
+  { category: 'Analytics', name: 'MetricsMind Engine', skill: 'analytics' }
+];
+
+const demoTemplates = [
+  {
+    name: 'Pattern A - Finance/Legal Split',
+    nodes: [
+      { id: 'n1', label: 'Research Phase', capability: 'Research', posX: 120, posY: 220 },
+      { id: 'n2', label: 'Financial Audit', capability: 'Finance', posX: 320, posY: 120 },
+      { id: 'n3', label: 'Legal Review', capability: 'Legal', posX: 320, posY: 320 },
+      { id: 'n4', label: 'Final Consolidation', capability: 'Compliance', posX: 520, posY: 220 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n4' }
+    ]
+  },
+  {
+    name: 'Pattern B - Sequential Pipeline',
+    nodes: [
+      { id: 'n1', label: 'Initial Research', capability: 'Research', posX: 100, posY: 200 },
+      { id: 'n2', label: 'Swarm Planning', capability: 'Operations', posX: 260, posY: 200 },
+      { id: 'n3', label: 'Financial Check', capability: 'Finance', posX: 420, posY: 200 },
+      { id: 'n4', label: 'Compliance Audit', capability: 'Compliance', posX: 580, posY: 200 },
+      { id: 'n5', label: 'Final Output', capability: 'Data', posX: 740, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n3', target: 'n4' },
+      { source: 'n4', target: 'n5' }
+    ]
+  },
+  {
+    name: 'Pattern C - Multi-Angle Decision',
+    nodes: [
+      { id: 'n1', label: 'Market Ingestion', capability: 'Data', posX: 100, posY: 220 },
+      { id: 'n2', label: 'Marketing Strategy', capability: 'Marketing', posX: 280, posY: 80 },
+      { id: 'n3', label: 'Legal Safeguard', capability: 'Legal', posX: 280, posY: 170 },
+      { id: 'n4', label: 'Risk Analysis', capability: 'Compliance', posX: 280, posY: 270 },
+      { id: 'n5', label: 'Financial Modeling', capability: 'Finance', posX: 280, posY: 360 },
+      { id: 'n6', label: 'Strategic Decision', capability: 'Operations', posX: 480, posY: 220 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n3' },
+      { source: 'n1', target: 'n4' },
+      { source: 'n1', target: 'n5' },
+      { source: 'n2', target: 'n6' },
+      { source: 'n3', target: 'n6' },
+      { source: 'n4', target: 'n6' },
+      { source: 'n5', target: 'n6' }
+    ]
+  },
+  {
+    name: 'Pattern D - Parallel Inputs with Aggregator',
+    nodes: [
+      { id: 'n1', label: 'Research Stream', capability: 'Research', posX: 100, posY: 90 },
+      { id: 'n2', label: 'Finance Stream', capability: 'Finance', posX: 100, posY: 180 },
+      { id: 'n3', label: 'Security Scan', capability: 'Security', posX: 100, posY: 270 },
+      { id: 'n4', label: 'Legal Audit', capability: 'Legal', posX: 100, posY: 360 },
+      { id: 'n5', label: 'Data Aggregator', capability: 'Data', posX: 320, posY: 220 },
+      { id: 'n6', label: 'Executive Report', capability: 'Analytics', posX: 540, posY: 220 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n5' },
+      { source: 'n2', target: 'n5' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n5' },
+      { source: 'n5', target: 'n6' }
+    ]
+  },
+  {
+    name: 'Pattern E - Planner Fan-Out/Fan-In',
+    nodes: [
+      { id: 'n1', label: 'Core Ingestion', capability: 'Data', posX: 100, posY: 250 },
+      { id: 'n2', label: 'Swarm Planner', capability: 'Operations', posX: 250, posY: 250 },
+      { id: 'n3', label: 'Legal Analysis', capability: 'Legal', posX: 420, posY: 100 },
+      { id: 'n4', label: 'Budget Allocation', capability: 'Finance', posX: 420, posY: 200 },
+      { id: 'n5', label: 'Marketing Target', capability: 'Marketing', posX: 420, posY: 300 },
+      { id: 'n6', label: 'Quality Assurance', capability: 'QA', posX: 420, posY: 400 },
+      { id: 'n7', label: 'Consolidated Outcome', capability: 'Analytics', posX: 600, posY: 250 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n2', target: 'n5' },
+      { source: 'n2', target: 'n6' },
+      { source: 'n3', target: 'n7' },
+      { source: 'n4', target: 'n7' },
+      { source: 'n5', target: 'n7' },
+      { source: 'n6', target: 'n7' }
+    ]
+  },
+  {
+    name: 'Pattern F - Cross-Functional Parallel Streams',
+    nodes: [
+      { id: 'n1', label: 'Initiation Stage', capability: 'Operations', posX: 80, posY: 200 },
+      { id: 'n2', label: 'Business Development', capability: 'Sales', posX: 240, posY: 100 },
+      { id: 'n3', label: 'Technical Prototype', capability: 'Data', posX: 240, posY: 300 },
+      { id: 'n4', label: 'Market Assessment', capability: 'Marketing', posX: 420, posY: 100 },
+      { id: 'n5', label: 'Security & QA Review', capability: 'Security', posX: 420, posY: 300 },
+      { id: 'n6', label: 'Deployment Strategy', capability: 'Compliance', posX: 580, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n6' },
+      { source: 'n5', target: 'n6' }
+    ]
+  },
+  {
+    name: 'Pattern G - Data Ingestion & Analytics Pipeline',
+    nodes: [
+      { id: 'n1', label: 'Data Ingestion', capability: 'Data', posX: 90, posY: 200 },
+      { id: 'n2', label: 'Data Refining', capability: 'QA', posX: 240, posY: 200 },
+      { id: 'n3', label: 'Market Trend Analysis', capability: 'Analytics', posX: 390, posY: 100 },
+      { id: 'n4', label: 'Operations Sync', capability: 'Operations', posX: 390, posY: 300 },
+      { id: 'n5', label: 'Legal Compliance Audit', capability: 'Compliance', posX: 540, posY: 200 },
+      { id: 'n6', label: 'Production Release', capability: 'Sales', posX: 690, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n5' },
+      { source: 'n5', target: 'n6' }
+    ]
+  },
+  {
+    name: 'Pattern H - Convergent V-Shape Execution',
+    nodes: [
+      { id: 'n1', label: 'Marketing Blast', capability: 'Marketing', posX: 100, posY: 90 },
+      { id: 'n2', label: 'Sales Funneling', capability: 'Sales', posX: 100, posY: 310 },
+      { id: 'n3', label: 'Operational Dispatch', capability: 'Operations', posX: 280, posY: 200 },
+      { id: 'n4', label: 'Performance Analytics', capability: 'Analytics', posX: 460, posY: 200 },
+      { id: 'n5', label: 'Regulatory Filing', capability: 'Compliance', posX: 640, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n3' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n3', target: 'n4' },
+      { source: 'n4', target: 'n5' }
+    ]
+  },
+  {
+    name: 'Pattern I - Diamond Validation Pipeline',
+    nodes: [
+      { id: 'n1', label: 'Job Initialization', capability: 'Operations', posX: 100, posY: 200 },
+      { id: 'n2', label: 'Auditing Upper Bound', capability: 'Finance', posX: 300, posY: 100 },
+      { id: 'n3', label: 'Auditing Lower Bound', capability: 'Security', posX: 300, posY: 300 },
+      { id: 'n4', label: 'Consensus Calibration', capability: 'QA', posX: 500, posY: 200 },
+      { id: 'n5', label: 'Report Dispatcher', capability: 'Data', posX: 700, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n4' },
+      { source: 'n4', target: 'n5' }
+    ]
+  },
+  {
+    name: 'Pattern J - Double Diamond Complex DAG',
+    nodes: [
+      { id: 'n1', label: 'Boot Initialization', capability: 'Operations', posX: 60, posY: 250 },
+      { id: 'n2', label: 'Payload Parser', capability: 'Data', posX: 200, posY: 250 },
+      { id: 'n3', label: 'Financial Appraisal', capability: 'Finance', posX: 340, posY: 130 },
+      { id: 'n4', label: 'Legal Soundness Audit', capability: 'Legal', posX: 340, posY: 370 },
+      { id: 'n5', label: 'Risk Quantification', capability: 'Compliance', posX: 480, posY: 130 },
+      { id: 'n6', label: 'Security Vulnerability Test', capability: 'Security', posX: 480, posY: 370 },
+      { id: 'n7', label: 'Consolidated Aggregation', capability: 'QA', posX: 620, posY: 250 },
+      { id: 'n8', label: 'Final Output Dispatcher', capability: 'Sales', posX: 760, posY: 250 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n6' },
+      { source: 'n5', target: 'n7' },
+      { source: 'n6', target: 'n7' },
+      { source: 'n7', target: 'n8' }
+    ]
+  }
+];
 
 export const useNexusStore = create<NexusState>((set, get) => {
   return {
@@ -748,9 +954,32 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     generateWorkflow: async (query, routingMode, budget) => {
       console.log('[STRUCTURED_LOG] START_GENERATE', { query, routingMode, budget });
-      console.log("STEP 1");
-      console.log("process.env.NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
       const state = get();
+      if (state.isDemoMode) {
+        const localWf = get().generateLocalDemoWorkflow(query, routingMode, budget);
+        
+        localStorage.setItem(`orbit_workflow_metadata_${localWf.id}`, JSON.stringify({
+          query,
+          routingMode,
+          budget,
+          promptTokens: get().promptTokens,
+          completionTokens: get().completionTokens,
+          totalTokens: get().totalTokens,
+          estimatedCost: get().estimatedCost,
+          nodeTitles: localWf.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
+          agentSelectionReasons: localWf.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
+        }));
+        localStorage.setItem('orbit_last_workflow_id', localWf.id);
+
+        if (typeof window !== 'undefined') {
+          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${localWf.id}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
+        }
+
+        set({ activeWorkflow: localWf, userQuery: query, appState: 'draft', isWorkflowSaved: true, unsavedWorkflowTemplate: null });
+        console.log('[STRUCTURED_LOG] RENDER_WORKFLOW_SUCCESS (Local Demo)', { workflowId: localWf.id });
+        return;
+      }
       const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
 
       if (!dbAgents || dbAgents.length === 0) {
@@ -1062,6 +1291,246 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
     },
 
+    generateLocalDemoWorkflow: (query, routingMode, budget) => {
+      const template = demoTemplates[Math.floor(Math.random() * demoTemplates.length)];
+      const shuffledRoles = [...demoRoles].sort(() => 0.5 - Math.random());
+      
+      const promptTokens = Math.floor(400 + Math.random() * 600);
+      const completionTokens = Math.floor(300 + Math.random() * 500);
+      const totalTokens = promptTokens + completionTokens;
+      const estimatedCost = Math.round((0.15 + Math.random() * 0.45) * 100) / 100;
+      
+      set({
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCost
+      });
+
+      const nodes: TaskNode[] = template.nodes.map((n, idx) => {
+        const role = shuffledRoles[idx % shuffledRoles.length];
+        const costEstimate = Math.round((0.02 + Math.random() * 0.88) * 100) / 100;
+        const timeEstimate = Math.floor(150 + Math.random() * 1650);
+        const trustScore = Math.floor(82 + Math.random() * 18);
+        
+        const jitterX = Math.floor(Math.random() * 20 - 10);
+        const jitterY = Math.floor(Math.random() * 20 - 10);
+
+        return {
+          id: n.id,
+          name: n.label,
+          task: n.label,
+          description: `Simulated execution of ${role.category} operations. Target capability: ${n.capability.toLowerCase()}. Selected because: ${trustScore}% trust success.`,
+          capability: role.skill,
+          costEstimate,
+          timeEstimate,
+          trustScore,
+          status: 'pending' as const,
+          assignedAgentId: `agent-${role.skill}-${Math.floor(Math.random() * 1000)}`,
+          assignedAgent: role.name,
+          positionX: n.posX + jitterX,
+          positionY: n.posY + jitterY
+        } as any;
+      });
+
+      const edges = template.edges.map((e, idx) => ({
+        id: `e-${idx}-${Date.now()}`,
+        source: e.source,
+        target: e.target
+      }));
+
+      const workflow: Workflow = {
+        id: `demo-${Date.now()}`,
+        name: query.slice(0, 30) + ' Swarm',
+        query,
+        nodes: nodes.map(n => ({
+          ...n,
+          task: n.name,
+          assignedAgent: n.assignedAgentId
+        })),
+        edges,
+        budget,
+        routingMode: routingMode as any,
+        retryCount: 0,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString()
+      };
+
+      localStorage.setItem(`orbit_workflow_data_${workflow.id}`, JSON.stringify(workflow));
+      return workflow;
+    },
+
+    runLocalDemoSimulation: async (workflow) => {
+      const runNode = async (nodeId: string) => {
+        set(state => {
+          if (!state.activeWorkflow) return {};
+          const updatedNodes = state.activeWorkflow.nodes.map(n => 
+            n.id === nodeId ? { ...n, status: 'running' as const } : n
+          );
+          const updatedWf = { ...state.activeWorkflow, nodes: updatedNodes };
+          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
+          return { activeWorkflow: updatedWf };
+        });
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('nexus_store_update'));
+        }
+
+        const currentWf = get().activeWorkflow;
+        const node = currentWf?.nodes.find(n => n.id === nodeId);
+        const agentName = node?.assignedAgent || 'Swarm Agent';
+        get().logExecution('execution', `Agent [${agentName}] started executing task: "${node?.name || nodeId}"...`);
+
+        const delay = Math.floor(400 + Math.random() * 500);
+        await new Promise(r => setTimeout(r, delay));
+
+        set(state => {
+          if (!state.activeWorkflow) return {};
+          const updatedNodes = state.activeWorkflow.nodes.map(n => 
+            n.id === nodeId ? { ...n, status: 'completed' as const } : n
+          );
+          const updatedWf = { ...state.activeWorkflow, nodes: updatedNodes };
+          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
+          return { activeWorkflow: updatedWf };
+        });
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('nexus_store_update'));
+        }
+
+        const updatedWf = get().activeWorkflow;
+        const compNode = updatedWf?.nodes.find(n => n.id === nodeId);
+        get().logExecution('execution', `Agent [${agentName}] completed task: "${node?.name || nodeId}" (Time: ${((compNode?.timeEstimate || 500) / 1000).toFixed(2)}s). Output generated.`, 'success');
+      };
+
+      try {
+        set(state => {
+          if (!state.activeWorkflow) return {};
+          const updatedWf = { ...state.activeWorkflow, status: 'running' as const };
+          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
+          return { activeWorkflow: updatedWf };
+        });
+
+        while (get().isRunning && get().activeWorkflow && get().activeWorkflow.status === 'running') {
+          const wf = get().activeWorkflow!;
+          const pendingNodes = wf.nodes.filter(n => n.status === 'pending');
+          if (pendingNodes.length === 0) {
+            const runningNodes = wf.nodes.filter(n => n.status === 'running');
+            if (runningNodes.length === 0) {
+              break;
+            }
+            await new Promise(r => setTimeout(r, 100));
+            continue;
+          }
+
+          const readyNodeIds: string[] = [];
+          for (const node of pendingNodes) {
+            const incomingEdges = wf.edges.filter(e => e.target === node.id);
+            const allPredecessorsCompleted = incomingEdges.every(edge => {
+              const predNode = wf.nodes.find(n => n.id === edge.source);
+              return predNode && predNode.status === 'completed';
+            });
+            if (allPredecessorsCompleted) {
+              readyNodeIds.push(node.id);
+            }
+          }
+
+          if (readyNodeIds.length > 0) {
+            await Promise.all(readyNodeIds.map(nodeId => runNode(nodeId)));
+          } else {
+            await new Promise(r => setTimeout(r, 100));
+          }
+        }
+
+        const finalWf = get().activeWorkflow;
+        if (finalWf && finalWf.nodes.every(n => n.status === 'completed')) {
+          const totalCost = finalWf.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
+
+          set(state => {
+            const escrowReleaseTx: Transaction = {
+              id: `tx-settle-${Date.now()}`,
+              senderAddress: 'ESCROW_VAULT',
+              receiverAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
+              amount: totalCost,
+              type: 'escrow_release',
+              timestamp: new Date().toISOString(),
+              status: 'completed',
+              txHash: '0x' + Math.random().toString(16).substring(2, 42)
+            };
+
+            const newDemoEscrow = Math.max(0, state.demoEscrow - totalCost);
+            const newDemoHistory = [escrowReleaseTx, ...state.demoHistory];
+            
+            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
+            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+            const updatedDemoWallet = {
+              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+              balance: state.demoBalance,
+              escrowBalance: newDemoEscrow,
+              history: newDemoHistory
+            };
+
+            const updatedAgentWallets = { ...state.agentWallets };
+            finalWf.nodes.forEach(node => {
+              if (node.assignedAgentId) {
+                const currentWallet = updatedAgentWallets[node.assignedAgentId] || {
+                  address: '0x' + Math.random().toString(16).substring(2, 42),
+                  balance: 0,
+                  escrowBalance: 0,
+                  history: []
+                };
+                const agentTx: Transaction = {
+                  id: `tx-agent-payout-${Date.now()}-${node.id}`,
+                  senderAddress: 'ESCROW_VAULT',
+                  receiverAddress: currentWallet.address,
+                  amount: node.costEstimate,
+                  type: 'deposit',
+                  timestamp: new Date().toISOString(),
+                  status: 'completed',
+                  txHash: '0x' + Math.random().toString(16).substring(2, 42)
+                };
+                updatedAgentWallets[node.assignedAgentId] = {
+                  ...currentWallet,
+                  balance: currentWallet.balance + node.costEstimate,
+                  history: [agentTx, ...currentWallet.history]
+                };
+              }
+            });
+
+            const completedWf: Workflow = {
+              ...finalWf,
+              status: 'completed' as const
+            };
+            localStorage.setItem(`orbit_workflow_data_${completedWf.id}`, JSON.stringify(completedWf));
+
+            return {
+              demoEscrow: newDemoEscrow,
+              demoHistory: newDemoHistory,
+              demoTransactions: newDemoHistory,
+              demoWallet: updatedDemoWallet,
+              userWallet: updatedDemoWallet,
+              agentWallets: updatedAgentWallets,
+              activeWorkflow: completedWf,
+              isRunning: false,
+              currentPhaseIndex: 9,
+              appState: 'completed'
+            };
+          });
+
+          get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
+          
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('nexus_store_update'));
+            window.dispatchEvent(new CustomEvent('nexus_demo_workflow_completed', { detail: { workflowId: finalWf.id } }));
+          }
+        }
+      } catch (err: any) {
+        console.error('Error during demo local execution simulation:', err);
+        set({ isRunning: false });
+      }
+    },
+
     startExecution: async (query, routingMode, budget) => {
       const state = get();
       if (state.isRunning) return;
@@ -1073,6 +1542,107 @@ export const useNexusStore = create<NexusState>((set, get) => {
       };
 
       try {
+        if (state.isDemoMode) {
+          log('intent', `LLM processing intent for: "${query}"`);
+          set({ currentPhaseIndex: 1 });
+          await new Promise(r => setTimeout(r, 450));
+          log('intent', `Detected intent capabilities.`, 'success');
+
+          set({ currentPhaseIndex: 2 });
+          log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
+          await new Promise(r => setTimeout(r, 450));
+
+          let workflow = state.activeWorkflow;
+          if (!workflow || workflow.query !== query) {
+            workflow = get().generateLocalDemoWorkflow(query, routingMode, budget);
+          }
+
+          workflow = {
+            ...workflow,
+            status: 'running' as const,
+            nodes: workflow.nodes.map(n => ({ ...n, status: 'pending' as const }))
+          };
+
+          localStorage.setItem(`orbit_workflow_data_${workflow.id}`, JSON.stringify(workflow));
+          localStorage.setItem(`orbit_workflow_metadata_${workflow.id}`, JSON.stringify({
+            query,
+            routingMode,
+            budget,
+            promptTokens: get().promptTokens,
+            completionTokens: get().completionTokens,
+            totalTokens: get().totalTokens,
+            estimatedCost: get().estimatedCost,
+            nodeTitles: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
+            agentSelectionReasons: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
+          }));
+          localStorage.setItem('orbit_last_workflow_id', workflow.id);
+
+          set({ activeWorkflow: workflow, appState: 'running' });
+          log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
+
+          set({ currentPhaseIndex: 3 });
+          log('discovery', 'Querying live agent registry database for skill set matching...');
+          await new Promise(r => setTimeout(r, 500));
+          log('discovery', `Identified matching capabilities.`, 'success');
+
+          set({ currentPhaseIndex: 4 });
+          log('evaluation', 'Evaluating agent endpoints, reliability SLA metrics, and bids...');
+          await new Promise(r => setTimeout(r, 500));
+          log('evaluation', 'Agent evaluation complete.', 'success');
+
+          set({ currentPhaseIndex: 5 });
+          log('negotiation', 'Negotiating execution fees and SLA guarantees...');
+          await new Promise(r => setTimeout(r, 500));
+          const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
+          log('negotiation', `Agreements finalized. Cumulative fee locked: ${totalCost.toFixed(2)} USDC`, 'success');
+
+          set({ currentPhaseIndex: 6 });
+          log('payment', 'Demo Mode - Escrow hold bypassed (No funds required)', 'success');
+          await new Promise(r => setTimeout(r, 450));
+
+          set(state => {
+            const escrowTx: Transaction = {
+              id: `tx-escrow-${Date.now()}`,
+              senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+              receiverAddress: 'ESCROW_VAULT',
+              amount: totalCost,
+              type: 'escrow_hold',
+              timestamp: new Date().toISOString(),
+              status: 'completed',
+              txHash: '0x' + Math.random().toString(16).substring(2, 42)
+            };
+            const newDemoBalance = Math.max(0, state.demoBalance - totalCost);
+            const newDemoEscrow = state.demoEscrow + totalCost;
+            const newDemoHistory = [escrowTx, ...state.demoHistory];
+            
+            localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
+            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
+            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+            const updatedDemoWallet = {
+              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+              balance: newDemoBalance,
+              escrowBalance: newDemoEscrow,
+              history: newDemoHistory
+            };
+
+            return {
+              demoBalance: newDemoBalance,
+              demoEscrow: newDemoEscrow,
+              demoHistory: newDemoHistory,
+              demoTransactions: newDemoHistory,
+              demoWallet: updatedDemoWallet,
+              userWallet: updatedDemoWallet
+            };
+          });
+
+          set({ currentPhaseIndex: 7 });
+          log('execution', 'Running simulated workflow...');
+          
+          get().runLocalDemoSimulation(workflow);
+          return;
+        }
+
         let workflow = state.activeWorkflow;
         const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
         
@@ -1577,6 +2147,46 @@ export const useNexusStore = create<NexusState>((set, get) => {
         if (workflowId) {
           console.log('[WORKFLOW_RESTORE] Attempting to restore workflow ID: ' + workflowId);
           try {
+            if (workflowId.startsWith('demo-')) {
+              const storedWf = localStorage.getItem(`orbit_workflow_data_${workflowId}`);
+              const storedMeta = localStorage.getItem(`orbit_workflow_metadata_${workflowId}`);
+              if (storedWf) {
+                const workflow = JSON.parse(storedWf);
+                const isRunning = workflow.status === 'running';
+                const isTerminal = workflow.status === 'completed' || workflow.status === 'failed' || (workflow.status as any) === 'cancelled';
+                
+                let meta = {
+                  query: workflow.name,
+                  routingMode: 'balanced',
+                  budget: workflow.budget || 2.0,
+                  promptTokens: 0,
+                  completionTokens: 0,
+                  totalTokens: 0,
+                  estimatedCost: workflow.estimatedCost || 0
+                };
+                if (storedMeta) {
+                  meta = { ...meta, ...JSON.parse(storedMeta) };
+                }
+
+                set({
+                  activeWorkflow: workflow,
+                  isRunning,
+                  currentPhaseIndex: isRunning ? 7 : (workflow.status === 'completed' ? 9 : 0),
+                  userQuery: meta.query,
+                  promptTokens: meta.promptTokens,
+                  completionTokens: meta.completionTokens,
+                  totalTokens: meta.totalTokens,
+                  estimatedCost: meta.estimatedCost,
+                  appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft')
+                });
+
+                if (isRunning) {
+                  get().runLocalDemoSimulation(workflow);
+                }
+                return;
+              }
+            }
+
             const wfRes = await apiClient.get<any>(`/api/v1/workflows/${workflowId}`);
             if (wfRes?.success && wfRes.data) {
               const dbWorkflow = wfRes.data;

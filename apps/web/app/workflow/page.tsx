@@ -101,6 +101,16 @@ export default function WorkflowPage() {
   }, []);
 
   useEffect(() => {
+    const handleDemoCompleted = (e: any) => {
+      toast('Workflow completed successfully.', 'success');
+    };
+    window.addEventListener('nexus_demo_workflow_completed', handleDemoCompleted);
+    return () => {
+      window.removeEventListener('nexus_demo_workflow_completed', handleDemoCompleted);
+    };
+  }, [toast]);
+
+  useEffect(() => {
     if (selectedNode) {
       setNodeNameInput(selectedNode.name);
     }
