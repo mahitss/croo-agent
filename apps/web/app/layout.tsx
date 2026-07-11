@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import CommandPalette from "../components/CommandPalette";
 import AiAssistant from "../components/AiAssistant";
 import { ToastProvider } from "../components/Toast";
@@ -30,10 +30,9 @@ export default function RootLayout({
         <ToastProvider>
           <ErrorBoundary>
             <DemoBanner />
-            <Navbar />
-            <main className="flex-1 flex flex-col">
+            <AppLayout>
               {children}
-            </main>
+            </AppLayout>
             <CommandPalette />
             <AiAssistant />
             <AuthModal />

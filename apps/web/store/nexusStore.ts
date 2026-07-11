@@ -46,6 +46,10 @@ interface NexusState {
   isWorkflowSaved: boolean;
   unsavedWorkflowTemplate: any | null;
   saveWorkflow: () => Promise<void>;
+  isSidebarCollapsed: boolean;
+  isMobileSidebarOpen: boolean;
+  toggleSidebar: () => void;
+  setMobileSidebarOpen: (val: boolean) => void;
 
   // Marketplace Persistent States
   marketplaceTab: 'all' | 'trending' | 'featured' | 'verified';
@@ -395,6 +399,10 @@ export const useNexusStore = create<NexusState>((set, get) => {
     authModalTab: 'login',
     isWorkflowSaved: true,
     unsavedWorkflowTemplate: null,
+    isSidebarCollapsed: false,
+    isMobileSidebarOpen: false,
+    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+    setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
 
     setUserQuery: (query) => set({ userQuery: query }),
 

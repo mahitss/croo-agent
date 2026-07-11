@@ -47,7 +47,6 @@ export default function Navbar() {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [isLargeDesktop, setIsLargeDesktop] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -68,6 +67,20 @@ export default function Navbar() {
   
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
+
+  const toggleSidebar = useNexusStore((state) => state.toggleSidebar);
+  const isMobileSidebarOpen = useNexusStore((state) => state.isMobileSidebarOpen);
+  const setMobileSidebarOpen = useNexusStore((state) => state.setMobileSidebarOpen);
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (!token || !user) return;
+    e.preventDefault();
+    if (window.innerWidth < 768) {
+      setMobileSidebarOpen(!isMobileSidebarOpen);
+    } else {
+      toggleSidebar();
+    }
+  };
 
   useEffect(() => {
     if (token) {
@@ -117,7 +130,6 @@ export default function Navbar() {
     ? [
         { href: '/', label: 'Portal', icon: Cpu },
         { href: '/marketplace', label: 'Marketplace', icon: Shuffle },
-        { href: '/dashboard', label: 'Dashboard', icon: TrendingUp },
       ]
     : [
         { href: '/', label: 'Portal', icon: Cpu },
@@ -126,13 +138,7 @@ export default function Navbar() {
         { href: '/dashboard', label: 'Dashboard', icon: TrendingUp },
       ];
 
-  const sidebarLinks = [
-    { href: '/workflow', label: 'Workflow Builder', icon: Layers },
-    { href: '/analytics', label: 'Analytics', icon: TrendingUp },
-    { href: '/registry', label: 'Publish Agent', icon: PlusCircle },
-    { href: '/admin', label: 'Admin', icon: ShieldCheck },
-    { href: '#/settings', label: 'Settings', icon: Settings },
-  ];
+
 
   console.log("Rendering Login/Register", {
     isAuthenticated,
@@ -162,7 +168,13 @@ export default function Navbar() {
         
         {/* LEFT SECTION */}
         <div className="flex items-center gap-6 flex-shrink-0">
-          <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+          <Link 
+            href="/" 
+            onClick={handleLogoClick}
+            className={`flex items-center gap-2 group flex-shrink-0 ${
+              isAuthenticated ? 'cursor-pointer hover:opacity-85 select-none' : ''
+            }`}
+          >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
               O
             </div>
@@ -336,15 +348,6 @@ export default function Navbar() {
                     </div>
                   </div>
                 </div>
-
-                {/* Hamburger Menu Button */}
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all focus:outline-none flex-shrink-0"
-                  aria-label="Toggle Navigation Sidebar"
-                >
-                  <Menu className="w-5 h-5 text-primary-neon" />
-                </button>
               </div>
             )}
           </div>
@@ -353,119 +356,6 @@ export default function Navbar() {
 
       </div>
     </nav>
-
-    {/* Sidebar Backdrop Overlay */}
-    {mounted && isAuthenticated && user && isSidebarOpen && (
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] transition-opacity duration-300 animate-in fade-in"
-        onClick={() => setIsSidebarOpen(false)}
-      />
-    )}
-
-    {/* Sidebar Panel */}
-    {mounted && isAuthenticated && user && (
-      <div 
-        className={`fixed inset-y-0 left-0 w-72 bg-black/95 border-r border-border-dark z-[9999] flex flex-col justify-between p-6 transform transition-transform duration-300 ease-in-out font-mono ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-6 border-b border-border-dark flex-shrink-0">
-          <Link 
-            href="/" 
-            onClick={() => setIsSidebarOpen(false)}
-            className="flex items-center gap-2 group"
-          >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-sm">
-              O
-            </div>
-            <span className="font-extrabold text-sm tracking-wider text-white">
-              ORBIT <span className="text-primary-neon font-normal text-xs tracking-widest ml-0.5">AI</span>
-            </span>
-          </Link>
-          
-          <button 
-            onClick={() => setIsSidebarOpen(false)}
-            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all focus:outline-none"
-          >
-            <X className="w-5 h-5 text-secondary-neon" />
-          </button>
-        </div>
-
-        {/* Links Section */}
-        <div className="flex-1 py-6 overflow-y-auto space-y-2">
-          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-4 font-mono">
-            Core Modules
-          </div>
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href;
-            const isMockSettings = link.href.startsWith('#');
-            
-            const handleClick = (e: React.MouseEvent) => {
-              setIsSidebarOpen(false);
-              if (isMockSettings) {
-                e.preventDefault();
-                toast({
-                  title: 'Settings',
-                  description: 'Settings panel features coming soon in the next update.',
-                  type: 'info'
-                });
-              }
-            };
-
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={handleClick}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'text-primary-neon bg-primary-neon/10 border border-primary-neon/20 shadow-[0_0_15px_rgba(0,255,204,0.05)]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-primary-neon' : 'text-gray-400'}`} />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Footer Controls */}
-        <div className="pt-6 border-t border-border-dark space-y-4 flex-shrink-0">
-          {/* Live Mode Toggle */}
-          <div className="flex items-center justify-between bg-white/5 border border-border-dark/50 rounded-xl p-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold text-gray-300">Execution Mode</span>
-              <span className="text-[9px] text-gray-500">Live payment validation</span>
-            </div>
-            <button
-              onClick={toggleDemoMode}
-              className={`text-[9px] font-bold uppercase px-2.5 py-1.5 rounded-md border tracking-wider transition-all duration-300 ${
-                !isDemoMode
-                  ? 'bg-primary-neon/20 border-primary-neon text-primary-neon'
-                  : 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
-              }`}
-            >
-              {!isDemoMode ? 'Live Mode' : 'Demo Mode'}
-            </button>
-          </div>
-
-          {/* Logout button */}
-          <button
-            onClick={() => {
-              setIsSidebarOpen(false);
-              logoutUser();
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all border border-transparent"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </div>
-    )}
     </>
   );
 }
