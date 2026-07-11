@@ -849,6 +849,12 @@ const shouldBypassMock = (url: string): boolean => {
   if (typeof window === 'undefined') return true;
   const token = localStorage.getItem('orbit_token');
   if (!token) return false;
+
+  const isDemo = localStorage.getItem('orbit_demomode') === 'true';
+  if (isDemo && url.startsWith('/api/v1/wallet')) {
+    return false;
+  }
+
   return url === '/api/v1/ai/plan' || 
          url.startsWith('/api/v1/workflows') || 
          url.startsWith('/api/v1/analytics') || 

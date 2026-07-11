@@ -36,6 +36,17 @@ interface NexusState {
   totalTokens: number;
   estimatedCost: number;
   appState: 'planning' | 'draft' | 'running' | 'completed' | 'history';
+
+  // Mode-isolated wallet states
+  demoBalance: number;
+  demoTransactions: Transaction[];
+  demoEscrow: number;
+  demoHistory: Transaction[];
+
+  liveBalance: number;
+  liveTransactions: Transaction[];
+  liveEscrow: number;
+  liveHistory: Transaction[];
   
   // Auth & Mode States
   user: { id: string; email: string; username: string; role: 'user' | 'creator' | 'admin'; displayName?: string; avatarUrl?: string; } | null;
@@ -358,6 +369,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
       escrowBalance: 0.0,
       history: []
     },
+    demoBalance: 0.0,
+    demoTransactions: [],
+    demoEscrow: 0.0,
+    demoHistory: [],
+    liveBalance: 0.0,
+    liveTransactions: [],
+    liveEscrow: 0.0,
+    liveHistory: [],
     agentWallets: {},
     isRunning: false,
     currentPhaseIndex: 0,
@@ -520,39 +539,33 @@ export const useNexusStore = create<NexusState>((set, get) => {
       
       // ─── DEMO MODE ────────────────────────────────────────────────────────
       if (state.isDemoMode) {
-        try {
-          const res = await apiClient.post<any>('/api/v1/wallet/deposit-credits', {
-            amount,
-            userId: state.user?.id || 'user-1',
-            address: state.userWallet.address
-          });
-          if (res.success) {
-            await get().initialize();
-            return { success: true };
-          } else {
-            throw new Error(res.message);
+        const tx: Transaction = {
+          id: `tx-deposit-${Date.now()}`,
+          senderAddress: 'EXTERNAL_BANK',
+          receiverAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+          amount,
+          type: 'deposit',
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+        };
+        const newDemoBalance = state.demoBalance + amount;
+        const newDemoHistory = [tx, ...state.demoHistory];
+
+        localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
+        localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+        set({
+          demoBalance: newDemoBalance,
+          demoHistory: newDemoHistory,
+          demoTransactions: newDemoHistory,
+          userWallet: {
+            ...state.userWallet,
+            balance: newDemoBalance,
+            history: newDemoHistory
           }
-        } catch (err: any) {
-          console.warn('Fallback local credit increment in Demo Mode:', err);
-          const tx: Transaction = {
-            id: `tx-deposit-${Date.now()}`,
-            senderAddress: 'EXTERNAL_BANK',
-            receiverAddress: state.userWallet.address,
-            amount,
-            type: 'deposit',
-            timestamp: new Date().toISOString(),
-            status: 'completed',
-            txHash: '0x' + Math.random().toString(16).substring(2, 42)
-          };
-          set({
-            userWallet: {
-              ...state.userWallet,
-              balance: state.userWallet.balance + amount,
-              history: [tx, ...state.userWallet.history]
-            }
-          });
-          return { success: true };
-        }
+        });
+        return { success: true };
       }
 
       // ─── LIVE MODE (Razorpay Checkout) ────────────────────────────────────
@@ -639,6 +652,36 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const state = get();
       if (state.userWallet.balance < amount) return;
       
+      if (state.isDemoMode) {
+        const tx: Transaction = {
+          id: `tx-withdraw-${Date.now()}`,
+          senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+          receiverAddress: 'EXTERNAL_BANK',
+          amount,
+          type: 'withdrawal',
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+        };
+        const newDemoBalance = state.demoBalance - amount;
+        const newDemoHistory = [tx, ...state.demoHistory];
+
+        localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
+        localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+        set({
+          demoBalance: newDemoBalance,
+          demoHistory: newDemoHistory,
+          demoTransactions: newDemoHistory,
+          userWallet: {
+            ...state.userWallet,
+            balance: newDemoBalance,
+            history: newDemoHistory
+          }
+        });
+        return;
+      }
+
       try {
         const res = await apiClient.post<any>('/api/v1/wallet/withdraw', {
           amount,
@@ -1200,6 +1243,39 @@ export const useNexusStore = create<NexusState>((set, get) => {
         } else {
           log('payment', 'Demo Mode - Escrow hold bypassed (No funds required)', 'success');
           await new Promise(r => setTimeout(r, 400));
+
+          set(state => {
+            const escrowTx: Transaction = {
+              id: `tx-escrow-${Date.now()}`,
+              senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+              receiverAddress: 'ESCROW_VAULT',
+              amount: totalCost,
+              type: 'escrow_hold',
+              timestamp: new Date().toISOString(),
+              status: 'completed',
+              txHash: '0x' + Math.random().toString(16).substring(2, 42)
+            };
+            const newDemoBalance = Math.max(0, state.demoBalance - totalCost);
+            const newDemoEscrow = state.demoEscrow + totalCost;
+            const newDemoHistory = [escrowTx, ...state.demoHistory];
+            
+            localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
+            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
+            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+            return {
+              demoBalance: newDemoBalance,
+              demoEscrow: newDemoEscrow,
+              demoHistory: newDemoHistory,
+              demoTransactions: newDemoHistory,
+              userWallet: {
+                ...state.userWallet,
+                balance: newDemoBalance,
+                escrowBalance: newDemoEscrow,
+                history: newDemoHistory
+              }
+            };
+          });
         }
 
         // --- PHASE 7: Run Swarm & Poll logs ---
@@ -1281,51 +1357,99 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
       }
 
-      // If in Live Mode and not logged in, reset wallet state to zero and do not fetch backend wallet APIs
-      if (!get().isDemoMode && !get().token) {
+      try {
+        // 1. Fetch agents list first (needed in both modes)
+        try {
+          const data = await apiService.getAgentsList() as any;
+          if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+            set({ agents: data.data });
+          }
+        } catch (e) {
+          console.error('Failed to load agents list:', e);
+        }
+
+      // 2. Mode-Aware Wallet Loading
+      if (get().isDemoMode) {
+        // Load demo wallet state from localStorage or memory
+        const savedDemoBalance = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_balance') : null;
+        const savedDemoEscrow = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_escrow') : null;
+        const savedDemoHistory = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_history') : null;
+
+        const demoBalance = savedDemoBalance ? Number(savedDemoBalance) : 0.0;
+        const demoEscrow = savedDemoEscrow ? Number(savedDemoEscrow) : 0.0;
+        const demoHistory = savedDemoHistory ? JSON.parse(savedDemoHistory) : [];
+
         set({
+          demoBalance,
+          demoEscrow,
+          demoHistory,
+          demoTransactions: demoHistory,
           userWallet: {
-            address: '0x0000000000000000000000000000000000000000',
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
+            address: '0xDemoWalletAddress789c',
+            balance: demoBalance,
+            escrowBalance: demoEscrow,
+            history: demoHistory
           }
         });
-        return;
-      }
+      } else {
+        // Live Mode
+        // Clear demo state in store UI
+        set({
+          demoBalance: 0.0,
+          demoEscrow: 0.0,
+          demoHistory: [],
+          demoTransactions: []
+        });
 
-      try {
-        const data = await apiService.getAgentsList() as any;
-        if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-          set({ agents: data.data });
-        }
-
-        const walletRes = await apiClient.get<any>('/api/v1/wallet');
-        const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
-        const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
-
-        if (walletRes?.success && walletRes.data) {
-          const balanceData = balanceRes?.success && balanceRes.data ? balanceRes.data : { available: 100.0, reserved: 0.0 };
-          const txsList = txsRes?.success && Array.isArray(txsRes.data) ? txsRes.data.map((tx: any) => ({
-            id: tx.id,
-            senderAddress: tx.senderAddress || walletRes.data.address,
-            receiverAddress: tx.receiverAddress || tx.reference || 'EXTERNAL',
-            amount: Number(tx.amount),
-            type: tx.type === 'deposit' ? 'deposit' : tx.type === 'withdraw' ? 'withdrawal' : tx.type === 'escrow_hold' ? 'escrow_hold' : 'escrow_release',
-            timestamp: tx.createdAt,
-            status: tx.status === 'completed' ? 'completed' : 'pending',
-            txHash: tx.txHash || '0x' + Math.random().toString(16).substring(2, 42)
-          })) : [];
-
+        if (!get().token) {
           set({
             userWallet: {
-              address: walletRes.data.address,
-              balance: Number(balanceData.available),
-              escrowBalance: Number(balanceData.reserved),
-              history: txsList
+              address: '0x0000000000000000000000000000000000000000',
+              balance: 0.0,
+              escrowBalance: 0.0,
+              history: []
             }
           });
+        } else {
+          try {
+            const walletRes = await apiClient.get<any>('/api/v1/wallet');
+            const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
+            const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
+
+            if (walletRes?.success && walletRes.data) {
+              const balanceData = balanceRes?.success && balanceRes.data ? balanceRes.data : { available: 0.0, reserved: 0.0 };
+              const txsList = txsRes?.success && Array.isArray(txsRes.data) ? txsRes.data.map((tx: any) => ({
+                id: tx.id,
+                senderAddress: tx.senderAddress || walletRes.data.address,
+                receiverAddress: tx.receiverAddress || tx.reference || 'EXTERNAL',
+                amount: Number(tx.amount),
+                type: tx.type === 'deposit' ? 'deposit' : tx.type === 'withdraw' ? 'withdrawal' : tx.type === 'escrow_hold' ? 'escrow_hold' : 'escrow_release',
+                timestamp: tx.createdAt,
+                status: tx.status === 'completed' ? 'completed' : 'pending',
+                txHash: tx.txHash || '0x' + Math.random().toString(16).substring(2, 42)
+              })) : [];
+
+              const liveBal = Number(balanceData.available);
+              const liveEsc = Number(balanceData.reserved);
+
+              set({
+                liveBalance: liveBal,
+                liveEscrow: liveEsc,
+                liveHistory: txsList,
+                liveTransactions: txsList,
+                userWallet: {
+                  address: walletRes.data.address,
+                  balance: liveBal,
+                  escrowBalance: liveEsc,
+                  history: txsList
+                }
+              });
+            }
+          } catch (e) {
+            console.error('Failed to load live wallet from backend:', e);
+          }
         }
+      }
 
         console.log('[APP_BOOT] Booting Orbit Autonomous Agent OS...');
         console.log('[BOOT] Initializing Workflow Builder startup lifecycle...');
@@ -1521,10 +1645,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
           history: []
         };
       });
+
+      localStorage.setItem('orbit_demo_balance', '100.0');
+      localStorage.setItem('orbit_demo_escrow', '0.0');
+      localStorage.setItem('orbit_demo_history', JSON.stringify([]));
+
       set({
         agents: seedAgents,
         activeWorkflow: null,
         executionLogs: [],
+        demoBalance: 100.0,
+        demoEscrow: 0.0,
+        demoHistory: [],
+        demoTransactions: [],
         userWallet: {
           address: '0xUserWalletAddress789c',
           balance: 100.0,
@@ -1629,10 +1762,46 @@ export const useNexusStore = create<NexusState>((set, get) => {
               
               if (computedStatus === 'completed' || computedStatus === 'Demo Completed') {
                 if (get().isDemoMode) {
-                  set({
-                    isRunning: false,
-                    currentPhaseIndex: 9,
-                    appState: 'completed'
+                  set(state => {
+                    const releaseTransactions: Transaction[] = [];
+                    updatedNodes.forEach(n => {
+                      const agentId = n.assignedAgentId!;
+                      const agent = state.agents.find(a => a.id === agentId)!;
+                      const fee = n.costEstimate;
+
+                      const agentTx: Transaction = {
+                        id: `tx-agent-release-${Date.now()}-${n.id}`,
+                        senderAddress: 'ESCROW_VAULT',
+                        receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
+                        amount: fee,
+                        type: 'escrow_release',
+                        timestamp: new Date().toISOString(),
+                        status: 'completed',
+                        txHash: '0x' + Math.random().toString(16).substring(2, 42),
+                        taskId: n.id
+                      };
+                      releaseTransactions.push(agentTx);
+                    });
+
+                    const newDemoEscrow = Math.max(0, state.demoEscrow - totalCost);
+                    const newDemoHistory = [...releaseTransactions, ...state.demoHistory];
+
+                    localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
+                    localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
+
+                    return {
+                      demoEscrow: newDemoEscrow,
+                      demoHistory: newDemoHistory,
+                      demoTransactions: newDemoHistory,
+                      userWallet: {
+                        ...state.userWallet,
+                        escrowBalance: newDemoEscrow,
+                        history: newDemoHistory
+                      },
+                      isRunning: false,
+                      currentPhaseIndex: 9,
+                      appState: 'completed'
+                    };
                   });
                   get().logExecution('settlement', 'Demo completed successfully. Simulated workflow finished.', 'success');
                 } else {
