@@ -87,12 +87,21 @@ export default function Navbar() {
     }
   }, [token, logoutUser]);
 
+  const isAuthenticated = !!token && !!user;
+  const authLoading = !mounted;
+
   console.log({
-    authenticated: !!token && !!user,
-    loading: !mounted,
+    isAuthenticated,
     user,
-    demoMode: isDemoMode,
-    audienceMode: isDemoMode ? 'demo' : 'live'
+    authLoading,
+    token: !!token
+  });
+
+  globalThis.console.log({
+    isAuthenticated,
+    user,
+    authLoading,
+    token: !!token
   });
 
   const leftLinks = [
@@ -276,65 +285,7 @@ export default function Navbar() {
             className="flex items-center gap-2 border-l border-border-dark pl-4"
             style={{ position: 'relative' }}
           >
-            {mounted ? (
-              user ? (
-                <div className="relative group" style={{ position: 'relative' }}>
-                  <button className="flex items-center gap-1.5 focus:outline-none">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
-                      {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : user.username.substring(0, 2).toUpperCase()}
-                    </div>
-                    <span className="text-xs text-gray-300 hover:text-white font-mono hidden lg:inline max-w-[80px] truncate">
-                      {user.displayName || user.username}
-                    </span>
-                  </button>
-                  
-                  {/* Dropdown Menu Wrapper (Bridges the hover gap and secures high z-index & pointer-events) */}
-                  <div 
-                    className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 8px)',
-                      right: '0',
-                      zIndex: 9999,
-                    }}
-                  >
-                    <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
-                      <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
-                        Role: <span className="text-primary-neon font-bold">{user.role}</span>
-                      </div>
-                      <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                        Dashboard
-                      </Link>
-                      <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                        Wallet ({userWallet.balance.toFixed(2)} USDC)
-                      </Link>
-                      <button
-                        onClick={logoutUser}
-                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Logout
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setAuthModal(true, 'login')}
-                    className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => setAuthModal(true, 'register')}
-                    className="bg-primary-neon text-black text-xs font-extrabold px-3 py-1.5 rounded-md hover:brightness-110 transition-all font-mono"
-                  >
-                    Register
-                  </button>
-                </div>
-              )
-            ) : (
+            {authLoading ? (
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setAuthModal(true, 'login')}
@@ -348,6 +299,67 @@ export default function Navbar() {
                 >
                   Register
                 </button>
+              </div>
+            ) : (!isAuthenticated || !user) ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAuthModal(true, 'login')}
+                  className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => setAuthModal(true, 'register')}
+                  className="bg-primary-neon text-black text-xs font-extrabold px-3 py-1.5 rounded-md hover:brightness-110 transition-all font-mono"
+                >
+                  Register
+                </button>
+              </div>
+            ) : (
+              <div className="relative group" style={{ position: 'relative' }}>
+                <button className="flex items-center gap-1.5 focus:outline-none">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
+                    {user.displayName && user.displayName.length > 0 
+                      ? user.displayName.substring(0, 2).toUpperCase() 
+                      : user.username && user.username.length > 0 
+                        ? user.username.substring(0, 2).toUpperCase() 
+                        : (user.email ? user.email.substring(0, 2).toUpperCase() : 'US')
+                    }
+                  </div>
+                  <span className="text-xs text-gray-300 hover:text-white font-mono hidden lg:inline max-w-[80px] truncate">
+                    {user.displayName || user.username || user.email || 'User'}
+                  </span>
+                </button>
+                
+                {/* Dropdown Menu Wrapper (Bridges the hover gap and secures high z-index & pointer-events) */}
+                <div 
+                  className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                    zIndex: 9999,
+                  }}
+                >
+                  <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
+                    <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
+                      Role: <span className="text-primary-neon font-bold">{user.role}</span>
+                    </div>
+                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                      Dashboard
+                    </Link>
+                    <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+                      Wallet ({userWallet.balance.toFixed(2)} USDC)
+                    </Link>
+                    <button
+                      onClick={logoutUser}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
