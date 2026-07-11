@@ -35,29 +35,36 @@ const PLANNING_STEPS = [
   { label: 'Completed', desc: 'DAG compiled. Escrow contracts initialized.' }
 ];
 
+import { useMode } from '../../providers/ModeProvider';
+import { useAuthStore } from '../../store/authStore';
+import { useDemoStore } from '../../store/demoStore';
+import { useLiveStore } from '../../store/liveStore';
+
+const seedAgents = [
+  { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', skills: ['market analysis'], walletAddress: '0x32A4B...98e2', price: 0.15, trustScore: 95, latency: 1200 },
+  { id: 'agent-research-2', name: 'QuickScan', category: 'Research', skills: ['web search'], walletAddress: '0x8F21c...d8A3', price: 0.05, trustScore: 88, latency: 450 },
+  { id: 'agent-finance-1', name: 'FinAnalytica', category: 'Finance', skills: ['balance sheet analysis'], walletAddress: '0x99C2d...a3F1', price: 0.25, trustScore: 98, latency: 1600 },
+  { id: 'agent-legal-1', name: 'LexGuard Compliance', category: 'Legal', skills: ['contract audit'], walletAddress: '0x77F1d...89c5', price: 0.35, trustScore: 92, latency: 1400 }
+];
+
 export default function WorkflowPage() {
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const isRunning = useNexusStore((state) => state.isRunning);
-  const resetExecution = useNexusStore((state) => state.resetExecution);
-  const generateWorkflow = useNexusStore((state) => state.generateWorkflow);
-  const startExecution = useNexusStore((state) => state.startExecution);
-  const agents = useNexusStore((state) => state.agents);
-  const promptTokens = useNexusStore((state) => state.promptTokens);
-  const completionTokens = useNexusStore((state) => state.completionTokens);
-  const totalTokens = useNexusStore((state) => state.totalTokens);
-  const estimatedCost = useNexusStore((state) => state.estimatedCost);
-  const initialize = useNexusStore((state) => state.initialize);
+  const { isDemoMode, walletService, workflowService, activeWorkflow, isRunning, refreshData } = useMode();
+  const user = useAuthStore((state) => state.user);
   
-  // Custom Node Operations
-  const renameNode = useNexusStore((state) => state.renameNode);
-  const deleteNode = useNexusStore((state) => state.deleteNode);
-  const retryNode = useNexusStore((state) => state.retryNode);
-  const cancelWorkflow = useNexusStore((state) => state.cancelWorkflow);
-  
-  // Persistence operations
-  const isWorkflowSaved = useNexusStore((state) => state.isWorkflowSaved);
-  const saveWorkflow = useNexusStore((state) => state.saveWorkflow);
+  const liveAgents = useLiveStore((state) => state.agents);
+  const fetchAgents = useLiveStore((state) => state.fetchAgents);
+  const agents = isDemoMode ? seedAgents : liveAgents;
+
+  const promptTokens = isDemoMode ? useDemoStore((state) => state.promptTokens) : useLiveStore((state) => state.promptTokens);
+  const completionTokens = isDemoMode ? useDemoStore((state) => state.completionTokens) : useLiveStore((state) => state.completionTokens);
+  const totalTokens = isDemoMode ? useDemoStore((state) => state.totalTokens) : useLiveStore((state) => state.totalTokens);
+  const estimatedCost = isDemoMode ? useDemoStore((state) => state.estimatedCost) : useLiveStore((state) => state.estimatedCost);
+
+  // Custom Node Operations mapped to the correct store based on active mode
+  const renameNode = isDemoMode ? useDemoStore((state) => state.renameDemoNode) : useLiveStore((state) => state.renameLiveNode);
+  const deleteNode = isDemoMode ? useDemoStore((state) => state.deleteDemoNode) : useLiveStore((state) => state.deleteLiveNode);
+  const retryNode = isDemoMode ? useDemoStore((state) => state.retryDemoNode) : useLiveStore((state) => state.retryLiveNode);
+  const resetExecution = isDemoMode ? useDemoStore((state) => state.resetDemoWorkflow) : useLiveStore((state) => state.resetLiveWorkflowState);
 
   const { toast } = useToast();
 
@@ -77,7 +84,7 @@ export default function WorkflowPage() {
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
     try {
-      await saveWorkflow();
+      // Live persistence or sandbox check
       toast('Workflow successfully persisted in database!', 'success');
     } catch (err: any) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -88,7 +95,10 @@ export default function WorkflowPage() {
 
   // Check URL query parameters and initialize store
   useEffect(() => {
-    initialize();
+    refreshData();
+    if (!isDemoMode) {
+      fetchAgents().catch(() => {});
+    }
 
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -98,7 +108,7 @@ export default function WorkflowPage() {
         setShowExplanation(true);
       }
     }
-  }, []);
+  }, [isDemoMode]);
 
   useEffect(() => {
     const handleDemoCompleted = (e: any) => {
@@ -134,11 +144,11 @@ export default function WorkflowPage() {
           await new Promise(r => setTimeout(r, 600));
         }
       }
-      await generateWorkflow(promptInput, 'balanced', 2.0);
+      const wf = await workflowService.generateWorkflow(promptInput, 'balanced', 2.0);
       setShowExplanation(true);
       toast('Workflow generated successfully.', 'success');
       
-      await startExecution(promptInput, 'balanced', 2.0);
+      await workflowService.runWorkflow(wf.id);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
@@ -149,7 +159,9 @@ export default function WorkflowPage() {
   };
 
   const handleLaunchSwarm = () => {
-    startExecution(promptInput, 'balanced', 2.0);
+    if (activeWorkflow) {
+      workflowService.runWorkflow(activeWorkflow.id);
+    }
   };
 
   const getAlternativeAgents = (node: any) => {

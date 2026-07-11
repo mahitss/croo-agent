@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "The Operating System for the Autonomous AI Economy. Let your agents search, collaborate, and settle payments in USDC.",
 };
 
+import { ModeProvider } from "../providers/ModeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,14 +29,16 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased min-h-screen flex flex-col font-sans`}>
         <ToastProvider>
-          <ErrorBoundary>
-            <DemoBanner />
-            <AppLayout>
-              {children}
-            </AppLayout>
-            <AiAssistant />
-            <AuthModal />
-          </ErrorBoundary>
+          <ModeProvider>
+            <ErrorBoundary>
+              <DemoBanner />
+              <AppLayout>
+                {children}
+              </AppLayout>
+              <AiAssistant />
+              <AuthModal />
+            </ErrorBoundary>
+          </ModeProvider>
         </ToastProvider>
       </body>
     </html>

@@ -1,33 +1,37 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useNexusStore } from '../../store/nexusStore';
+import { useMode } from '../../providers/ModeProvider';
+import { useAuthStore } from '../../store/authStore';
 import { useToast } from '../../components/Toast';
 import { Wallet, ArrowDownLeft, ArrowUpRight, ShieldCheck, History, ExternalLink, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function WalletPage() {
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const demoWallet = useNexusStore((state) => state.demoWallet);
-  const liveWallet = useNexusStore((state) => state.liveWallet);
-  const userWallet = isDemoMode ? demoWallet : liveWallet;
-  
-  const depositUserWallet = useNexusStore((state) => state.depositUserWallet);
-  const withdrawUserWallet = useNexusStore((state) => state.withdrawUserWallet);
-  const initialize = useNexusStore((state) => state.initialize);
+  const { isDemoMode, walletService, wallet: userWallet, refreshData } = useMode();
+  const user = useAuthStore((state) => state.user);
 
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [walletError, setWalletError] = useState<string | null>(null);
+
+  const loadWalletDetails = async () => {
+    setLoading(true);
+    setWalletError(null);
+    try {
+      await refreshData();
+      if (!isDemoMode) {
+        await walletService.getBalance();
+      }
+    } catch (err: any) {
+      setWalletError(err.message || 'Unable to load wallet.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    initialize();
-
-    window.addEventListener('storage', initialize);
-    window.addEventListener('nexus_store_update', initialize);
-
-    return () => {
-      window.removeEventListener('storage', initialize);
-      window.removeEventListener('nexus_store_update', initialize);
-    };
-  }, [initialize, isDemoMode]);
+    loadWalletDetails();
+  }, [isDemoMode]);
 
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -57,9 +61,10 @@ export default function WalletPage() {
     
     setIsDepositing(true);
     try {
-      const result = await depositUserWallet(amount);
+      const result = await walletService.deposit(amount);
       if (result && result.success) {
         toast(`Successfully deposited ${amount.toFixed(2)} USDC`, 'success');
+        loadWalletDetails();
       } else {
         toast(result?.message || 'Payment deposit failed', 'error');
       }
@@ -83,9 +88,14 @@ export default function WalletPage() {
     setIsWithdrawing(true);
     setErrorMessage('');
     try {
-      await withdrawUserWallet(amount);
-      toast(`Successfully withdrew ${amount.toFixed(2)} USDC`, 'success');
-      setWithdrawAmount('');
+      const result = await walletService.withdraw(amount);
+      if (result && result.success) {
+        toast(`Successfully withdrew ${amount.toFixed(2)} USDC`, 'success');
+        setWithdrawAmount('');
+        loadWalletDetails();
+      } else {
+        toast(result?.message || 'Withdrawal failed', 'error');
+      }
     } catch (err: any) {
       toast(err.message || 'Withdrawal error occurred', 'error');
     } finally {
@@ -123,6 +133,28 @@ export default function WalletPage() {
         { title: "User Wallet Balance Check", amount: `${userWallet.balance.toFixed(2)} USDC`, status: "Checked", time: "Idle" },
         { title: "Escrow Reserve Ready", amount: "0.00 USDC", status: "Awaiting", time: "Idle" }
       ];
+
+  if (walletError) {
+    return (
+      <div className="flex-1 bg-bg-dark flex items-center justify-center p-6 font-mono">
+        <div className="glass-card max-w-md w-full border border-border-dark p-8 rounded-2xl text-center shadow-xl">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4 text-red-400 animate-pulse">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <h2 className="text-sm font-extrabold text-white uppercase tracking-wider mb-2">Unable to load wallet</h2>
+          <p className="text-xs text-gray-400 leading-relaxed mb-6">
+            {walletError}
+          </p>
+          <button
+            onClick={loadWalletDetails}
+            className="w-full bg-primary-neon text-black text-xs font-extrabold py-2.5 rounded-xl hover:brightness-110 transition-all font-mono"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const totalIncomingTransfers = userWallet.history
     .filter(tx => tx.type === 'deposit' || tx.type === 'escrow_release')

@@ -21,6 +21,7 @@ const console = {
   }
 };
 import { useNexusStore, seedAgents } from '../../store/nexusStore';
+import { useMode } from '../../providers/ModeProvider';
 import { apiClient } from '../../lib/api-client';
 import { Agent } from '@nexus-ai/types';
 import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
@@ -74,7 +75,7 @@ export default function MarketplacePage() {
 
   const categories = ['All', 'Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'];
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const { isDemoMode } = useMode();
 
   useEffect(() => {
     initialize();

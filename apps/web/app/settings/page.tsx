@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useNexusStore } from '../../store/nexusStore';
+import { useMode } from '../../providers/ModeProvider';
+import { useAuthStore } from '../../store/authStore';
 import { Settings, Shield, Key, Eye, EyeOff, Check, RefreshCw } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const user = useNexusStore((state) => state.user);
-  const token = useNexusStore((state) => state.token);
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
-  const setAuthModal = useNexusStore((state) => state.setAuthModal);
+  const { isDemoMode, toggleMode: toggleDemoMode } = useMode();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const setAuthModal = useAuthStore((state) => state.setAuthModal);
   const { toast } = useToast();
 
   const [displayName, setDisplayName] = useState('');

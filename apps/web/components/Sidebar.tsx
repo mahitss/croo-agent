@@ -11,15 +11,15 @@ import {
   Settings, 
   LogOut
 } from 'lucide-react';
-import { useNexusStore } from '../store/nexusStore';
+import { useAuthStore } from '../store/authStore';
 
 export default function Sidebar() {
   const pathname = usePathname();
   
-  const isSidebarCollapsed = useNexusStore((state) => state.isSidebarCollapsed);
-  const isMobileSidebarOpen = useNexusStore((state) => state.isMobileSidebarOpen);
-  const setMobileSidebarOpen = useNexusStore((state) => state.setMobileSidebarOpen);
-  const logoutUser = useNexusStore((state) => state.logoutUser);
+  const isSidebarCollapsed = useAuthStore((state) => state.isSidebarCollapsed);
+  const isMobileSidebarOpen = useAuthStore((state) => state.isMobileSidebarOpen);
+  const setMobileSidebarOpen = useAuthStore((state) => state.setMobileSidebarOpen);
+  const logoutUser = useAuthStore((state) => state.logoutUser);
 
   const links = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },

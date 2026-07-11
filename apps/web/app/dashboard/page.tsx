@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useNexusStore } from '../../store/nexusStore';
-import { apiService } from '../../services/api';
-import { apiClient } from '../../lib/api-client';
+import { useMode } from '../../providers/ModeProvider';
+import { useAuthStore } from '../../store/authStore';
+import { useLiveStore } from '../../store/liveStore';
 import Link from 'next/link';
 import { 
   TrendingUp, 
@@ -34,18 +34,21 @@ import {
   Cell 
 } from 'recharts';
 
-export default function DashboardPage() {
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const demoWallet = useNexusStore((state) => state.demoWallet);
-  const liveWallet = useNexusStore((state) => state.liveWallet);
-  const userWallet = isDemoMode ? demoWallet : liveWallet;
-  
-  const agents = useNexusStore((state) => state.agents);
-  const agentWallets = useNexusStore((state) => state.agentWallets);
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
-  const initialize = useNexusStore((state) => state.initialize);
-  const user = useNexusStore((state) => state.user);
+const seedAgents = [
+  { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', skills: ['market analysis'], walletAddress: '0x32A4B...98e2', price: 0.15, trustScore: 95, latency: 1200 },
+  { id: 'agent-research-2', name: 'QuickScan', category: 'Research', skills: ['web search'], walletAddress: '0x8F21c...d8A3', price: 0.05, trustScore: 88, latency: 450 },
+  { id: 'agent-finance-1', name: 'FinAnalytica', category: 'Finance', skills: ['balance sheet analysis'], walletAddress: '0x99C2d...a3F1', price: 0.25, trustScore: 98, latency: 1600 },
+  { id: 'agent-legal-1', name: 'LexGuard Compliance', category: 'Legal', skills: ['contract audit'], walletAddress: '0x77F1d...89c5', price: 0.35, trustScore: 92, latency: 1400 }
+];
 
+export default function DashboardPage() {
+  const { isDemoMode, walletService, workflowService, dashboardService, analyticsService, wallet: userWallet, activeWorkflow } = useMode();
+  const user = useAuthStore((state) => state.user);
+  const liveAgents = useLiveStore((state) => state.agents);
+  const fetchAgents = useLiveStore((state) => state.fetchAgents);
+
+  const agents = isDemoMode ? seedAgents : liveAgents;
+  
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -54,113 +57,44 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    initialize();
-    
-    if (isDemoMode) {
-      setActivityFeed([
-        { time: '1s ago', type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro' },
-        { time: '4s ago', type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica' },
-        { time: '12s ago', type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet' }
-      ]);
-      setDashboardData({
-        activeWorkflows: 1,
-        completedWorkflows: 1402,
-        failedWorkflows: 18,
-        publishedAgents: 8,
-        walletBalance: 100.0,
-        todayTokens: 1489200,
-        todayInferenceCost: 0.89,
-        averageLatency: 820,
-        platformRevenue: 15.0,
-        recentWorkflows: []
-      });
-      setNotifications([
-        { id: 'notif-1', title: 'Welcome to ORBIT AI', message: 'Nexus Swarm networks are active and listening.', type: 'info' },
-        { id: 'notif-2', title: 'SLA Latency Stagger', message: 'Agent research-1 had a minor latency delay.', type: 'warning' }
-      ]);
-      setRevenueChartData([
-        { hour: '08:00', volume: 4.2 },
-        { hour: '09:00', volume: 8.5 },
-        { hour: '10:00', volume: 14.8 },
-        { hour: '11:00', volume: 22.1 },
-        { hour: '12:00', volume: 32.5 },
-        { hour: '13:00', volume: 45.3 },
-        { hour: '14:00', volume: 55.7 }
-      ]);
-      setAgentMetrics([
-        { agentId: 'agent-research-1', revenueUsdc: 210.50, invocations: 1402, avgLatencyMs: 820 }
-      ]);
-      setLoading(false);
-      return;
+    if (!isDemoMode) {
+      fetchAgents().catch(() => {});
     }
 
-    // --- LIVE MODE: Start clean, query backend APIs directly ---
-    setActivityFeed([]);
-    setDashboardData(null);
-    setNotifications([]);
-    setRevenueChartData([]);
-    setAgentMetrics([]);
     setLoading(true);
+    dashboardService.getDashboardData()
+      .then(data => {
+        setDashboardData(data);
+      })
+      .catch(err => console.warn('Failed to load dashboard statistics:', err))
+      .finally(() => setLoading(false));
 
-    const fetchAllData = () => {
-      apiService.getActivityFeed()
-        .then(res => {
-          if (res && res.success && Array.isArray(res.data)) {
-            setActivityFeed(res.data);
-          }
-        })
-        .catch(err => {
-          console.warn('Failed to load live activity feed:', err);
-        });
+    dashboardService.getActivityFeed()
+      .then(feed => {
+        setActivityFeed(feed);
+      })
+      .catch(err => console.warn('Failed to load activity feed:', err));
 
-      apiClient.get<any>('/api/v1/analytics/dashboard')
-        .then(res => {
-          if (res && res.success && res.data) {
-            setDashboardData(res.data);
-          }
-        })
-        .catch(err => console.warn('Failed to load dashboard statistics:', err))
-        .finally(() => setLoading(false));
+    analyticsService.getRevenueData()
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted = data.map((r: any) => ({
+            hour: r.date || r.hour,
+            volume: Number(r.revenue || r.volume || 0)
+          }));
+          setRevenueChartData(formatted);
+        }
+      })
+      .catch(err => console.warn('Failed to load revenue analytics:', err));
 
-      apiClient.get<any>('/api/v1/notifications')
-        .then(res => {
-          if (res && res.success && Array.isArray(res.data)) {
-            setNotifications(res.data);
-          }
-        })
-        .catch(err => console.warn('Failed to load notifications:', err));
-
-      apiClient.get<any>('/api/v1/analytics/revenue')
-        .then(res => {
-          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-            const formatted = res.data.slice(-7).map((r: any) => ({
-              hour: r.date,
-              volume: Number(r.revenue)
-            }));
-            setRevenueChartData(formatted);
-          }
-        })
-        .catch(err => console.warn('Failed to load revenue analytics:', err));
-
-      apiClient.get<any>('/api/v1/analytics/agents')
-        .then(res => {
-          if (res && res.success && Array.isArray(res.data)) {
-            setAgentMetrics(res.data);
-          }
-        })
-        .catch(err => console.warn('Failed to load agent metrics:', err));
-    };
-
-    fetchAllData();
-
-    window.addEventListener('storage', fetchAllData);
-    window.addEventListener('nexus_store_update', fetchAllData);
-
-    return () => {
-      window.removeEventListener('storage', fetchAllData);
-      window.removeEventListener('nexus_store_update', fetchAllData);
-    };
-  }, [initialize, isDemoMode]);
+    analyticsService.getAgentMetrics()
+      .then(metrics => {
+        if (Array.isArray(metrics)) {
+          setAgentMetrics(metrics);
+        }
+      })
+      .catch(err => console.warn('Failed to load agent metrics:', err));
+  }, [isDemoMode]);
 
   // Leaderboard data calculation using database analytics values
   const leaderboard = [...agents]

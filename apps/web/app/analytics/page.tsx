@@ -31,15 +31,10 @@ import {
   Pie
 } from 'recharts';
 
+import { useMode } from '../../providers/ModeProvider';
+
 export default function AnalyticsPage() {
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const demoWallet = useNexusStore((state) => state.demoWallet);
-  const liveWallet = useNexusStore((state) => state.liveWallet);
-  const userWallet = isDemoMode ? demoWallet : liveWallet;
-
-  const agents = useNexusStore((state) => state.agents);
-  const initialize = useNexusStore((state) => state.initialize);
-
+  const { isDemoMode, analyticsService, wallet: userWallet } = useMode();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [loading, setLoading] = useState(true);
 
@@ -53,38 +48,6 @@ export default function AnalyticsPage() {
   const [systemMetrics, setSystemMetrics] = useState<any>({ cpuUsage: 0, memoryUsage: 0 });
 
   useEffect(() => {
-    initialize();
-
-    if (isDemoMode) {
-      setRevenueData([
-        { date: '2026-06-25', revenue: 240.0, expenses: 80.0, platformFee: 24.0 },
-        { date: '2026-06-26', revenue: 380.0, expenses: 110.0, platformFee: 38.0 },
-        { date: '2026-06-27', revenue: 512.0, expenses: 140.0, platformFee: 51.2 },
-        { date: '2026-06-28', revenue: 450.0, expenses: 130.0, platformFee: 45.0 },
-        { date: '2026-06-29', revenue: 620.0, expenses: 180.0, platformFee: 62.0 },
-        { date: '2026-06-30', revenue: 780.0, expenses: 220.0, platformFee: 78.0 },
-        { date: '2026-07-01', revenue: 710.0, expenses: 200.0, platformFee: 71.0 }
-      ]);
-      setPlatformMetrics({ apiRequestsCount: 92837, successRate: 99.92, queueDepth: 2 });
-      setMarketplaceMetrics({ publishedAgents: 8, verifiedAgents: 8, topCategory: 'Research' });
-      setWorkflowMetrics({ created: 1420, completed: 1402, failed: 18, avgDurationMs: 45231 });
-      setAgentMetrics([
-        { agentId: 'agent-research-1', invocations: 1402, revenueUsdc: 210.50, avgLatencyMs: 820 }
-      ]);
-      setAiMetrics({ avgPlanningLatencyMs: 1240, tokensConsumed: 4892300 });
-      setSystemMetrics({ cpuUsage: 12, memoryUsage: 45 });
-      setLoading(false);
-      return;
-    }
-
-    // --- LIVE MODE: Start clean, query backend APIs directly ---
-    setRevenueData([]);
-    setPlatformMetrics({ apiRequestsCount: 0, successRate: 0, queueDepth: 0 });
-    setMarketplaceMetrics({ publishedAgents: 0, verifiedAgents: 0, topCategory: 'None' });
-    setWorkflowMetrics({ created: 0, completed: 0, failed: 0, avgDurationMs: 0 });
-    setAgentMetrics([]);
-    setAiMetrics({ avgPlanningLatencyMs: 0, tokensConsumed: 0 });
-    setSystemMetrics({ cpuUsage: 0, memoryUsage: 0 });
     setLoading(true);
 
     const fetchAllData = async () => {
@@ -98,40 +61,32 @@ export default function AnalyticsPage() {
           aiRes,
           sysRes
         ] = await Promise.all([
-          apiService.getRevenueData(),
-          apiService.getPlatformMetrics(),
-          apiService.getMarketplaceMetrics(),
-          apiService.getWorkflowMetrics(),
-          apiService.getAgentMetrics(),
-          apiService.getAiMetrics(),
-          apiService.getSystemMetrics()
-        ]) as any[];
+          analyticsService.getRevenueData(),
+          analyticsService.getPlatformMetrics(),
+          analyticsService.getMarketplaceMetrics(),
+          analyticsService.getWorkflowMetrics(),
+          analyticsService.getAgentMetrics(),
+          analyticsService.getAiMetrics(),
+          analyticsService.getSystemMetrics()
+        ]);
 
-        if (revRes?.success && Array.isArray(revRes.data)) setRevenueData(revRes.data);
-        if (platRes?.success && platRes.data) setPlatformMetrics(platRes.data);
-        if (mktRes?.success && mktRes.data) setMarketplaceMetrics(mktRes.data);
-        if (flowRes?.success && flowRes.data) setWorkflowMetrics(flowRes.data);
-        if (agRes?.success && Array.isArray(agRes.data)) setAgentMetrics(agRes.data);
-        if (aiRes?.success && aiRes.data) setAiMetrics(aiRes.data);
-        if (sysRes?.success && sysRes.data) setSystemMetrics(sysRes.data);
+        if (Array.isArray(revRes)) setRevenueData(revRes);
+        if (platRes) setPlatformMetrics(platRes);
+        if (mktRes) setMarketplaceMetrics(mktRes);
+        if (flowRes) setWorkflowMetrics(flowRes);
+        if (Array.isArray(agRes)) setAgentMetrics(agRes);
+        if (aiRes) setAiMetrics(aiRes);
+        if (sysRes) setSystemMetrics(sysRes);
 
       } catch (err) {
-        console.error('Error fetching analytics from backend microservices:', err);
+        console.error('Error fetching analytics:', err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchAllData();
-
-    window.addEventListener('storage', fetchAllData);
-    window.addEventListener('nexus_store_update', fetchAllData);
-
-    return () => {
-      window.removeEventListener('storage', fetchAllData);
-      window.removeEventListener('nexus_store_update', fetchAllData);
-    };
-  }, [initialize, isDemoMode]);
+  }, [isDemoMode]);
 
   const handleExport = () => {
     const exportPayload = {

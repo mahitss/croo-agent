@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useNexusStore } from '../store/nexusStore';
+import { useMode } from '../providers/ModeProvider';
+import { useAuthStore } from '../store/authStore';
 import { useToast } from './Toast';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { 
@@ -58,21 +59,16 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const demoWallet = useNexusStore((state) => state.demoWallet);
-  const liveWallet = useNexusStore((state) => state.liveWallet);
-  const userWallet = isDemoMode ? demoWallet : liveWallet;
+  const { isDemoMode, wallet: userWallet, toggleMode: toggleDemoMode } = useMode();
   
-  const user = useNexusStore((state) => state.user);
-  const token = useNexusStore((state) => state.token);
-  const logoutUser = useNexusStore((state) => state.logoutUser);
-  const setAuthModal = useNexusStore((state) => state.setAuthModal);
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const logoutUser = useAuthStore((state) => state.logoutUser);
+  const setAuthModal = useAuthStore((state) => state.setAuthModal);
   
-  const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
-
-  const toggleSidebar = useNexusStore((state) => state.toggleSidebar);
-  const isMobileSidebarOpen = useNexusStore((state) => state.isMobileSidebarOpen);
-  const setMobileSidebarOpen = useNexusStore((state) => state.setMobileSidebarOpen);
+  const toggleSidebar = useAuthStore((state) => state.toggleSidebar || (() => {}));
+  const isMobileSidebarOpen = useAuthStore((state) => state.isMobileSidebarOpen || false);
+  const setMobileSidebarOpen = useAuthStore((state) => state.setMobileSidebarOpen || (() => {}));
 
   const handleLogoClick = (e: React.MouseEvent) => {
     if (!token || !user) return;
