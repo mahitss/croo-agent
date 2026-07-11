@@ -75,6 +75,7 @@ export interface Transaction {
   taskId?: string;
   reference?: string;
   createdAt?: string;
+  paymentMethod?: string;
 }
 
 export interface WalletState {

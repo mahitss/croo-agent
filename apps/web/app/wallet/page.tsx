@@ -33,6 +33,22 @@ export default function WalletPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  useEffect(() => {
+    if (!withdrawAmount) {
+      setErrorMessage('');
+      return;
+    }
+    const val = parseFloat(withdrawAmount);
+    if (isNaN(val) || val <= 0) {
+      setErrorMessage('Enter a valid positive amount');
+    } else if (val > userWallet.balance) {
+      setErrorMessage('Insufficient balance');
+    } else {
+      setErrorMessage('');
+    }
+  }, [withdrawAmount, userWallet.balance]);
 
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,9 +71,26 @@ export default function WalletPage() {
     }
   };
 
-  const handleWithdraw = (e: React.FormEvent) => {
+  const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Disabled for now
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    if (amount > userWallet.balance) {
+      setErrorMessage('Insufficient balance');
+      return;
+    }
+
+    setIsWithdrawing(true);
+    setErrorMessage('');
+    try {
+      await withdrawUserWallet(amount);
+      toast(`Successfully withdrew ${amount.toFixed(2)} USDC`, 'success');
+      setWithdrawAmount('');
+    } catch (err: any) {
+      toast(err.message || 'Withdrawal error occurred', 'error');
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   // Mock flow steps for the WOW Feature
@@ -95,6 +128,9 @@ export default function WalletPage() {
     .filter(tx => tx.type === 'deposit' || tx.type === 'escrow_release')
     .reduce((sum, tx) => sum + tx.amount, 0);
   const lifetimeRevenue = totalIncomingTransfers > 0 ? totalIncomingTransfers : 0.00;
+
+  const parsedWithdrawAmount = parseFloat(withdrawAmount) || 0;
+  const isWithdrawDisabled = isWithdrawing || parsedWithdrawAmount <= 0 || parsedWithdrawAmount > userWallet.balance || userWallet.balance <= 0;
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
@@ -200,20 +236,24 @@ export default function WalletPage() {
               <input
                 type="number"
                 step="0.01"
-                min="1"
+                min="0.01"
                 placeholder="Amount (USDC)"
                 value={withdrawAmount}
-                disabled
+                disabled={isWithdrawing}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 className="flex-1 bg-black/40 border border-border-dark focus:border-secondary-neon/40 px-3 py-2.5 rounded-xl text-xs text-white outline-none disabled:opacity-50"
                 required
               />
               <button 
                 type="submit"
-                disabled
-                className="bg-secondary-neon/30 text-white/50 cursor-not-allowed font-extrabold text-xs px-5 rounded-xl transition-all font-mono disabled:opacity-50"
+                disabled={isWithdrawDisabled}
+                className="bg-secondary-neon text-black font-extrabold text-xs px-5 rounded-xl hover:brightness-110 transition-all font-mono flex items-center justify-center min-w-[85px] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-secondary-neon/20 disabled:text-white/40"
               >
-                Withdraw
+                {isWithdrawing ? (
+                  <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  'Withdraw'
+                )}
               </button>
             </div>
             {errorMessage && <span className="text-[10px] text-secondary-neon font-mono">{errorMessage}</span>}
@@ -264,7 +304,7 @@ export default function WalletPage() {
                       if (tx.type === 'withdrawal') { typeLabel = 'Withdrawal'; typeColor = 'text-secondary-neon'; }
 
                       // Parse payment method and razorpay payment ID from reference field
-                      let paymentMethod = 'Mock Credits';
+                      let paymentMethod = tx.paymentMethod || 'Mock Credits';
                       let razorpayPaymentId = 'N/A';
                       
                       if (tx.reference) {

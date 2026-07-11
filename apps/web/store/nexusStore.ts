@@ -683,7 +683,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
           type: 'withdrawal',
           timestamp: new Date().toISOString(),
           status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substring(2, 42)
+          txHash: '0x' + Math.random().toString(16).substring(2, 42),
+          paymentMethod: 'Mock Credits'
         };
         const newDemoBalance = state.demoBalance - amount;
         const newDemoHistory = [tx, ...state.demoHistory];
