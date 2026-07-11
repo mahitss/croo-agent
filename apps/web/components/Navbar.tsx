@@ -204,7 +204,7 @@ export default function Navbar() {
             outline: '2px solid green',
           }}
         >
-          {isLargeDesktop && mounted && (
+          {isLargeDesktop && mounted && isAuthenticated && user && (
             <div className="hidden md:flex items-center gap-2 lg:gap-3">
               {rightLinks.map((link) => {
                 const Icon = link.icon;
@@ -227,7 +227,7 @@ export default function Navbar() {
             </div>
           )}
 
-          {(!isLargeDesktop && mounted) && (
+          {(!isLargeDesktop && mounted && isAuthenticated && user) && (
             <div className="relative group" style={{ position: 'relative' }}>
               <button className="flex items-center gap-1 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-md text-xs font-mono font-bold text-gray-300 hover:text-white transition-all duration-300 focus:outline-none">
                 <span>More</span>
@@ -267,32 +267,36 @@ export default function Navbar() {
             </div>
           )}
 
-          <button
-            onClick={toggleDemoMode}
-            className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
-              mounted && isDemoMode
-                ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
-                : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
-            }`}
-            title="Toggle between demo simulated execution and production live payment mode"
-          >
-            <span>{mounted && !isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
-          </button>
+          {mounted && isAuthenticated && user && (
+            <button
+              onClick={toggleDemoMode}
+              className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
+                mounted && isDemoMode
+                  ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
+                  : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
+              }`}
+              title="Toggle between demo simulated execution and production live payment mode"
+            >
+              <span>{mounted && !isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
+            </button>
+          )}
 
-          <Link 
-            href="/wallet" 
-            className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300"
-            style={{
-              flexShrink: 0,
-              maxWidth: 'fit-content',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Wallet className="w-4 h-4 text-primary-neon" />
-            <span className="text-sm font-mono font-bold text-white">
-              {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">USDC</span>
-            </span>
-          </Link>
+          {mounted && isAuthenticated && user && (
+            <Link 
+              href="/wallet" 
+              className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300"
+              style={{
+                flexShrink: 0,
+                maxWidth: 'fit-content',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Wallet className="w-4 h-4 text-primary-neon" />
+              <span className="text-sm font-mono font-bold text-white">
+                {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">USDC</span>
+              </span>
+            </Link>
+          )}
 
           <div 
             className="flex items-center gap-2 border-l border-border-dark pl-4"
