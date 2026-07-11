@@ -122,8 +122,8 @@ export default function Navbar() {
       className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50 box-border"
       style={{
         maxWidth: '100%',
-        overflowX: 'hidden',
         boxSizing: 'border-box',
+        outline: '2px solid red',
       }}
     >
       <div 
@@ -171,7 +171,16 @@ export default function Navbar() {
         </div>
 
         {/* CENTER SECTION */}
-        <div className="flex-1" />
+        <div 
+          className="flex-1" 
+          style={{
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            minWidth: 0,
+            outline: '2px solid blue',
+          }}
+        />
 
         {/* RIGHT SECTION */}
         <div 
@@ -179,9 +188,10 @@ export default function Navbar() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '16px',
+            gap: '12px',
             flexShrink: 0,
             whiteSpace: 'nowrap',
+            outline: '2px solid green',
           }}
         >
           {isLargeDesktop && mounted && (
@@ -259,7 +269,15 @@ export default function Navbar() {
             <span>{mounted && !isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
           </button>
 
-          <Link href="/wallet" className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300">
+          <Link 
+            href="/wallet" 
+            className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300"
+            style={{
+              flexShrink: 0,
+              maxWidth: 'fit-content',
+              whiteSpace: 'nowrap',
+            }}
+          >
             <Wallet className="w-4 h-4 text-primary-neon" />
             <span className="text-sm font-mono font-bold text-white">
               {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">USDC</span>
@@ -268,10 +286,22 @@ export default function Navbar() {
 
           <div 
             className="flex items-center gap-2 border-l border-border-dark pl-4"
-            style={{ position: 'relative' }}
+            style={{ 
+              position: 'relative',
+              flexShrink: 0,
+              display: 'flex',
+              gap: '12px'
+            }}
           >
             {authLoading ? (
-              <div className="flex items-center gap-2">
+              <div 
+                className="flex items-center gap-2"
+                style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  gap: '12px'
+                }}
+              >
                 <button
                   onClick={() => setAuthModal(true, 'login')}
                   className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
@@ -286,7 +316,14 @@ export default function Navbar() {
                 </button>
               </div>
             ) : (!isAuthenticated || !user) ? (
-              <div className="flex items-center gap-2">
+              <div 
+                className="flex items-center gap-2"
+                style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  gap: '12px'
+                }}
+              >
                 <button
                   onClick={() => setAuthModal(true, 'login')}
                   className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
