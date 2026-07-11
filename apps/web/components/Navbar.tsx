@@ -280,7 +280,7 @@ export default function Navbar() {
             className="flex items-center gap-2 border-l border-border-dark pl-4"
             style={{ position: 'relative' }}
           >
-            {(user && token) ? (
+            {user ? (
               <div className="relative group" style={{ position: 'relative' }}>
                 <button className="flex items-center gap-1.5 focus:outline-none">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
