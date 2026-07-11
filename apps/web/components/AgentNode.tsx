@@ -73,11 +73,11 @@ export default function AgentNode({ data }: { data: any }) {
   const getStatusClass = () => {
     switch (data.status) {
       case 'completed':
-        return 'border-primary-neon/40 shadow-[0_0_12px_rgba(0,255,204,0.08)]';
+        return 'animate-completed-glow';
       case 'running':
-        return 'border-secondary-neon/40 shadow-[0_0_12px_rgba(255,0,127,0.08)]';
+        return 'animate-running-glow';
       case 'failed':
-        return 'border-red-500/40';
+        return 'border-red-500/40 shadow-[0_0_12px_rgba(239,68,68,0.25)]';
       default:
         return 'border-border-dark';
     }
@@ -145,7 +145,7 @@ export default function AgentNode({ data }: { data: any }) {
       };
 
   return (
-    <div className={`glass-card border px-4 py-3.5 rounded-xl w-[240px] text-left transition-all duration-300 ${getStatusClass()}`}>
+    <div className={`glass-card border px-4 py-3.5 rounded-xl w-[240px] text-left transition-all duration-300 animate-node-pop ${getStatusClass()}`}>
       
       {/* Target handle (Input) */}
       <Handle 

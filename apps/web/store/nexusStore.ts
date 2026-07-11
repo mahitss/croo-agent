@@ -375,7 +375,8 @@ const demoRoles = [
   { category: 'Data', name: 'SchemaSync Data Engine', skill: 'data' },
   { category: 'Operations', name: 'OptimaSwarm Ops', skill: 'operations' },
   { category: 'Compliance', name: 'ReguRadar Audit', skill: 'compliance' },
-  { category: 'Analytics', name: 'MetricsMind Engine', skill: 'analytics' }
+  { category: 'Analytics', name: 'MetricsMind Engine', skill: 'analytics' },
+  { category: 'Engineering', name: 'CodeCraft Engineer', skill: 'engineering' }
 ];
 
 const demoTemplates = [
@@ -565,6 +566,52 @@ const demoTemplates = [
       { source: 'n6', target: 'n7' },
       { source: 'n7', target: 'n8' }
     ]
+  },
+  {
+    name: 'Pattern K - Sequential Verification Grid',
+    nodes: [
+      { id: 'n1', label: 'Operations Dispatch', capability: 'Operations', posX: 80, posY: 200 },
+      { id: 'n2', label: 'Research Analysis', capability: 'Research', posX: 240, posY: 100 },
+      { id: 'n3', label: 'Legal Safeguard Audit', capability: 'Legal', posX: 240, posY: 300 },
+      { id: 'n4', label: 'Security Auditing Scan', capability: 'Security', posX: 400, posY: 100 },
+      { id: 'n5', label: 'Financial Performance Logs', capability: 'Analytics', posX: 400, posY: 300 },
+      { id: 'n6', label: 'Quality Assurance Review', capability: 'QA', posX: 560, posY: 200 },
+      { id: 'n7', label: 'Compliance Signoff', capability: 'Compliance', posX: 720, posY: 200 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n6' },
+      { source: 'n5', target: 'n6' },
+      { source: 'n6', target: 'n7' }
+    ]
+  },
+  {
+    name: 'Pattern L - Dual Diamond Tree',
+    nodes: [
+      { id: 'n1', label: 'Operations Sync', capability: 'Operations', posX: 60, posY: 250 },
+      { id: 'n2', label: 'Data Processing Stack', capability: 'Data', posX: 180, posY: 250 },
+      { id: 'n3', label: 'Finance Appraisal', capability: 'Finance', posX: 300, posY: 140 },
+      { id: 'n4', label: 'Security Vulnerability Test', capability: 'Security', posX: 300, posY: 360 },
+      { id: 'n5', label: 'Marketing Target Matrix', capability: 'Marketing', posX: 440, posY: 140 },
+      { id: 'n6', label: 'Sales Lead Conversion', capability: 'Sales', posX: 440, posY: 360 },
+      { id: 'n7', label: 'Quality Assurance Consensus', capability: 'QA', posX: 580, posY: 250 },
+      { id: 'n8', label: 'Analytics Performance Logs', capability: 'Analytics', posX: 700, posY: 250 },
+      { id: 'n9', label: 'Compliance Audit Signoff', capability: 'Compliance', posX: 820, posY: 250 }
+    ],
+    edges: [
+      { source: 'n1', target: 'n2' },
+      { source: 'n2', target: 'n3' },
+      { source: 'n2', target: 'n4' },
+      { source: 'n3', target: 'n5' },
+      { source: 'n4', target: 'n6' },
+      { source: 'n5', target: 'n7' },
+      { source: 'n6', target: 'n7' },
+      { source: 'n7', target: 'n8' },
+      { source: 'n8', target: 'n9' }
+    ]
   }
 ];
 
@@ -651,6 +698,21 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
     resetExecution: () => {
       console.log('[CLEAR_EXECUTION_STATE] Resetting active workflow and execution logs.');
+      
+      if (typeof window !== 'undefined') {
+        const lastId = localStorage.getItem('orbit_last_workflow_id');
+        localStorage.removeItem('orbit_last_workflow_id');
+        if (lastId) {
+          localStorage.removeItem(`orbit_workflow_data_${lastId}`);
+          localStorage.removeItem(`orbit_workflow_metadata_${lastId}`);
+        }
+        const params = new URLSearchParams(window.location.search);
+        params.delete('workflowId');
+        const searchStr = params.toString();
+        const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+      }
+
       set({
         activeWorkflow: null,
         executionLogs: [],
@@ -1307,14 +1369,17 @@ export const useNexusStore = create<NexusState>((set, get) => {
         estimatedCost
       });
 
+      const scaleX = 0.95 + Math.random() * 0.25;
+      const scaleY = 0.95 + Math.random() * 0.25;
+
       const nodes: TaskNode[] = template.nodes.map((n, idx) => {
         const role = shuffledRoles[idx % shuffledRoles.length];
         const costEstimate = Math.round((0.02 + Math.random() * 0.88) * 100) / 100;
         const timeEstimate = Math.floor(150 + Math.random() * 1650);
         const trustScore = Math.floor(82 + Math.random() * 18);
         
-        const jitterX = Math.floor(Math.random() * 20 - 10);
-        const jitterY = Math.floor(Math.random() * 20 - 10);
+        const jitterX = Math.floor(Math.random() * 60 - 30);
+        const jitterY = Math.floor(Math.random() * 50 - 25);
 
         return {
           id: n.id,
@@ -1328,8 +1393,8 @@ export const useNexusStore = create<NexusState>((set, get) => {
           status: 'pending' as const,
           assignedAgentId: `agent-${role.skill}-${Math.floor(Math.random() * 1000)}`,
           assignedAgent: role.name,
-          positionX: n.posX + jitterX,
-          positionY: n.posY + jitterY
+          positionX: Math.round(n.posX * scaleX) + jitterX,
+          positionY: Math.round(n.posY * scaleY) + jitterY
         } as any;
       });
 
@@ -1339,9 +1404,36 @@ export const useNexusStore = create<NexusState>((set, get) => {
         target: e.target
       }));
 
+      let name = 'Agent Swarm Pipeline';
+      const q = query.toLowerCase();
+      if (q.includes('risk') || q.includes('finance') || q.includes('market')) {
+        name = 'Market Risk Analysis';
+      } else if (q.includes('audit') || q.includes('contract') || q.includes('vuln')) {
+        name = 'Smart Contract Audit';
+      } else if (q.includes('customer') || q.includes('segment') || q.includes('user')) {
+        name = 'Customer Segmentation';
+      } else if (q.includes('forecast') || q.includes('predict') || q.includes('sale')) {
+        name = 'Financial Forecast';
+      } else if (q.includes('medical') || q.includes('health') || q.includes('report')) {
+        name = 'Medical Report Review';
+      } else if (q.includes('product') || q.includes('launch') || q.includes('marketing')) {
+        name = 'Product Launch Plan';
+      } else if (q.includes('cyber') || q.includes('security') || q.includes('scan') || q.includes('sast')) {
+        name = 'Cybersecurity Assessment';
+      } else if (q.includes('hire') || q.includes('hiring') || q.includes('job') || q.includes('resume')) {
+        name = 'Hiring Workflow';
+      } else if (q.includes('invest') || q.includes('due diligence') || q.includes('deal')) {
+        name = 'Investment Due Diligence';
+      } else if (q.includes('document') || q.includes('verify') || q.includes('id') || q.includes('kyc')) {
+        name = 'Document Verification';
+      } else {
+        const capitalized = query.split(' ').slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        name = capitalized ? `${capitalized} Workflow` : 'Agent Swarm Pipeline';
+      }
+
       const workflow: Workflow = {
         id: `demo-${Date.now()}`,
-        name: query.slice(0, 30) + ' Swarm',
+        name,
         query,
         nodes: nodes.map(n => ({
           ...n,
@@ -1381,7 +1473,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const agentName = node?.assignedAgent || 'Swarm Agent';
         get().logExecution('execution', `Agent [${agentName}] started executing task: "${node?.name || nodeId}"...`);
 
-        const delay = Math.floor(400 + Math.random() * 500);
+        const delay = Math.floor(300 + Math.random() * 900);
         await new Promise(r => setTimeout(r, delay));
 
         set(state => {
@@ -2127,21 +2219,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
           }
         };
 
-        // Reconstruct workflow if ID is in URL or localStorage
+        // Reconstruct workflow if ID is in URL
         let workflowId = '';
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           workflowId = params.get('workflowId') || '';
-        }
-        if (!workflowId && typeof window !== 'undefined') {
-          workflowId = localStorage.getItem('orbit_last_workflow_id') || '';
-          if (workflowId) {
-            const params = new URLSearchParams(window.location.search);
-            params.set('workflowId', workflowId);
-            const searchStr = params.toString();
-            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?${searchStr}`;
-            window.history.replaceState({ path: newUrl }, '', newUrl);
-          }
         }
 
         if (workflowId) {

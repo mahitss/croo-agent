@@ -26,14 +26,13 @@ import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2
 import Link from 'next/link';
 import { useToast } from '../../components/Toast';
 
-const PLANNING_STAGES = [
-  { name: 'Intent Detection', desc: 'Parsing natural language semantics & intent tags' },
-  { name: 'Capability Matching', desc: 'Mapping requirements to defined CAP schemas' },
-  { name: 'Marketplace Search', desc: 'Scanning registry database for suitable nodes' },
-  { name: 'Cost Optimization', desc: 'Balancing execution rates against SLA constraints' },
-  { name: 'Parallelization', desc: 'Resolving dependency trees and async paths' },
-  { name: 'Risk Analysis', desc: 'Evaluating historical failure rates and safety scores' },
-  { name: 'Workflow Generation', desc: 'Compiling structural JSON schema DAG layout' },
+const PLANNING_STEPS = [
+  { label: 'Generating prompt...', desc: 'Optimizing query variables and intent markers' },
+  { label: 'Selecting capabilities...', desc: 'Scanning intent schema templates and routing options' },
+  { label: 'Matching agents...', desc: 'Evaluating live registry candidate pricing, latency, and bids' },
+  { label: 'Building DAG...', desc: 'Compiling Directed Acyclic Graph structure and node coordinates' },
+  { label: 'Optimizing execution...', desc: 'Validating cost constraints and resource allocation limits' },
+  { label: 'Completed', desc: 'DAG compiled. Escrow contracts initialized.' }
 ];
 
 export default function WorkflowPage() {
@@ -65,10 +64,11 @@ export default function WorkflowPage() {
   // States
   const [promptInput, setPromptInput] = useState('');
   const [showExplanation, setShowExplanation] = useState(false);
-  const [optimizationMode, setOptimizationMode] = useState<'cost' | 'speed' | 'accuracy'>('accuracy');
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
   
   const [isPlanning, setIsPlanning] = useState(false);
+  const [planningStage, setPlanningStage] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [nodeNameInput, setNodeNameInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -103,6 +103,8 @@ export default function WorkflowPage() {
   useEffect(() => {
     const handleDemoCompleted = (e: any) => {
       toast('Workflow completed successfully.', 'success');
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 4500);
     };
     window.addEventListener('nexus_demo_workflow_completed', handleDemoCompleted);
     return () => {
@@ -117,36 +119,32 @@ export default function WorkflowPage() {
   }, [selectedNode]);
 
   const handleGenerateWorkflow = async () => {
-    console.log("CLICK_HANDLER STEP A: enter");
-    if (!promptInput.trim()) {
-      console.log("CLICK_HANDLER STEP B: empty prompt return");
-      return;
-    }
+    if (!promptInput.trim()) return;
     setIsPlanning(true);
     setSelectedNode(null);
     setShowExplanation(false);
     setErrorMsg(null);
+    setPlanningStage(0);
     
     try {
-      console.log("CLICK_HANDLER STEP C: about to call generateWorkflow");
+      if (isDemoMode) {
+        // Step through planning stages
+        for (let i = 0; i <= 5; i++) {
+          setPlanningStage(i);
+          await new Promise(r => setTimeout(r, 600));
+        }
+      }
       await generateWorkflow(promptInput, 'balanced', 2.0);
-      console.log("CLICK_HANDLER STEP D: generateWorkflow completed");
       setShowExplanation(true);
-      toast('Workflow DAG generated successfully from backend!', 'success');
+      toast('Workflow generated successfully.', 'success');
       
-      console.log("CLICK_HANDLER STEP D2: automatically starting execution run");
       await startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
-      console.error("CLICK_HANDLER STEP E: caught error", err);
-      if (err && err.stack) {
-        console.error(err.stack);
-      }
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
       toast(`Generation failed: ${msg}`, 'error');
     } finally {
       setIsPlanning(false);
-      console.log("CLICK_HANDLER STEP F: finally completed");
     }
   };
 
@@ -171,9 +169,123 @@ export default function WorkflowPage() {
     ? agents.find(a => a.id === liveSelectedNode.assignedAgentId) 
     : null;
 
+  // Render logic for clean Empty State (ISSUE 1)
+  if (!activeWorkflow && !isPlanning) {
+    return (
+      <div className="flex-1 max-w-4xl w-full mx-auto p-6 flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-fade-in">
+        <div className="text-center flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/5 border border-border-dark flex items-center justify-center text-primary-neon shadow-[0_0_20px_rgba(0,255,204,0.05)]">
+            <Sparkles className="w-8 h-8 text-primary-neon animate-pulse" />
+          </div>
+          <h2 className="text-2xl font-bold text-white tracking-tight mt-2">No Workflow Yet</h2>
+          <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+            Describe a task and click &quot;Generate Workflow&quot; to begin. The AI Planner will automatically build the agent execution DAG.
+          </p>
+        </div>
+
+        <div className="w-full glass-card p-6 rounded-2xl border border-border-dark shadow-2xl flex flex-col gap-4">
+          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-gray-400">
+            <Terminal className="w-3.5 h-3.5 text-primary-neon" />
+            Describe Swarm Goal
+          </div>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              className="flex-grow bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-3 rounded-xl text-sm text-white outline-none font-mono focus-glowing"
+              placeholder="Describe the multi-agent task sequence, e.g. Audit smart contract token vulnerabilities..."
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleGenerateWorkflow();
+              }}
+            />
+            <button
+              onClick={handleGenerateWorkflow}
+              disabled={!promptInput.trim()}
+              className="bg-primary-neon hover:bg-primary-neon/90 text-black font-extrabold text-xs px-6 rounded-xl hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-mono active-press"
+            >
+              Generate Workflow
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 text-[10px] text-gray-500 font-mono">
+            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
+              <span className="text-primary-neon font-bold">01</span>
+              <span>Input natural language queries detailing required operations.</span>
+            </div>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
+              <span className="text-secondary-neon font-bold">02</span>
+              <span>AI matches registry agent capability profiles to solve tasks.</span>
+            </div>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
+              <span className="text-accent-blue font-bold">03</span>
+              <span>Visual topological DAG canvas schedules multi-agent runs.</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic SLA Configurations displayed in Empty State */}
+        <div className="w-full glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-4 text-xs font-mono max-w-sm">
+          <h3 className="font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-border-dark pb-2.5">
+            <Sliders className="w-4 h-4 text-primary-neon" />
+            SLA Configurations
+          </h3>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
+              <span className="text-white font-bold truncate">—</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-500 uppercase">Routing Policy</span>
+              <span className="text-primary-neon font-bold uppercase">—</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-500 uppercase">Budget Cap</span>
+              <span className="text-secondary-neon font-bold">—</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-500 uppercase">Status</span>
+              <span className="text-gray-500 font-bold uppercase">Idle</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+    <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6 animate-fade-in relative">
       
+      {/* Confetti Explosion Overlay */}
+      {showConfetti && (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {[...Array(60)].map((_, i) => {
+            const angle = (i * 360) / 60 + (Math.random() * 15 - 7.5);
+            const distance = 100 + Math.random() * 250;
+            const x = Math.cos((angle * Math.PI) / 180) * distance;
+            const y = Math.sin((angle * Math.PI) / 180) * distance - 50;
+            const size = 6 + Math.random() * 10;
+            const colors = ['#00ffcc', '#ff007f', '#00e5ff', '#ffeb3b', '#ff5722'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            return (
+              <div
+                key={i}
+                className="absolute rounded-full animate-particle"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  backgroundColor: color,
+                  left: '50%',
+                  top: '40%',
+                  '--tw-x': `${x}px`,
+                  '--tw-y': `${y}px`
+                } as any}
+              />
+            );
+          })}
+        </div>
+      )}
+
       {/* Header */}
       <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -185,18 +297,17 @@ export default function WorkflowPage() {
             Displaying structural node execution orders and decentralized escrow relations.
           </p>
         </div>
-        {activeWorkflow && (
-          <button
-            onClick={() => {
-              resetExecution();
-              setSelectedNode(null);
-            }}
-            className="text-xs bg-white/5 border border-border-dark hover:bg-white/10 hover:border-secondary-neon/40 px-4 py-2 rounded-xl text-gray-400 hover:text-white font-mono flex items-center gap-1.5 transition-all"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            CLEAR_ACTIVE_WORKFLOW
-          </button>
-        )}
+        
+        <button
+          onClick={() => {
+            resetExecution();
+            setSelectedNode(null);
+          }}
+          className="text-xs bg-white/5 border border-border-dark hover:bg-white/10 hover:border-secondary-neon/40 px-4 py-2 rounded-xl text-gray-400 hover:text-white font-mono flex items-center gap-1.5 transition-all active-press"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          New Workflow
+        </button>
       </div>
 
       {!isWorkflowSaved && (
@@ -225,24 +336,27 @@ export default function WorkflowPage() {
         </div>
         <input
           type="text"
-          className="flex-grow bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-2 rounded-lg text-xs text-white outline-none font-mono"
+          className="flex-grow bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-2 rounded-lg text-xs text-white outline-none font-mono focus-glowing"
           placeholder="Describe the multi-agent task sequence, e.g. Research NVIDIA Blackwell and verify findings..."
           value={promptInput}
           onChange={(e) => setPromptInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleGenerateWorkflow();
+          }}
         />
         <div className="flex gap-2 shrink-0">
           <button
             onClick={handleGenerateWorkflow}
-            disabled={!promptInput.trim()}
-            className="bg-white/5 border border-border-dark text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-white/10 font-mono disabled:opacity-50"
+            disabled={!promptInput.trim() || isPlanning}
+            className="bg-white/5 border border-border-dark text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-white/10 font-mono disabled:opacity-50 active-press"
           >
             Generate Workflow
           </button>
           {!activeWorkflow && !isRunning && (
             <button
               onClick={handleLaunchSwarm}
-              disabled={!promptInput.trim()}
-              className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-extrabold px-5 py-2 rounded-lg hover:brightness-110 font-mono disabled:opacity-50 transition-all"
+              disabled={!promptInput.trim() || isPlanning}
+              className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-extrabold px-5 py-2 rounded-lg hover:brightness-110 font-mono disabled:opacity-50 transition-all active-press"
             >
               Run Swarm
             </button>
@@ -252,16 +366,54 @@ export default function WorkflowPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
-        {/* Canvas container */}
+        {/* Canvas container / Planning checker */}
         <div className="lg:col-span-3 flex flex-col">
-          <Canvas onSelectNode={setSelectedNode} />
+          {isPlanning ? (
+            <div className="flex-grow flex flex-col items-center justify-center p-8 bg-black/40 border border-border-dark rounded-xl min-h-[500px] gap-6 animate-fade-in font-mono">
+              <div className="w-16 h-16 rounded-full border-t-2 border-primary-neon animate-spin flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-primary-neon animate-pulse" />
+              </div>
+              <div className="text-center">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">AI Swarm Planner Running</h3>
+                <p className="text-[10px] text-gray-500 mt-1 max-w-sm">Querying model endpoints, evaluating safety credentials, and compiling task DAGs...</p>
+              </div>
+
+              <div className="w-full max-w-md bg-white/2 border border-border-dark rounded-xl p-4 flex flex-col gap-3.5 text-xs text-left">
+                {PLANNING_STEPS.map((step, idx) => {
+                  const isDone = planningStage > idx;
+                  const isActive = planningStage === idx;
+                  return (
+                    <div key={idx} className={`flex items-start gap-3 transition-opacity duration-300 ${isDone ? 'opacity-100 text-gray-400' : isActive ? 'opacity-100 text-white font-bold' : 'opacity-45 text-gray-500'}`}>
+                      <div className="mt-0.5">
+                        {isDone ? (
+                          <CheckCircle2 className="w-4 h-4 text-primary-neon animate-bounce" />
+                        ) : isActive ? (
+                          <Loader2 className="w-4 h-4 text-secondary-neon animate-spin" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border border-gray-600" />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span>{step.label}</span>
+                        {isActive && <span className="text-[10px] text-gray-400 font-normal mt-0.5">{step.desc}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="relative flex-grow min-h-[500px] bg-black/40 border border-border-dark rounded-xl overflow-hidden transition-all duration-700 animate-fade-in">
+              <Canvas onSelectNode={setSelectedNode} />
+            </div>
+          )}
         </div>
 
         {/* Sidebar details panel */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
+        <div className="lg:col-span-1 flex flex-col gap-6 animate-slide-in">
           
-          {/* WOW Feature: Node execution inspector (GitHub Actions style) */}
-          {selectedNode ? (
+          {/* Node execution inspector */}
+          {selectedNode && activeWorkflow ? (
             <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
               <div className="flex justify-between items-center border-b border-border-dark pb-3">
                 <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
@@ -270,7 +422,7 @@ export default function WorkflowPage() {
                 </h3>
                 <button 
                   onClick={() => setSelectedNode(null)}
-                  className="text-gray-500 hover:text-white hover:bg-white/5 p-1 rounded-md transition-all"
+                  className="text-gray-500 hover:text-white hover:bg-white/5 p-1 rounded-md transition-all active-press"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -327,7 +479,6 @@ export default function WorkflowPage() {
                   </span>
                 </div>
 
-                {/* Operations & Expand Panel */}
                 <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                   <button
                     type="button"
@@ -355,7 +506,6 @@ export default function WorkflowPage() {
                   )}
                 </div>
 
-                {/* Node Operations */}
                 <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                   <span className="text-[9px] text-gray-500 uppercase">Operations</span>
                   <div className="flex gap-2">
@@ -367,7 +517,7 @@ export default function WorkflowPage() {
                           toast(`Retrying node execution: ${liveSelectedNode.name}`, 'info');
                           setSelectedNode((prev: any) => ({ ...prev, status: 'pending', retryCount: (prev.retryCount || 0) + 1 }));
                         }}
-                        className="bg-yellow-400 text-black text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all flex-1 text-center"
+                        className="bg-yellow-400 text-black text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all flex-1 text-center active-press"
                       >
                         Retry Node
                       </button>
@@ -379,14 +529,13 @@ export default function WorkflowPage() {
                         toast(`Removed node from DAG: ${liveSelectedNode.name}`, 'success');
                         setSelectedNode(null);
                       }}
-                      className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-all flex-grow text-center"
+                      className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-all flex-grow text-center active-press"
                     >
                       Delete Node
                     </button>
                   </div>
                 </div>
 
-                {/* Token Usage & Cost per Node details */}
                 <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">Token Accounting</span>
@@ -396,7 +545,7 @@ export default function WorkflowPage() {
                   </div>
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">AI Trust Confidence</span>
-                    <span className="text-primary-neon font-bold">{(assignedAgent?.trustScore || 95.0)}%</span>
+                    <span className="text-primary-neon font-bold">{(assignedAgent?.trustScore || liveSelectedNode.trustScore || 95.0)}%</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-gray-500 uppercase">Est. Completion Time</span>
@@ -408,7 +557,6 @@ export default function WorkflowPage() {
                   </div>
                 </div>
 
-                {/* Alternative suggestions */}
                 {assignedAgent && getAlternativeAgents(liveSelectedNode).length > 0 && (
                   <div className="flex flex-col border-t border-border-dark pt-2.5 gap-1.5">
                     <span className="text-[9px] text-gray-500 uppercase">Alternative Candidates Evaluated</span>
@@ -426,7 +574,6 @@ export default function WorkflowPage() {
                   </div>
                 )}
 
-                {/* Simulated Timeline Logs */}
                 <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
                   <span className="text-[9px] text-gray-500 uppercase flex items-center gap-1">
                     <Clock className="w-3 h-3" />
@@ -455,7 +602,6 @@ export default function WorkflowPage() {
                   </div>
                 </div>
 
-                {/* Outputs detail */}
                 {liveSelectedNode.status === 'completed' && (
                   <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
                     <span className="text-[9px] text-gray-500 uppercase">Step Output Payload</span>
@@ -468,16 +614,6 @@ export default function WorkflowPage() {
             </div>
           ) : (
             <>
-              {/* AI Thinking Loader */}
-              {isPlanning && (
-                <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-black/60 flex flex-col items-center justify-center py-10 gap-3 text-xs font-mono text-center">
-                  <Loader2 className="w-8 h-8 text-primary-neon animate-spin" />
-                  <span className="text-white font-bold uppercase tracking-wider">AI Swarm Planner</span>
-                  <span className="text-gray-500">Querying OpenRouter LLM, evaluating candidate bids, and generating optimal DAG template in real-time...</span>
-                </div>
-              )}
-
-              {/* Dynamic Planning Failure Alert */}
               {errorMsg && (
                 <div className="glass-card p-5 rounded-xl border border-red-500/40 bg-red-500/5 flex flex-col gap-3 text-xs font-mono">
                   <div className="flex items-center gap-1.5 text-red-400 font-bold border-b border-red-500/20 pb-2.5">
@@ -532,60 +668,60 @@ export default function WorkflowPage() {
               )}
 
               {/* General SLA Configurations */}
-              <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-4 text-xs">
-                <h3 className="font-bold uppercase tracking-wider text-gray-400 font-mono flex items-center gap-1.5 border-b border-border-dark pb-2.5">
+              <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-4 text-xs font-mono">
+                <h3 className="font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-border-dark pb-2.5">
                   <Sliders className="w-4 h-4 text-primary-neon" />
                   SLA Configurations
                 </h3>
 
-                {activeWorkflow ? (
-                  <div className="flex flex-col gap-3 font-mono">
-                    {isDemoMode && (
-                      <div className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_8px_rgba(0,255,204,0.05)]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary-neon animate-pulse" />
-                        <span>Demo Mode - No funds required</span>
-                      </div>
-                    )}
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
-                      <span className="text-white font-bold truncate">{activeWorkflow.name}</span>
+                <div className="flex flex-col gap-3">
+                  {isDemoMode && activeWorkflow && (
+                    <div className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_8px_rgba(0,255,204,0.05)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary-neon animate-pulse" />
+                      <span>Demo Mode - No funds required</span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-500 uppercase">Routing Policy</span>
-                      <span className="text-primary-neon font-bold uppercase">{activeWorkflow.routingMode}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-500 uppercase">Budget Cap</span>
-                      <span className="text-secondary-neon font-bold">{activeWorkflow.budget.toFixed(2)} USDC</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-500 uppercase">Status</span>
-                      <span className={`font-bold capitalize ${
-                        activeWorkflow.status === 'completed' || activeWorkflow.status === 'Demo Completed'
-                          ? 'text-primary-neon' 
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
+                    <span className="text-white font-bold truncate">
+                      {activeWorkflow ? activeWorkflow.name : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase">Routing Policy</span>
+                    <span className="text-primary-neon font-bold uppercase">
+                      {activeWorkflow ? activeWorkflow.routingMode : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase">Budget Cap</span>
+                    <span className="text-secondary-neon font-bold">
+                      {activeWorkflow ? `${activeWorkflow.budget.toFixed(2)} USDC` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase">Status</span>
+                    <span className={`font-bold capitalize ${
+                      activeWorkflow
+                        ? activeWorkflow.status === 'completed' || activeWorkflow.status === 'Demo Completed'
+                          ? 'text-primary-neon animate-pulse' 
                           : activeWorkflow.status === 'failed'
                             ? 'text-red-500'
                             : activeWorkflow.status === 'running'
                               ? 'text-blue-400'
                               : 'text-yellow-400'
-                      }`}>
-                        {isDemoMode && activeWorkflow.status === 'running'
+                        : 'text-gray-500'
+                    }`}>
+                      {activeWorkflow
+                        ? (isDemoMode && activeWorkflow.status === 'running'
                           ? 'Running simulated workflow...'
                           : activeWorkflow.status === 'Demo Completed'
                             ? 'Demo completed successfully'
-                            : activeWorkflow.status}
-                      </span>
-                    </div>
+                            : activeWorkflow.status)
+                        : 'Idle'}
+                    </span>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 gap-2 text-center text-gray-500 italic">
-                    <AlertTriangle className="w-8 h-8 text-yellow-500/50 mb-1" />
-                    <span>No workflow is currently active in this session.</span>
-                    <Link href="/" className="text-primary-neon not-italic hover:underline mt-2 font-mono text-[10px]">
-                      GO_TO_PORTAL →
-                    </Link>
-                  </div>
-                )}
+                </div>
               </div>
             </>
           )}

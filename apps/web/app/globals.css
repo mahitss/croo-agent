@@ -125,3 +125,70 @@ body {
   outline: 2px solid var(--color-primary-neon);
   box-shadow: 0 0 12px rgba(0, 255, 204, 0.35);
 }
+
+/* Staff Engineer Refined Animations */
+@keyframes nodePop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-node-pop {
+  animation: nodePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes runningGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 0, 127, 0.2), inset 0 0 4px rgba(255, 0, 127, 0.1);
+    border-color: rgba(255, 0, 127, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(255, 0, 127, 0.25);
+    border-color: rgba(255, 0, 127, 0.7);
+  }
+}
+.animate-running-glow {
+  animation: runningGlow 1.6s ease-in-out infinite;
+}
+
+@keyframes completedGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.25);
+    border-color: rgba(0, 255, 204, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.55);
+    border-color: rgba(0, 255, 204, 0.8);
+  }
+}
+.animate-completed-glow {
+  animation: completedGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes particleExplosion {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tw-x, 100px), var(--tw-y, 100px)) scale(0) rotate(360deg);
+    opacity: 0;
+  }
+}
+.animate-particle {
+  animation: particleExplosion 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
