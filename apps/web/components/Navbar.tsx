@@ -46,7 +46,7 @@ export default function Navbar() {
   useEffect(() => {
     setMounted(true);
     const handleResize = () => {
-      setIsLargeDesktop(window.innerWidth >= 1400);
+      setIsLargeDesktop(window.innerWidth >= 1536);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
