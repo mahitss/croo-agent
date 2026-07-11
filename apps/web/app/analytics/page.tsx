@@ -32,9 +32,13 @@ import {
 } from 'recharts';
 
 export default function AnalyticsPage() {
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const demoWallet = useNexusStore((state) => state.demoWallet);
+  const liveWallet = useNexusStore((state) => state.liveWallet);
+  const userWallet = isDemoMode ? demoWallet : liveWallet;
+
   const agents = useNexusStore((state) => state.agents);
   const initialize = useNexusStore((state) => state.initialize);
-  const userWallet = useNexusStore((state) => state.userWallet);
 
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [loading, setLoading] = useState(true);
@@ -47,8 +51,6 @@ export default function AnalyticsPage() {
   const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
   const [aiMetrics, setAiMetrics] = useState<any>({ avgPlanningLatencyMs: 0, tokensConsumed: 0 });
   const [systemMetrics, setSystemMetrics] = useState<any>({ cpuUsage: 0, memoryUsage: 0 });
-
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
 
   useEffect(() => {
     initialize();

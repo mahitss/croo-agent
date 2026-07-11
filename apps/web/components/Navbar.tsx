@@ -58,14 +58,16 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const userWallet = useNexusStore((state) => state.userWallet);
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const demoWallet = useNexusStore((state) => state.demoWallet);
+  const liveWallet = useNexusStore((state) => state.liveWallet);
+  const userWallet = isDemoMode ? demoWallet : liveWallet;
   
   const user = useNexusStore((state) => state.user);
   const token = useNexusStore((state) => state.token);
   const logoutUser = useNexusStore((state) => state.logoutUser);
   const setAuthModal = useNexusStore((state) => state.setAuthModal);
   
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const toggleDemoMode = useNexusStore((state) => state.toggleDemoMode);
 
   const toggleSidebar = useNexusStore((state) => state.toggleSidebar);

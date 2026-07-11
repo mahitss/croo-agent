@@ -12,8 +12,12 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '../../components/Toast';
 
 export default function AdminPage() {
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const demoWallet = useNexusStore((state) => state.demoWallet);
+  const liveWallet = useNexusStore((state) => state.liveWallet);
+  const userWallet = isDemoMode ? demoWallet : liveWallet;
+
   const agents = useNexusStore((state) => state.agents);
-  const userWallet = useNexusStore((state) => state.userWallet);
   const resetDemoMode = useNexusStore((state) => state.resetDemoMode);
   const startExecution = useNexusStore((state) => state.startExecution);
   const setUserQuery = useNexusStore((state) => state.setUserQuery);

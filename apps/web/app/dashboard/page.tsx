@@ -35,9 +35,13 @@ import {
 } from 'recharts';
 
 export default function DashboardPage() {
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const demoWallet = useNexusStore((state) => state.demoWallet);
+  const liveWallet = useNexusStore((state) => state.liveWallet);
+  const userWallet = isDemoMode ? demoWallet : liveWallet;
+  
   const agents = useNexusStore((state) => state.agents);
   const agentWallets = useNexusStore((state) => state.agentWallets);
-  const userWallet = useNexusStore((state) => state.userWallet);
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
   const initialize = useNexusStore((state) => state.initialize);
   const user = useNexusStore((state) => state.user);
@@ -48,8 +52,6 @@ export default function DashboardPage() {
   const [revenueChartData, setRevenueChartData] = useState<any[]>([]);
   const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
 
   useEffect(() => {
     initialize();

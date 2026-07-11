@@ -6,12 +6,15 @@ import { useToast } from '../../components/Toast';
 import { Wallet, ArrowDownLeft, ArrowUpRight, ShieldCheck, History, ExternalLink, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function WalletPage() {
-  const userWallet = useNexusStore((state) => state.userWallet);
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const demoWallet = useNexusStore((state) => state.demoWallet);
+  const liveWallet = useNexusStore((state) => state.liveWallet);
+  const userWallet = isDemoMode ? demoWallet : liveWallet;
+  
   const depositUserWallet = useNexusStore((state) => state.depositUserWallet);
   const withdrawUserWallet = useNexusStore((state) => state.withdrawUserWallet);
   const initialize = useNexusStore((state) => state.initialize);
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const { toast } = useToast();
 
   useEffect(() => {

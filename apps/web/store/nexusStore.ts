@@ -40,13 +40,17 @@ interface NexusState {
   // Mode-isolated wallet states
   demoBalance: number;
   demoTransactions: Transaction[];
+  demoWalletAddress: string;
   demoEscrow: number;
   demoHistory: Transaction[];
+  demoWallet: WalletState;
 
   liveBalance: number;
   liveTransactions: Transaction[];
+  liveWalletAddress: string;
   liveEscrow: number;
   liveHistory: Transaction[];
+  liveWallet: WalletState;
   
   // Auth & Mode States
   user: { id: string; email: string; username: string; role: 'user' | 'creator' | 'admin'; displayName?: string; avatarUrl?: string; } | null;
@@ -364,19 +368,33 @@ export const useNexusStore = create<NexusState>((set, get) => {
     activeWorkflow: null,
     executionLogs: [],
     userWallet: {
+      address: '0xDemoWalletAddress789c',
+      balance: 100.0,
+      escrowBalance: 0.0,
+      history: []
+    },
+    demoBalance: 100.0,
+    demoTransactions: [],
+    demoWalletAddress: '0xDemoWalletAddress789c',
+    demoEscrow: 0.0,
+    demoHistory: [],
+    demoWallet: {
+      address: '0xDemoWalletAddress789c',
+      balance: 100.0,
+      escrowBalance: 0.0,
+      history: []
+    },
+    liveBalance: 0.0,
+    liveTransactions: [],
+    liveWalletAddress: '0x0000000000000000000000000000000000000000',
+    liveEscrow: 0.0,
+    liveHistory: [],
+    liveWallet: {
       address: '0x0000000000000000000000000000000000000000',
       balance: 0.0,
       escrowBalance: 0.0,
       history: []
     },
-    demoBalance: 0.0,
-    demoTransactions: [],
-    demoEscrow: 0.0,
-    demoHistory: [],
-    liveBalance: 0.0,
-    liveTransactions: [],
-    liveEscrow: 0.0,
-    liveHistory: [],
     agentWallets: {},
     isRunning: false,
     currentPhaseIndex: 0,
@@ -542,7 +560,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const tx: Transaction = {
           id: `tx-deposit-${Date.now()}`,
           senderAddress: 'EXTERNAL_BANK',
-          receiverAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+          receiverAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
           amount,
           type: 'deposit',
           timestamp: new Date().toISOString(),
@@ -555,15 +573,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
         localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
         localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
 
+        const updatedDemoWallet = {
+          address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+          balance: newDemoBalance,
+          escrowBalance: state.demoEscrow,
+          history: newDemoHistory
+        };
+
         set({
           demoBalance: newDemoBalance,
           demoHistory: newDemoHistory,
           demoTransactions: newDemoHistory,
-          userWallet: {
-            ...state.userWallet,
-            balance: newDemoBalance,
-            history: newDemoHistory
-          }
+          demoWallet: updatedDemoWallet,
+          userWallet: updatedDemoWallet
         });
         return { success: true };
       }
@@ -655,7 +677,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       if (state.isDemoMode) {
         const tx: Transaction = {
           id: `tx-withdraw-${Date.now()}`,
-          senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
+          senderAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
           receiverAddress: 'EXTERNAL_BANK',
           amount,
           type: 'withdrawal',
@@ -669,15 +691,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
         localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
         localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
 
+        const updatedDemoWallet = {
+          address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+          balance: newDemoBalance,
+          escrowBalance: state.demoEscrow,
+          history: newDemoHistory
+        };
+
         set({
           demoBalance: newDemoBalance,
           demoHistory: newDemoHistory,
           demoTransactions: newDemoHistory,
-          userWallet: {
-            ...state.userWallet,
-            balance: newDemoBalance,
-            history: newDemoHistory
-          }
+          demoWallet: updatedDemoWallet,
+          userWallet: updatedDemoWallet
         });
         return;
       }
@@ -696,7 +722,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         console.error('Failed to register withdrawal in database, falling back locally:', err);
         const tx: Transaction = {
           id: `tx-withdraw-${Date.now()}`,
-          senderAddress: state.userWallet.address,
+          senderAddress: state.liveWalletAddress || '0x0000000000000000000000000000000000000000',
           receiverAddress: 'EXTERNAL_BANK',
           amount,
           type: 'withdrawal',
@@ -704,12 +730,17 @@ export const useNexusStore = create<NexusState>((set, get) => {
           status: 'completed',
           txHash: '0x' + Math.random().toString(16).substring(2, 42)
         };
+        const updatedLiveWallet = {
+          ...state.liveWallet,
+          balance: state.liveWallet.balance - amount,
+          history: [tx, ...state.liveWallet.history]
+        };
         set({
-          userWallet: {
-            ...state.userWallet,
-            balance: state.userWallet.balance - amount,
-            history: [tx, ...state.userWallet.history]
-          }
+          liveBalance: updatedLiveWallet.balance,
+          liveHistory: updatedLiveWallet.history,
+          liveTransactions: updatedLiveWallet.history,
+          liveWallet: updatedLiveWallet,
+          userWallet: updatedLiveWallet
         });
       }
     },
@@ -1230,13 +1261,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
               status: 'completed',
               txHash: '0x' + Math.random().toString(16).substring(2, 42)
             };
+            const updatedLiveWallet = {
+              ...state.liveWallet,
+              balance: state.liveWallet.balance - totalCost,
+              escrowBalance: state.liveWallet.escrowBalance + totalCost,
+              history: [escrowTx, ...state.liveWallet.history]
+            };
             return {
-              userWallet: {
-                ...state.userWallet,
-                balance: state.userWallet.balance - totalCost,
-                escrowBalance: state.userWallet.escrowBalance + totalCost,
-                history: [escrowTx, ...state.userWallet.history]
-              }
+              liveBalance: updatedLiveWallet.balance,
+              liveEscrow: updatedLiveWallet.escrowBalance,
+              liveHistory: updatedLiveWallet.history,
+              liveTransactions: updatedLiveWallet.history,
+              liveWallet: updatedLiveWallet,
+              userWallet: updatedLiveWallet
             };
           });
           log('payment', 'Budget reserved in database escrow vault record.', 'success');
@@ -1263,17 +1300,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
             localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
             localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
 
+            const updatedDemoWallet = {
+              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+              balance: newDemoBalance,
+              escrowBalance: newDemoEscrow,
+              history: newDemoHistory
+            };
+
             return {
               demoBalance: newDemoBalance,
               demoEscrow: newDemoEscrow,
               demoHistory: newDemoHistory,
               demoTransactions: newDemoHistory,
-              userWallet: {
-                ...state.userWallet,
-                balance: newDemoBalance,
-                escrowBalance: newDemoEscrow,
-                history: newDemoHistory
-              }
+              demoWallet: updatedDemoWallet,
+              userWallet: updatedDemoWallet
             };
           });
         }
@@ -1375,40 +1415,71 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const savedDemoEscrow = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_escrow') : null;
         const savedDemoHistory = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_history') : null;
 
-        const demoBalance = savedDemoBalance ? Number(savedDemoBalance) : 0.0;
-        const demoEscrow = savedDemoEscrow ? Number(savedDemoEscrow) : 0.0;
+        const demoBalance = savedDemoBalance !== null ? Number(savedDemoBalance) : 100.0;
+        const demoEscrow = savedDemoEscrow !== null ? Number(savedDemoEscrow) : 0.0;
         const demoHistory = savedDemoHistory ? JSON.parse(savedDemoHistory) : [];
+        const demoWalletAddress = '0xDemoWalletAddress789c';
+
+        const demoWalletObj = {
+          address: demoWalletAddress,
+          balance: demoBalance,
+          escrowBalance: demoEscrow,
+          history: demoHistory
+        };
 
         set({
           demoBalance,
           demoEscrow,
           demoHistory,
           demoTransactions: demoHistory,
-          userWallet: {
-            address: '0xDemoWalletAddress789c',
-            balance: demoBalance,
-            escrowBalance: demoEscrow,
-            history: demoHistory
+          demoWalletAddress,
+          demoWallet: demoWalletObj,
+          userWallet: demoWalletObj,
+          // Clear live state in store memory to ensure complete isolation
+          liveBalance: 0.0,
+          liveEscrow: 0.0,
+          liveHistory: [],
+          liveTransactions: [],
+          liveWalletAddress: '0x0000000000000000000000000000000000000000',
+          liveWallet: {
+            address: '0x0000000000000000000000000000000000000000',
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
           }
         });
       } else {
         // Live Mode
-        // Clear demo state in store UI
+        // Clear demo state in store memory to ensure complete isolation
         set({
           demoBalance: 0.0,
           demoEscrow: 0.0,
           demoHistory: [],
-          demoTransactions: []
+          demoTransactions: [],
+          demoWalletAddress: '0xDemoWalletAddress789c',
+          demoWallet: {
+            address: '0xDemoWalletAddress789c',
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
+          }
         });
 
         if (!get().token) {
+          const emptyLiveWallet = {
+            address: '0x0000000000000000000000000000000000000000',
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
+          };
           set({
-            userWallet: {
-              address: '0x0000000000000000000000000000000000000000',
-              balance: 0.0,
-              escrowBalance: 0.0,
-              history: []
-            }
+            liveBalance: 0.0,
+            liveEscrow: 0.0,
+            liveHistory: [],
+            liveTransactions: [],
+            liveWalletAddress: '0x0000000000000000000000000000000000000000',
+            liveWallet: emptyLiveWallet,
+            userWallet: emptyLiveWallet
           });
         } else {
           try {
@@ -1431,18 +1502,23 @@ export const useNexusStore = create<NexusState>((set, get) => {
 
               const liveBal = Number(balanceData.available);
               const liveEsc = Number(balanceData.reserved);
+              const liveAddr = walletRes.data.address;
+
+              const liveWalletObj = {
+                address: liveAddr,
+                balance: liveBal,
+                escrowBalance: liveEsc,
+                history: txsList
+              };
 
               set({
                 liveBalance: liveBal,
                 liveEscrow: liveEsc,
                 liveHistory: txsList,
                 liveTransactions: txsList,
-                userWallet: {
-                  address: walletRes.data.address,
-                  balance: liveBal,
-                  escrowBalance: liveEsc,
-                  history: txsList
-                }
+                liveWalletAddress: liveAddr,
+                liveWallet: liveWalletObj,
+                userWallet: liveWalletObj
               });
             }
           } catch (e) {
@@ -1650,6 +1726,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
       localStorage.setItem('orbit_demo_escrow', '0.0');
       localStorage.setItem('orbit_demo_history', JSON.stringify([]));
 
+      const updatedDemoWallet = {
+        address: '0xDemoWalletAddress789c',
+        balance: 100.0,
+        escrowBalance: 0.0,
+        history: []
+      };
+
       set({
         agents: seedAgents,
         activeWorkflow: null,
@@ -1658,12 +1741,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
         demoEscrow: 0.0,
         demoHistory: [],
         demoTransactions: [],
-        userWallet: {
-          address: '0xUserWalletAddress789c',
-          balance: 100.0,
-          escrowBalance: 0.0,
-          history: []
-        },
+        demoWalletAddress: '0xDemoWalletAddress789c',
+        demoWallet: updatedDemoWallet,
+        userWallet: updatedDemoWallet,
         agentWallets: initialAgentWallets,
         isRunning: false,
         currentPhaseIndex: 0,
@@ -1789,15 +1869,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
                     localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
                     localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
 
+                    const updatedDemoWallet = {
+                      address: state.demoWalletAddress || '0xDemoWalletAddress789c',
+                      balance: state.demoBalance,
+                      escrowBalance: newDemoEscrow,
+                      history: newDemoHistory
+                    };
+
                     return {
                       demoEscrow: newDemoEscrow,
                       demoHistory: newDemoHistory,
                       demoTransactions: newDemoHistory,
-                      userWallet: {
-                        ...state.userWallet,
-                        escrowBalance: newDemoEscrow,
-                        history: newDemoHistory
-                      },
+                      demoWallet: updatedDemoWallet,
+                      userWallet: updatedDemoWallet,
                       isRunning: false,
                       currentPhaseIndex: 9,
                       appState: 'completed'
@@ -1812,7 +1896,6 @@ export const useNexusStore = create<NexusState>((set, get) => {
                   
                   set(state => {
                     const updatedAgentWallets = { ...state.agentWallets };
-                    const userWallet = { ...state.userWallet };
                     const releaseTransactions: Transaction[] = [];
 
                     updatedNodes.forEach(n => {
@@ -1841,12 +1924,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
                       releaseTransactions.push(agentTx);
                     });
 
-                    userWallet.escrowBalance = Math.max(0, userWallet.escrowBalance - totalCost);
-                    userWallet.history = [...releaseTransactions, ...userWallet.history];
-                    
+                    const updatedLiveWallet = {
+                      ...state.liveWallet,
+                      escrowBalance: Math.max(0, state.liveWallet.escrowBalance - totalCost),
+                      history: [...releaseTransactions, ...state.liveWallet.history]
+                    };
+
                     return {
                       agentWallets: updatedAgentWallets,
-                      userWallet,
+                      liveBalance: updatedLiveWallet.balance,
+                      liveEscrow: updatedLiveWallet.escrowBalance,
+                      liveHistory: updatedLiveWallet.history,
+                      liveTransactions: updatedLiveWallet.history,
+                      liveWallet: updatedLiveWallet,
+                      userWallet: updatedLiveWallet,
                       isRunning: false,
                       currentPhaseIndex: 9,
                       appState: 'completed'
@@ -1930,13 +2021,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
       set({ isDemoMode: mode });
       localStorage.setItem('orbit_demomode', String(mode));
       if (!mode) {
-        // Switching to Live Mode: clear any legacy flags
-        localStorage.removeItem('orbit_demo_wallet');
-        localStorage.removeItem('orbit_demo_transactions');
-        localStorage.removeItem('orbit_demo_notifications');
-        localStorage.removeItem('orbit_demo_activity');
-        localStorage.removeItem('orbit_demo_workflows');
-        sessionStorage.removeItem('orbit_demomode');
+        // Switching to Live Mode: clear all in-memory demo wallet state
+        set({
+          demoBalance: 0.0,
+          demoTransactions: [],
+          demoEscrow: 0.0,
+          demoHistory: [],
+          demoWalletAddress: '0xDemoWalletAddress789c',
+          demoWallet: {
+            address: '0xDemoWalletAddress789c',
+            balance: 0.0,
+            escrowBalance: 0.0,
+            history: []
+          }
+        });
       }
       get().initialize();
     },
