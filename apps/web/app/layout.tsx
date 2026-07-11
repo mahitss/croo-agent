@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AppLayout from "../components/AppLayout";
-import CommandPalette from "../components/CommandPalette";
 import AiAssistant from "../components/AiAssistant";
 import { ToastProvider } from "../components/Toast";
 import DemoBanner from "../components/DemoBanner";
@@ -33,7 +32,6 @@ export default function RootLayout({
             <AppLayout>
               {children}
             </AppLayout>
-            <CommandPalette />
             <AiAssistant />
             <AuthModal />
           </ErrorBoundary>

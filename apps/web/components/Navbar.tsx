@@ -236,6 +236,20 @@ export default function Navbar() {
             </Link>
           )}
 
+          {mounted && isAuthenticated && user && (
+            <button
+              onClick={toggleDemoMode}
+              className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 flex-shrink-0 ${
+                isDemoMode
+                  ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400 hover:bg-yellow-400/30'
+                  : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
+              }`}
+              title="Toggle execution mode between demo sandbox and production live payments"
+            >
+              <span>{!isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
+            </button>
+          )}
+
           <div 
             className={`flex items-center gap-2 ${
               isAuthenticated && user ? 'border-l border-border-dark pl-4' : ''
