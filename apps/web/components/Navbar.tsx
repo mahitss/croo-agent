@@ -41,7 +41,7 @@ export default function Navbar() {
   useKeyboardShortcuts();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const [isLargeDesktop, setIsLargeDesktop] = useState(true);
+  const [isLargeDesktop, setIsLargeDesktop] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -242,33 +242,33 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
+                mounted && isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
               }`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
+                mounted && isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
               }`}></span>
             </span>
             <span className="text-xs text-gray-500 font-mono tracking-wider">
-              {isRunning ? 'RUNNING_DAG' : 'NODE_CONNECTED'}
+              {mounted && isRunning ? 'RUNNING_DAG' : 'NODE_CONNECTED'}
             </span>
           </div>
 
           <button
             onClick={toggleDemoMode}
             className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 ${
-              isDemoMode
+              mounted && isDemoMode
                 ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400'
                 : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
             }`}
             title="Toggle between demo simulated execution and production live payment mode"
           >
-            <span>{isDemoMode ? 'Demo Mode' : 'Live Mode'}</span>
+            <span>{mounted && !isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
           </button>
 
           <Link href="/wallet" className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300">
             <Wallet className="w-4 h-4 text-primary-neon" />
             <span className="text-sm font-mono font-bold text-white">
-              {userWallet.balance.toFixed(2)} <span className="text-gray-400 text-xs">USDC</span>
+              {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">USDC</span>
             </span>
           </Link>
 
