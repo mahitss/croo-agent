@@ -95,9 +95,10 @@ async function bootstrap() {
       "Accept",
       "Origin",
       "X-Requested-With",
+      "x-execution-mode",
     ],
 
-    optionsSuccessStatus: 204,
+    optionsSuccessStatus: 200,
   });
 
   // Enable global validation pipeline for secure requests
