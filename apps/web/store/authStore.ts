@@ -82,6 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           set({ user: profile, token });
           localStorage.setItem('orbit-live-session', token);
           localStorage.setItem('orbit-live-user', JSON.stringify(profile));
+          localStorage.setItem('orbit_login_just_succeeded', 'true');
           if (refreshToken) {
             localStorage.setItem('orbit_refreshtoken', refreshToken);
           }
@@ -101,6 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ user: localProfile, token: 'local-mock-token' });
         localStorage.setItem('orbit-live-session', 'local-mock-token');
         localStorage.setItem('orbit-live-user', JSON.stringify(localProfile));
+        localStorage.setItem('orbit_login_just_succeeded', 'true');
         return true;
       }
     },
@@ -116,6 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           set({ user: profile, token });
           localStorage.setItem('orbit-live-session', token);
           localStorage.setItem('orbit-live-user', JSON.stringify(profile));
+          localStorage.setItem('orbit_login_just_succeeded', 'true');
           if (refreshToken) {
             localStorage.setItem('orbit_refreshtoken', refreshToken);
           }
@@ -134,6 +137,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ user: localProfile, token: 'local-mock-token' });
         localStorage.setItem('orbit-live-session', 'local-mock-token');
         localStorage.setItem('orbit-live-user', JSON.stringify(localProfile));
+        localStorage.setItem('orbit_login_just_succeeded', 'true');
         return true;
       }
     },
@@ -146,6 +150,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       localStorage.removeItem('orbit-live-session');
       localStorage.removeItem('orbit-live-user');
       localStorage.removeItem('orbit_refreshtoken');
+      localStorage.removeItem('orbit_login_just_succeeded');
     },
 
     loginOAuth: async (provider) => {
@@ -162,6 +167,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       set({ user: localProfile, token: `oauth-${provider}-token` });
       localStorage.setItem('orbit-live-session', `oauth-${provider}-token`);
       localStorage.setItem('orbit-live-user', JSON.stringify(localProfile));
+      localStorage.setItem('orbit_login_just_succeeded', 'true');
     },
 
     loginWithGoogle: async (idToken) => {
@@ -175,6 +181,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           set({ user: profile, token });
           localStorage.setItem('orbit-live-session', token);
           localStorage.setItem('orbit-live-user', JSON.stringify(profile));
+          localStorage.setItem('orbit_login_just_succeeded', 'true');
           if (refreshToken) {
             localStorage.setItem('orbit_refreshtoken', refreshToken);
           }
@@ -194,6 +201,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ user: localProfile, token: 'google-mock-token' });
         localStorage.setItem('orbit-live-session', 'google-mock-token');
         localStorage.setItem('orbit-live-user', JSON.stringify(localProfile));
+        localStorage.setItem('orbit_login_just_succeeded', 'true');
         return true;
       }
     }

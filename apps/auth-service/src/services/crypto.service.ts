@@ -5,6 +5,11 @@ import * as crypto from 'crypto';
 export class CryptoService {
   private readonly jwtSecret = process.env.JWT_SECRET || 'nexus_secure_secret_hash_key_1012';
 
+  constructor() {
+    const hash = crypto.createHash('sha256').update(this.jwtSecret).digest('hex');
+    console.log(`[CRYPTO_SERVICE] Active JWT Secret Hash: ${hash}`);
+  }
+
   hashPassword(password: string): string {
     const salt = crypto.randomBytes(16).toString('hex');
     const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');

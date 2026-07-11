@@ -5,6 +5,11 @@ import * as crypto from 'crypto';
 export class GatewayAuthGuard implements CanActivate {
   private readonly jwtSecret = process.env.JWT_SECRET || 'nexus_secure_secret_hash_key_1012';
 
+  constructor() {
+    const hash = crypto.createHash('sha256').update(this.jwtSecret).digest('hex');
+    console.log(`[AUTH_GUARD] Active JWT Secret Hash: ${hash}`);
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
