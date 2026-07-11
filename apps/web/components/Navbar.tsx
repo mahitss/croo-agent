@@ -54,7 +54,6 @@ export default function Navbar() {
   }, []);
 
   const userWallet = useNexusStore((state) => state.userWallet);
-  const isRunning = useNexusStore((state) => state.isRunning);
   
   const user = useNexusStore((state) => state.user);
   const token = useNexusStore((state) => state.token);
@@ -247,20 +246,6 @@ export default function Navbar() {
               </div>
             </div>
           )}
-
-          <div className="hidden lg:flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                mounted && isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
-              }`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                mounted && isRunning ? 'bg-secondary-neon' : 'bg-primary-neon'
-              }`}></span>
-            </span>
-            <span className="text-xs text-gray-500 font-mono tracking-wider">
-              {mounted && isRunning ? 'RUNNING_DAG' : 'NODE_CONNECTED'}
-            </span>
-          </div>
 
           <button
             onClick={toggleDemoMode}
