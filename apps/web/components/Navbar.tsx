@@ -87,14 +87,10 @@ export default function Navbar() {
     }
   }, [token, logoutUser]);
 
-  console.log('[NAVBAR_AUTH_DEBUG] Current State:', {
-    isAuthenticated: !!token && !!user,
-    currentUser: user,
-    jwt: token,
-    token: token,
-    accessToken: token,
-    'authStore.user': user,
-    'authStore.token': token,
+  console.log({
+    authenticated: !!token && !!user,
+    loading: !mounted,
+    user,
     demoMode: isDemoMode,
     audienceMode: isDemoMode ? 'demo' : 'live'
   });
