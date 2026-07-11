@@ -88,19 +88,23 @@ export default function Navbar() {
 
   const isAuthenticated = !!token && !!user;
   const authLoading = !mounted;
+  const session = token;
+  const walletConnected = !!userWallet.address && userWallet.address !== '0x0000000000000000000000000000000000000000';
 
-  console.log({
+  console.log("Navbar State Update:", {
     isAuthenticated,
     user,
-    authLoading,
-    token: !!token
+    session: !!session,
+    walletConnected,
+    authLoading
   });
 
-  globalThis.console.log({
+  globalThis.console.log("Navbar State Update:", {
     isAuthenticated,
     user,
-    authLoading,
-    token: !!token
+    session: !!session,
+    walletConnected,
+    authLoading
   });
 
   const leftLinks = [
@@ -116,6 +120,12 @@ export default function Navbar() {
     { href: '/registry', label: 'Publish Agent', icon: PlusCircle },
     { href: '/admin', label: 'Admin', icon: ShieldCheck },
   ];
+
+  console.log("Rendering Login/Register", {
+    isAuthenticated,
+    user,
+    authLoading
+  });
 
   return (
     <nav 
@@ -293,6 +303,16 @@ export default function Navbar() {
               gap: '12px'
             }}
           >
+            {(() => {
+              console.log("Rendering Login/Register", {
+                isAuthenticated,
+                user,
+                session: !!session,
+                walletConnected,
+                authLoading
+              });
+              return null;
+            })()}
             {authLoading ? (
               <div 
                 className="flex items-center gap-2"
