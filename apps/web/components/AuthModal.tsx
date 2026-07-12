@@ -55,6 +55,12 @@ export default function AuthModal() {
   }, []);
 
   useEffect(() => {
+    if (authModalTab) {
+      setTab(authModalTab as any);
+    }
+  }, [authModalTab]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined' && isAuthModalOpen) {
       const scriptId = 'google-gsi-client-script';
       let script = document.getElementById(scriptId) as HTMLScriptElement;

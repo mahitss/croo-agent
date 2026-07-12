@@ -18,11 +18,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex flex-col">
-          {children}
-        </main>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary-neon/20 border-t-primary-neon animate-spin" />
       </div>
     );
   }

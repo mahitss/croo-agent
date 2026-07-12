@@ -271,26 +271,11 @@ export default function Navbar() {
             })()}
             {authLoading ? (
               <div 
-                className="flex items-center gap-2"
+                className="w-[120px] h-7 rounded bg-white/5 animate-pulse"
                 style={{
                   flexShrink: 0,
-                  display: 'flex',
-                  gap: '12px'
                 }}
-              >
-                <button
-                  onClick={() => setAuthModal(true, 'login')}
-                  className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => setAuthModal(true, 'register')}
-                  className="bg-primary-neon text-black text-xs font-extrabold px-3 py-1.5 rounded-md hover:brightness-110 transition-all font-mono"
-                >
-                  Register
-                </button>
-              </div>
+              />
             ) : (!isAuthenticated || !user) ? (
               <div 
                 className="flex items-center gap-2"

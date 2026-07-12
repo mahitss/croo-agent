@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Agent, Workflow, TaskNode, ExecutionLog, Transaction, WalletState } from '@nexus-ai/types';
 import { apiService } from '../services/api';
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from './authStore';
 
 const isProd = process.env.NODE_ENV === 'production';
 const console = {
@@ -682,11 +683,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
     setMarketplaceMatchedStack: (stack) => set({ marketplaceMatchedStack: stack }),
     
     // Auth & Mode Defaults
-    user: null,
-    token: null,
-    isDemoMode: true,
-    isAuthModalOpen: false,
-    authModalTab: 'login',
+    user: useAuthStore.getState().user,
+    token: useAuthStore.getState().token,
+    isDemoMode: useAuthStore.getState().isDemoMode,
+    isAuthModalOpen: useAuthStore.getState().isAuthModalOpen,
+    authModalTab: useAuthStore.getState().authModalTab,
     isWorkflowSaved: true,
     unsavedWorkflowTemplate: null,
     isSidebarCollapsed: false,
@@ -2018,46 +2019,15 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     initialize: async () => {
-      // Rehydrate auth from localStorage
+      // Rehydrate auth from useAuthStore
       if (typeof window !== 'undefined') {
         if (!(window as any)._hasSessionExpiredListener) {
           (window as any)._hasSessionExpiredListener = true;
           window.addEventListener('nexus_session_expired', () => {
-            set({ user: null, token: null, isAuthModalOpen: true, authModalTab: 'login' });
+            useAuthStore.getState().setAuthModal(true, 'login');
           });
         }
-
-        const isTokenExpired = (t: string | null): boolean => {
-          if (!t) return true;
-          try {
-            const parts = t.split('.');
-            if (parts.length !== 3) return true;
-            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-            if (payload && typeof payload.exp === 'number') {
-              return payload.exp < Math.floor(Date.now() / 1000);
-            }
-            return false;
-          } catch (e) {
-            return true;
-          }
-        };
-
-        const storedToken = localStorage.getItem('orbit_token');
-        const storedUser = localStorage.getItem('orbit_user');
-        const storedDemoMode = localStorage.getItem('orbit_demomode');
-        if (storedToken && storedUser && !isTokenExpired(storedToken)) {
-          set({ token: storedToken, user: JSON.parse(storedUser) });
-        } else {
-          localStorage.removeItem('orbit_token');
-          localStorage.removeItem('orbit_user');
-          localStorage.removeItem('orbit_refreshtoken');
-          sessionStorage.removeItem('orbit_token');
-          sessionStorage.removeItem('orbit_user');
-          set({ token: null, user: null });
-        }
-        if (storedDemoMode !== null) {
-          set({ isDemoMode: storedDemoMode === 'true' });
-        }
+        useAuthStore.getState().initializeAuth();
       }
 
       try {
@@ -2707,12 +2677,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
     },
 
-    setAuthModal: (open, tab = 'login') => set({ isAuthModalOpen: open, authModalTab: tab }),
+    setAuthModal: (open, tab = 'login') => useAuthStore.getState().setAuthModal(open, tab as any),
 
     toggleDemoMode: () => {
-      const mode = !get().isDemoMode;
-      set({ isDemoMode: mode });
-      localStorage.setItem('orbit_demomode', String(mode));
+      useAuthStore.getState().toggleDemoMode();
+      const mode = useAuthStore.getState().isDemoMode;
       if (!mode) {
         // Switching to Live Mode: clear all in-memory demo wallet state
         set({
@@ -2733,108 +2702,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     loginUser: async (usernameOrEmail, password) => {
-      try {
-        const res = await apiClient.post<any>('/api/v1/auth/login', { usernameOrEmail, password });
-        if (res.success && res.data) {
-          // Clear any previous token sources in all contexts
-          localStorage.removeItem('orbit_token');
-          localStorage.removeItem('orbit_refreshtoken');
-          localStorage.removeItem('orbit_user');
-          sessionStorage.removeItem('orbit_token');
-          sessionStorage.removeItem('orbit_user');
-          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-          const profile = res.data.profile;
-          const token = res.data.token;
-          const refreshToken = res.data.refreshToken;
-          set({ user: profile, token });
-          localStorage.setItem('orbit_token', token);
-          localStorage.setItem('orbit_user', JSON.stringify(profile));
-          if (refreshToken) {
-            localStorage.setItem('orbit_refreshtoken', refreshToken);
-          }
-          return true;
-        } else {
-          throw new Error(res.message || 'Login failed');
-        }
-      } catch (err: any) {
-        if (!get().isDemoMode) {
-          throw err;
-        }
-        console.warn('Backend auth unavailable, generating local session:', err);
-        const localProfile = {
-          id: 'user-mock-1',
-          email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@orbitai.dev`,
-          username: usernameOrEmail.split('@')[0],
-          role: 'user' as const,
-          displayName: usernameOrEmail.split('@')[0]
-        };
-        set({ user: localProfile, token: 'local-mock-token' });
-        localStorage.setItem('orbit_token', 'local-mock-token');
-        localStorage.setItem('orbit_user', JSON.stringify(localProfile));
-        return true;
-      }
+      return useAuthStore.getState().loginUser(usernameOrEmail, password);
     },
 
     registerUser: async (email, username, password, displayName, role = 'user') => {
-      try {
-        const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role });
-        if (res.success && res.data) {
-          // Clear any previous token sources in all contexts
-          localStorage.removeItem('orbit_token');
-          localStorage.removeItem('orbit_refreshtoken');
-          localStorage.removeItem('orbit_user');
-          sessionStorage.removeItem('orbit_token');
-          sessionStorage.removeItem('orbit_user');
-          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-          const profile = res.data.profile;
-          const token = res.data.token;
-          const refreshToken = res.data.refreshToken;
-          set({ user: profile, token });
-          localStorage.setItem('orbit_token', token);
-          localStorage.setItem('orbit_user', JSON.stringify(profile));
-          if (refreshToken) {
-            localStorage.setItem('orbit_refreshtoken', refreshToken);
-          }
-          return true;
-        } else {
-          throw new Error(res.message || 'Registration failed');
-        }
-      } catch (err: any) {
-        if (!get().isDemoMode) {
-          throw err;
-        }
-        console.warn('Backend registration unavailable, generating local session:', err);
-        const localProfile = {
-          id: 'user-mock-1',
-          email,
-          username,
-          role: role as any,
-          displayName: displayName || username
-        };
-        set({ user: localProfile, token: 'local-mock-token' });
-        localStorage.setItem('orbit_token', 'local-mock-token');
-        localStorage.setItem('orbit_user', JSON.stringify(localProfile));
-        return true;
-      }
+      return useAuthStore.getState().registerUser(email, username, password, displayName, role);
     },
 
     logoutUser: async () => {
-      try {
-        await apiClient.post<any>('/api/v1/auth/logout', {});
-      } catch (err) {
-        console.warn('Logout request failed:', err);
-      }
+      await useAuthStore.getState().logoutUser();
       set({
-        user: null,
-        token: null,
         userWallet: {
           address: '0x0000000000000000000000000000000000000000',
           balance: 0.0,
@@ -2842,117 +2719,34 @@ export const useNexusStore = create<NexusState>((set, get) => {
           history: []
         }
       });
-      localStorage.removeItem('orbit_token');
-      localStorage.removeItem('orbit_refreshtoken');
-      localStorage.removeItem('orbit_user');
-      sessionStorage.removeItem('orbit_token');
-      sessionStorage.removeItem('orbit_user');
-      document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     },
 
     loginOAuth: async (provider) => {
-      const localProfile = {
-        id: `user-oauth-${provider}-${Date.now()}`,
-        email: `oauth-${provider}@orbitai.dev`,
-        username: `${provider}_user`,
-        role: 'user' as const,
-        displayName: `OAuth ${provider.toUpperCase()} User`,
-        avatarUrl: provider === 'google' 
-          ? 'https://lh3.googleusercontent.com/a/default-user' 
-          : 'https://github.com/identicons/default.png'
-      };
-      set({ user: localProfile, token: `oauth-${provider}-token` });
-      localStorage.setItem('orbit_token', `oauth-${provider}-token`);
-      localStorage.setItem('orbit_user', JSON.stringify(localProfile));
+      return useAuthStore.getState().loginOAuth(provider);
     },
 
     loginWithGoogle: async (idToken) => {
-      try {
-        const isDemo = get().isDemoMode;
-        const localFlag = typeof window !== 'undefined' ? localStorage.getItem('orbit_demomode') : null;
-        console.log('[GOOGLE_LOGIN_DEBUG] Before executing loginWithGoogle:');
-        console.log(`[GOOGLE_LOGIN_DEBUG] - isDemoMode: ${isDemo}`);
-        console.log(`[GOOGLE_LOGIN_DEBUG] - audienceMode: ${isDemo ? 'demo' : 'live'}`);
-        console.log(`[GOOGLE_LOGIN_DEBUG] - localStorage demo flag: ${localFlag}`);
-        console.log(`[GOOGLE_LOGIN_DEBUG] - zustand demo state: ${isDemo}`);
-
-        console.log('[GOOGLE_LOGIN_DEBUG] Google login initiated with idToken length:', idToken?.length);
-        const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken });
-        console.log('[GOOGLE_AUTH_DEBUG] Backend response received:', JSON.stringify(res));
-
-        if (res.success && res.data) {
-          console.log('[GOOGLE_LOGIN_DEBUG] Google login succeeded? yes');
-
-          // Clear any previous token sources in all contexts
-          localStorage.removeItem('orbit_token');
-          localStorage.removeItem('orbit_refreshtoken');
-          localStorage.removeItem('orbit_user');
-          sessionStorage.removeItem('orbit_token');
-          sessionStorage.removeItem('orbit_user');
-          document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-          const profile = res.data.user;
-          const token = res.data.accessToken;
-          const refreshToken = res.data.refreshToken;
-          
-          console.log('[GOOGLE_LOGIN_DEBUG] JWT returned? ', token ? 'yes' : 'no');
-
-          set({ user: profile, token });
-          console.log('[GOOGLE_AUTH_DEBUG] Auth context updated');
-          
-          localStorage.setItem('orbit_token', token);
-          localStorage.setItem('orbit_user', JSON.stringify(profile));
-          if (refreshToken) {
-            localStorage.setItem('orbit_refreshtoken', refreshToken);
-          }
-          console.log('[GOOGLE_AUTH_DEBUG] JWT stored');
-
-          console.log('[GOOGLE_LOGIN_DEBUG] JWT stored? yes');
-          console.log('[GOOGLE_LOGIN_DEBUG] Auth context updated? yes');
-          console.log('[GOOGLE_LOGIN_DEBUG] Authorization header attached? yes');
-          return true;
-        } else {
-          console.warn('[GOOGLE_LOGIN_DEBUG] Google login succeeded? no (success: false)');
-          throw new Error(res.message || 'Google authentication failed');
-        }
-      } catch (err: any) {
-        console.error('[GOOGLE_LOGIN_DEBUG] Google login error:', err);
-        if (!get().isDemoMode) {
-          throw err;
-        }
-        console.warn('Backend Google auth unavailable, generating local session:', err);
-        const localProfile = {
-          id: 'user-google-mock-1',
-          email: 'google-test@orbitai.dev',
-          username: 'google_test',
-          role: 'user' as const,
-          displayName: 'Google Test User',
-          avatarUrl: 'https://lh3.googleusercontent.com/a/default-user'
-        };
-        set({ user: localProfile, token: 'google-mock-token' });
-        localStorage.setItem('orbit_token', 'google-mock-token');
-        localStorage.setItem('orbit_user', JSON.stringify(localProfile));
-        return true;
-      }
+      return useAuthStore.getState().loginWithGoogle(idToken);
     },
 
     verifyEmail: async (code) => {
-      const user = get().user;
-      if (user) {
-        const updated = { ...user, emailVerified: true } as any;
-        set({ user: updated });
-        localStorage.setItem('orbit_user', JSON.stringify(updated));
-      }
+      return useAuthStore.getState().verifyEmail(code);
     },
 
     forgotPassword: async (email) => {
-      console.log('Sending forgot password email to:', email);
+      return useAuthStore.getState().forgotPassword(email);
     },
   };
 });
+
+// Synchronize auth state changes from useAuthStore to useNexusStore
+useAuthStore.subscribe((state) => {
+  useNexusStore.setState({
+    user: state.user,
+    token: state.token,
+    isDemoMode: state.isDemoMode,
+    isAuthModalOpen: state.isAuthModalOpen,
+    authModalTab: state.authModalTab as any
+  });
+});
+
