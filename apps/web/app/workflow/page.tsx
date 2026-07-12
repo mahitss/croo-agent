@@ -80,14 +80,17 @@ export default function WorkflowPage() {
   const [nodeNameInput, setNodeNameInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isWorkflowSaved, setIsWorkflowSaved] = useState(true);
 
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
     try {
       // Live persistence or sandbox check
       toast('Workflow successfully persisted in database!', 'success');
+      setIsWorkflowSaved(true);
     } catch (err: any) {
       toast(`Save failed: ${err.message}`, 'error');
+      setIsWorkflowSaved(false);
     } finally {
       setIsSaving(false);
     }
@@ -146,12 +149,14 @@ export default function WorkflowPage() {
       }
       const wf = await workflowService.generateWorkflow(promptInput, 'balanced', 2.0);
       setShowExplanation(true);
+      setIsWorkflowSaved(true);
       toast('Workflow generated successfully.', 'success');
       
       await workflowService.runWorkflow(wf.id);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
+      setIsWorkflowSaved(false);
       toast(`Generation failed: ${msg}`, 'error');
     } finally {
       setIsPlanning(false);
