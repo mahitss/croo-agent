@@ -125,9 +125,7 @@ export default function DashboardPage() {
     },
     { 
       label: 'Wallet Balance', 
-      value: dashboardData?.walletBalance !== undefined
-        ? `${Number(dashboardData.walletBalance).toFixed(2)} USDC`
-        : `${userWallet.balance.toFixed(2)} USDC`, 
+      value: `${userWallet.balance.toFixed(2)} USDC`, 
       icon: Wallet, 
       color: 'text-accent-blue' 
     },
@@ -159,7 +157,7 @@ export default function DashboardPage() {
             👋 Welcome back, {user?.displayName || user?.username || 'User'}
           </h1>
           <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
-            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : (isDemoMode ? agents.length : 0)} published agents, and ${dashboardData?.walletBalance !== undefined ? Number(dashboardData.walletBalance).toFixed(2) : userWallet.balance.toFixed(2)} USDC available in your wallet.
+            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : (isDemoMode ? agents.length : 0)} published agents, and ${userWallet.balance.toFixed(2)} USDC available in your wallet.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -246,9 +244,7 @@ export default function DashboardPage() {
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Available Balance</span>
               <span className="text-white font-mono font-bold">
-                {dashboardData?.walletBalance !== undefined 
-                  ? `${Number(dashboardData.walletBalance).toFixed(2)} USDC` 
-                  : `${userWallet.balance.toFixed(2)} USDC`}
+                {`${userWallet.balance.toFixed(2)} USDC`}
               </span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">

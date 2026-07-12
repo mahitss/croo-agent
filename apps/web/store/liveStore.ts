@@ -24,6 +24,7 @@ export interface LiveState {
   fetchAgents: () => Promise<void>;
   runLiveWorkflow: (id: string) => Promise<{ success: boolean; message?: string }>;
   resetLiveWorkflowState: () => void;
+  clearLiveWallet: () => void;
   setLiveWorkflow: (wf: Workflow | null) => void;
   renameLiveNode: (nodeId: string, newName: string) => void;
   deleteLiveNode: (nodeId: string) => void;
@@ -55,13 +56,34 @@ export const useLiveStore = create<LiveState>((set, get) => {
     isWorkflowSaved: true,
     agents: [],
 
+    clearLiveWallet: () => {
+      set({
+        liveWallet: {
+          address: '0x0000000000000000000000000000000000000000',
+          balance: 0.0,
+          escrowBalance: 0.0,
+          history: []
+        },
+        liveTransactions: [],
+        liveHistory: [],
+        liveEscrow: 0.0
+      });
+    },
+
     fetchLiveWallet: async () => {
+      const fallbackWallet = {
+        address: '0x0000000000000000000000000000000000000000',
+        balance: 0.0,
+        escrowBalance: 0.0,
+        history: []
+      };
+
       try {
         const walletRes = await apiClient.get<any>('/api/v1/wallet');
-        const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
-        const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
-
         if (walletRes?.success && walletRes.data) {
+          const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
+          const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
+
           const balanceData = balanceRes?.success && balanceRes.data ? balanceRes.data : { available: 0.0, reserved: 0.0 };
           const txsList = txsRes?.success && Array.isArray(txsRes.data) ? txsRes.data.map((tx: any) => ({
             id: tx.id,
@@ -74,8 +96,8 @@ export const useLiveStore = create<LiveState>((set, get) => {
             txHash: tx.txHash || '0x' + Math.random().toString(16).substring(2, 42)
           })) : [];
 
-          const liveBal = Number(balanceData.available);
-          const liveEsc = Number(balanceData.reserved);
+          const liveBal = Number(balanceData.available || 0);
+          const liveEsc = Number(balanceData.reserved || 0);
           const liveAddr = walletRes.data.address;
 
           const liveWalletObj = {
@@ -91,10 +113,22 @@ export const useLiveStore = create<LiveState>((set, get) => {
             liveHistory: txsList,
             liveEscrow: liveEsc
           });
+        } else {
+          set({
+            liveWallet: fallbackWallet,
+            liveTransactions: [],
+            liveHistory: [],
+            liveEscrow: 0.0
+          });
         }
       } catch (err) {
-        console.error('[LIVE_STORE] Failed to fetch live wallet details:', err);
-        throw err;
+        console.error('[LIVE_STORE] Failed to fetch live wallet details, falling back to 0.0:', err);
+        set({
+          liveWallet: fallbackWallet,
+          liveTransactions: [],
+          liveHistory: [],
+          liveEscrow: 0.0
+        });
       }
     },
 

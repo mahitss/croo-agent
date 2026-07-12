@@ -102,11 +102,13 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage
     if (isDemoMode) {
-      // Demo -> Live: Clear sandbox workflow
+      // Demo -> Live: Clear sandbox workflow and reset demo wallet state
       resetDemoWorkflow();
+      useDemoStore.getState().resetDemoWallet();
     } else {
-      // Live -> Demo: Clear live workflow
+      // Live -> Demo: Clear live workflow and discard live wallet cache
       resetLiveWorkflowState();
+      useLiveStore.getState().clearLiveWallet();
     }
     toggleDemoMode();
     toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Mode'}`, 'info');
