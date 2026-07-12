@@ -61,22 +61,14 @@ export default function SettingsPage() {
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
-      toast({
-        title: 'Settings Saved',
-        description: 'Your user profile and settings preferences were updated successfully.',
-        type: 'success'
-      });
+      toast('Settings preferences updated successfully.', 'success');
     }, 800);
   };
 
   const handleRegenerateKey = () => {
     const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
     setApiKey(`nx_live_${randomHex}`);
-    toast({
-      title: 'API Key Regenerated',
-      description: 'A new secret credentials token has been issued for your agent applications.',
-      type: 'info'
-    });
+    toast('API Key successfully regenerated.', 'info');
   };
 
   return (

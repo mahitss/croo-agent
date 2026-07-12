@@ -58,7 +58,7 @@ interface NexusState {
   token: string | null;
   isDemoMode: boolean;
   isAuthModalOpen: boolean;
-  authModalTab: 'login' | 'register' | 'forgot';
+  authModalTab: 'login' | 'register' | 'forgot' | 'verify';
   isWorkflowSaved: boolean;
   unsavedWorkflowTemplate: any | null;
   saveWorkflow: () => Promise<void>;
@@ -1504,7 +1504,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
           return { activeWorkflow: updatedWf };
         });
 
-        while (get().isRunning && get().activeWorkflow && get().activeWorkflow.status === 'running') {
+        while (get().isRunning && get().activeWorkflow && get().activeWorkflow?.status === 'running') {
           const wf = get().activeWorkflow!;
           const pendingNodes = wf.nodes.filter(n => n.status === 'pending');
           if (pendingNodes.length === 0) {

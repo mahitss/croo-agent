@@ -136,8 +136,9 @@ export const useLiveStore = create<LiveState>((set, get) => {
       try {
         const res = await apiClient.get<any>(`/api/v1/workflows/${id}`);
         if (res?.success && res.data) {
-          // Reconstruct real workspace workflow node states
           const dbWorkflow = res.data;
+          
+          // Reconstruct real workspace workflow node states
           const liveWorkflowObj: Workflow = {
             id: dbWorkflow.id,
             name: dbWorkflow.title,
@@ -166,7 +167,25 @@ export const useLiveStore = create<LiveState>((set, get) => {
             createdAt: dbWorkflow.createdAt
           };
 
-          set({ liveWorkflow: liveWorkflowObj, appState: dbWorkflow.status === 'running' ? 'running' : 'draft' });
+          const isCurrentlyRunning = dbWorkflow.status === 'running' || dbWorkflow.status === 'pending';
+
+          // Fetch execution logs for the workflow to display real-time updates
+          let fetchedLogs = [];
+          try {
+            const logsRes = await apiClient.get<any>(`/api/v1/workflows/${id}/logs`);
+            if (logsRes.success && Array.isArray(logsRes.data)) {
+              fetchedLogs = logsRes.data;
+            }
+          } catch (logErr) {
+            console.error('[LIVE_STORE] Failed to fetch workflow logs:', logErr);
+          }
+
+          set({ 
+            liveWorkflow: liveWorkflowObj, 
+            appState: isCurrentlyRunning ? 'running' : 'draft',
+            isRunning: isCurrentlyRunning,
+            executionLogs: fetchedLogs
+          });
         }
       } catch (err) {
         console.error('[LIVE_STORE] Failed to fetch workflow details:', err);

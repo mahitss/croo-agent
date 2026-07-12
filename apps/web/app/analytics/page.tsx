@@ -32,9 +32,12 @@ import {
 } from 'recharts';
 
 import { useMode } from '../../providers/ModeProvider';
+import { seedAgents } from '../../store/nexusStore';
 
 export default function AnalyticsPage() {
   const { isDemoMode, analyticsService, wallet: userWallet } = useMode();
+  const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
+
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +55,7 @@ export default function AnalyticsPage() {
 
     const fetchAllData = async () => {
       try {
+
         const [
           revRes,
           platRes,

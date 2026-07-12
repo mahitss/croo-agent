@@ -35,7 +35,7 @@ const AgentDetailModal = dynamic(() => import('../../components/AgentDetailModal
 });
 
 export default function MarketplacePage() {
-  const agents = useNexusStore((state) => state.agents);
+  const agents = useNexusStore((state) => state.agents) ?? [];
   const initialize = useNexusStore((state) => state.initialize);
   const { toast } = useToast();
   const [isInitialLoading, setIsInitialLoading] = useState(true);

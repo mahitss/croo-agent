@@ -57,11 +57,30 @@ async function main() {
     if (!data.success) throw new Error(data.message || 'Login failed');
   }));
 
+  // 2.5 DEPOSIT CREDITS
+  results.push(await runTest("Deposit Credits for Testing", async () => {
+    const res = await fetch(`${BASE_URL}/wallet/deposit-credits`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
+      body: JSON.stringify({
+        amount: 1000.0
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Deposit credits failed');
+  }));
+
   // 3. AI PLANNER: WORKFLOW GENERATION
   results.push(await runTest("AI Planner DAG Generation API", async () => {
     const res = await fetch(`${BASE_URL}/ai/plan`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
       body: JSON.stringify({
         query: 'Analyze Tesla Q1 reports and translate to Chinese',
         routingMode: 'balanced',
@@ -75,7 +94,11 @@ async function main() {
 
   // 4. MARKETPLACE: LIST AGENTS
   results.push(await runTest("List Registered Agents Discovery API", async () => {
-    const res = await fetch(`${BASE_URL}/agents`);
+    const res = await fetch(`${BASE_URL}/agents`, {
+      headers: {
+        'Authorization': `Bearer ${userToken}`
+      }
+    });
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Agent listing failed');
   }));
@@ -85,7 +108,10 @@ async function main() {
   results.push(await runTest("Create Workflow Template API", async () => {
     const res = await fetch(`${BASE_URL}/workflows`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
       body: JSON.stringify({
         title: 'Tesla Analysis Swarm Run',
         estimatedCost: 1.25,
@@ -107,7 +133,10 @@ async function main() {
   results.push(await runTest("Trigger Workflow Run Pipeline API", async () => {
     if (!createdWorkflowId) throw new Error("Workflow ID missing from previous step");
     const res = await fetch(`${BASE_URL}/workflows/${createdWorkflowId}/run`, {
-      method: 'POST'
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userToken}`
+      }
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Workflow trigger failed');
@@ -115,7 +144,11 @@ async function main() {
 
   // 7. WALLET: RETRIEVE BALANCE
   results.push(await runTest("Wallet Balance Retrieval API", async () => {
-    const res = await fetch(`${BASE_URL}/wallet/balance`);
+    const res = await fetch(`${BASE_URL}/wallet/balance`, {
+      headers: {
+        'Authorization': `Bearer ${userToken}`
+      }
+    });
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Balance fetch failed');
   }));
@@ -124,7 +157,10 @@ async function main() {
   results.push(await runTest("Payment Invoice Creation & Settlement API", async () => {
     const createRes = await fetch(`${BASE_URL}/payments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
       body: JSON.stringify({
         workflowId: 'wf-test-payment',
         payerWallet: '0x3a4b...e9c2',
@@ -137,7 +173,10 @@ async function main() {
     const paymentId = createData.data.id;
     const settleRes = await fetch(`${BASE_URL}/payments/settle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
       body: JSON.stringify({ paymentId })
     });
     const settleData = await settleRes.json();

@@ -1,9 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { useDemoStore } from '../store/demoStore';
-import { useLiveStore } from '../store/liveStore';
+import { useNexusStore } from '../store/nexusStore';
 import { demoWalletService } from '../services/demo/wallet';
 import { liveWalletService } from '../services/live/wallet';
 import { demoWorkflowService } from '../services/demo/workflow';
@@ -39,30 +38,16 @@ const ModeContext = createContext<ModeContextProps | undefined>(undefined);
 
 export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
-  const isDemoMode = useAuthStore((state) => state.isDemoMode);
+  
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const isRunning = useNexusStore((state) => state.isRunning);
+  const wallet = useNexusStore((state) => state.userWallet);
+  const executionLogs = useNexusStore((state) => state.executionLogs);
+  const appState = useNexusStore((state) => state.appState);
+  
   const toggleDemoMode = useAuthStore((state) => state.toggleDemoMode);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
-  
-  // Demo states
-  const demoWallet = useDemoStore((state) => state.demoWallet);
-  const demoTransactions = useDemoStore((state) => state.demoTransactions);
-  const demoWorkflow = useDemoStore((state) => state.demoWorkflow);
-  const demoLogs = useDemoStore((state) => state.executionLogs);
-  const demoRunning = useDemoStore((state) => state.isRunning);
-  const demoAppState = useDemoStore((state) => state.appState);
-  const initializeDemo = useDemoStore((state) => state.initializeDemo);
-  const resetDemoWorkflow = useDemoStore((state) => state.resetDemoWorkflow);
-
-  // Live states
-  const liveWallet = useLiveStore((state) => state.liveWallet);
-  const liveTransactions = useLiveStore((state) => state.liveTransactions);
-  const liveWorkflow = useLiveStore((state) => state.liveWorkflow);
-  const liveLogs = useLiveStore((state) => state.executionLogs);
-  const liveRunning = useLiveStore((state) => state.isRunning);
-  const liveAppState = useLiveStore((state) => state.appState);
-  const fetchLiveWallet = useLiveStore((state) => state.fetchLiveWallet);
-  const fetchAgents = useLiveStore((state) => state.fetchAgents);
-  const resetLiveWorkflowState = useLiveStore((state) => state.resetLiveWorkflowState);
 
   // Injected services
   const walletService = isDemoMode ? demoWalletService : liveWalletService;
@@ -71,23 +56,13 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const analyticsService = isDemoMode ? demoAnalyticsService : liveAnalyticsService;
 
   // Unified States mapping
-  const wallet = isDemoMode ? demoWallet : liveWallet;
-  const transactions = isDemoMode ? demoTransactions : liveTransactions;
-  const activeWorkflow = isDemoMode ? demoWorkflow : liveWorkflow;
-  const executionLogs = isDemoMode ? demoLogs : liveLogs;
-  const isRunning = isDemoMode ? demoRunning : liveRunning;
-  const appState = isDemoMode ? demoAppState : liveAppState;
+  const transactions = wallet?.history || [];
 
   const refreshData = async () => {
-    if (isDemoMode) {
-      initializeDemo();
-    } else {
-      try {
-        await fetchLiveWallet();
-        await fetchAgents();
-      } catch (err: any) {
-        toast(`Live wallet loading failed: ${err.message || err}`, 'error');
-      }
+    try {
+      await useNexusStore.getState().initialize();
+    } catch (err: any) {
+      toast(`State loading failed: ${err.message || err}`, 'error');
     }
   };
 
@@ -101,15 +76,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage
-    if (isDemoMode) {
-      // Demo -> Live: Clear sandbox workflow and reset demo wallet state
-      resetDemoWorkflow();
-      useDemoStore.getState().resetDemoWallet();
-    } else {
-      // Live -> Demo: Clear live workflow and discard live wallet cache
-      resetLiveWorkflowState();
-      useLiveStore.getState().clearLiveWallet();
-    }
+    useNexusStore.getState().resetExecution();
     toggleDemoMode();
     toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Mode'}`, 'info');
   };

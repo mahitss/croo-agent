@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMode } from '../providers/ModeProvider';
 import { useAuthStore } from '../store/authStore';
+import { useNexusStore } from '../store/nexusStore';
 import { useToast } from './Toast';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { 
@@ -59,7 +60,9 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { isDemoMode, wallet: userWallet, toggleMode: toggleDemoMode } = useMode();
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const userWallet = useNexusStore((state) => state.userWallet);
+  const { toggleMode: toggleDemoMode } = useMode();
   
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -85,7 +88,7 @@ export default function Navbar() {
       const isExpired = () => {
         try {
           const parts = token.split('.');
-          if (parts.length !== 3) return true;
+          if (parts.length !== 3) return false;
           const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
           if (payload && typeof payload.exp === 'number') {
             return payload.exp < Math.floor(Date.now() / 1000);

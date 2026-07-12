@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useMode } from '../../providers/ModeProvider';
 import { useAuthStore } from '../../store/authStore';
-import { useLiveStore } from '../../store/liveStore';
+
 import Link from 'next/link';
 import { 
   TrendingUp, 
@@ -33,21 +33,12 @@ import {
   Bar, 
   Cell 
 } from 'recharts';
-
-const seedAgents = [
-  { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', skills: ['market analysis'], walletAddress: '0x32A4B...98e2', price: 0.15, trustScore: 95, latency: 1200 },
-  { id: 'agent-research-2', name: 'QuickScan', category: 'Research', skills: ['web search'], walletAddress: '0x8F21c...d8A3', price: 0.05, trustScore: 88, latency: 450 },
-  { id: 'agent-finance-1', name: 'FinAnalytica', category: 'Finance', skills: ['balance sheet analysis'], walletAddress: '0x99C2d...a3F1', price: 0.25, trustScore: 98, latency: 1600 },
-  { id: 'agent-legal-1', name: 'LexGuard Compliance', category: 'Legal', skills: ['contract audit'], walletAddress: '0x77F1d...89c5', price: 0.35, trustScore: 92, latency: 1400 }
-];
+import { useNexusStore, seedAgents } from '../../store/nexusStore';
 
 export default function DashboardPage() {
   const { isDemoMode, walletService, workflowService, dashboardService, analyticsService, wallet: userWallet, activeWorkflow } = useMode();
-  const user = useAuthStore((state) => state.user);
-  const liveAgents = useLiveStore((state) => state.agents);
-  const fetchAgents = useLiveStore((state) => state.fetchAgents);
-
-  const agents = isDemoMode ? seedAgents : liveAgents;
+  const user = useNexusStore((state) => state.user);
+  const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
   
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -57,9 +48,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isDemoMode) {
-      fetchAgents().catch(() => {});
-    }
 
     setLoading(true);
     dashboardService.getDashboardData()
@@ -97,12 +85,15 @@ export default function DashboardPage() {
   }, [isDemoMode]);
 
   // Leaderboard data calculation using database analytics values
-  const leaderboard = [...agents]
+  const leaderboard = ([...agents] as any[])
     .map(agent => {
       const metric = agentMetrics.find(m => m.agentId === agent.id);
       return {
         ...agent,
-        earnings: metric ? Number(metric.revenueUsdc) : 0
+        earnings: metric ? Number(metric.revenueUsdc) : 0,
+        accuracy: agent.accuracy !== undefined ? agent.accuracy : 92,
+        rating: agent.rating !== undefined ? agent.rating : 4.6,
+        reviewsCount: agent.reviewsCount !== undefined ? agent.reviewsCount : 150
       };
     })
     .sort((a, b) => b.trustScore - a.trustScore);

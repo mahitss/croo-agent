@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMode } from '../../providers/ModeProvider';
 import { useAuthStore } from '../../store/authStore';
-import { useDemoStore } from '../../store/demoStore';
-import { useLiveStore } from '../../store/liveStore';
+import { useNexusStore, seedAgents } from '../../store/nexusStore';
+import { apiService } from '../../services/api';
 import { 
   Users, Cpu, Layers, ShieldCheck, DollarSign, AlertTriangle, 
   Activity, CheckCircle, Clock, Sliders, Play, Pause, RotateCcw, 
@@ -13,20 +13,15 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '../../components/Toast';
 
-const seedAgents = [
-  { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', skills: ['market analysis'], walletAddress: '0x32A4B...98e2', price: 0.15, trustScore: 95, latency: 1200 },
-  { id: 'agent-research-2', name: 'QuickScan', category: 'Research', skills: ['web search'], walletAddress: '0x8F21c...d8A3', price: 0.05, trustScore: 88, latency: 450 },
-  { id: 'agent-finance-1', name: 'FinAnalytica', category: 'Finance', skills: ['balance sheet analysis'], walletAddress: '0x99C2d...a3F1', price: 0.25, trustScore: 98, latency: 1600 },
-  { id: 'agent-legal-1', name: 'LexGuard Compliance', category: 'Legal', skills: ['contract audit'], walletAddress: '0x77F1d...89c5', price: 0.35, trustScore: 92, latency: 1400 }
-];
-
 export default function AdminPage() {
   const { isDemoMode, wallet: userWallet, activeWorkflow, isRunning, workflowService } = useMode();
-  const resetDemoMode = useDemoStore((state) => state.resetDemoWallet);
-  const liveAgents = useLiveStore((state) => state.agents);
-  const agents = isDemoMode ? seedAgents : liveAgents;
+  const resetDemoMode = useNexusStore((state) => state.resetDemoMode);
+  const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
   const { toast } = useToast();
   const router = useRouter();
+
+  const setUserQuery = useNexusStore((state) => state.setUserQuery);
+  const startExecution = useNexusStore((state) => state.startExecution);
 
   // Demo Timer States
   const [timerActive, setTimerActive] = useState(false);

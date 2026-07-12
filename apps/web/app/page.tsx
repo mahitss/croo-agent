@@ -16,7 +16,7 @@ export default function PortalPage() {
   const resetExecution = useNexusStore((state) => state.resetExecution);
   const isRunning = useNexusStore((state) => state.isRunning);
   const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
-  const agents = useNexusStore((state) => state.agents);
+  const agents = useNexusStore((state) => state.agents) ?? [];
   const initialize = useNexusStore((state) => state.initialize);
 
   useEffect(() => {

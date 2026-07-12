@@ -30,6 +30,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useNexusStore } from '../store/nexusStore';
+import { useMode } from '../providers/ModeProvider';
 import AgentNode from './AgentNode';
 import dagre from '@dagrejs/dagre';
 
@@ -222,8 +223,8 @@ function CanvasInner({ onSelectNode }: CanvasProps) {
       </div>
 
       {!activeWorkflow && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 font-mono text-xs text-gray-400 gap-2">
-          <span>No active workflow.</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-20 font-mono text-xs text-gray-400 gap-2">
+          <span className="text-sm font-bold text-white uppercase tracking-wider">No Workflow Yet</span>
           <span>Describe a task above and click "Generate Workflow" to begin.</span>
         </div>
       )}

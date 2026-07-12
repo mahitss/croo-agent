@@ -21,7 +21,7 @@ const console = {
   }
 };
 import Canvas from '../../components/Canvas';
-import { useNexusStore } from '../../store/nexusStore';
+import { useNexusStore, seedAgents } from '../../store/nexusStore';
 import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '../../components/Toast';
@@ -35,36 +35,25 @@ const PLANNING_STEPS = [
   { label: 'Completed', desc: 'DAG compiled. Escrow contracts initialized.' }
 ];
 
-import { useMode } from '../../providers/ModeProvider';
-import { useAuthStore } from '../../store/authStore';
-import { useDemoStore } from '../../store/demoStore';
-import { useLiveStore } from '../../store/liveStore';
 
-const seedAgents = [
-  { id: 'agent-research-1', name: 'InsightFinder Pro', category: 'Research', skills: ['market analysis'], walletAddress: '0x32A4B...98e2', price: 0.15, trustScore: 95, latency: 1200 },
-  { id: 'agent-research-2', name: 'QuickScan', category: 'Research', skills: ['web search'], walletAddress: '0x8F21c...d8A3', price: 0.05, trustScore: 88, latency: 450 },
-  { id: 'agent-finance-1', name: 'FinAnalytica', category: 'Finance', skills: ['balance sheet analysis'], walletAddress: '0x99C2d...a3F1', price: 0.25, trustScore: 98, latency: 1600 },
-  { id: 'agent-legal-1', name: 'LexGuard Compliance', category: 'Legal', skills: ['contract audit'], walletAddress: '0x77F1d...89c5', price: 0.35, trustScore: 92, latency: 1400 }
-];
 
 export default function WorkflowPage() {
-  const { isDemoMode, walletService, workflowService, activeWorkflow, isRunning, refreshData } = useMode();
-  const user = useAuthStore((state) => state.user);
-  
-  const liveAgents = useLiveStore((state) => state.agents);
-  const fetchAgents = useLiveStore((state) => state.fetchAgents);
-  const agents = isDemoMode ? seedAgents : liveAgents;
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const isRunning = useNexusStore((state) => state.isRunning);
+  const user = useNexusStore((state) => state.user);
+  const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
 
-  const promptTokens = isDemoMode ? useDemoStore((state) => state.promptTokens) : useLiveStore((state) => state.promptTokens);
-  const completionTokens = isDemoMode ? useDemoStore((state) => state.completionTokens) : useLiveStore((state) => state.completionTokens);
-  const totalTokens = isDemoMode ? useDemoStore((state) => state.totalTokens) : useLiveStore((state) => state.totalTokens);
-  const estimatedCost = isDemoMode ? useDemoStore((state) => state.estimatedCost) : useLiveStore((state) => state.estimatedCost);
+  const promptTokens = useNexusStore((state) => state.promptTokens);
+  const completionTokens = useNexusStore((state) => state.completionTokens);
+  const totalTokens = useNexusStore((state) => state.totalTokens);
+  const estimatedCost = useNexusStore((state) => state.estimatedCost);
 
-  // Custom Node Operations mapped to the correct store based on active mode
-  const renameNode = isDemoMode ? useDemoStore((state) => state.renameDemoNode) : useLiveStore((state) => state.renameLiveNode);
-  const deleteNode = isDemoMode ? useDemoStore((state) => state.deleteDemoNode) : useLiveStore((state) => state.deleteLiveNode);
-  const retryNode = isDemoMode ? useDemoStore((state) => state.retryDemoNode) : useLiveStore((state) => state.retryLiveNode);
-  const resetExecution = isDemoMode ? useDemoStore((state) => state.resetDemoWorkflow) : useLiveStore((state) => state.resetLiveWorkflowState);
+  // Custom Node Operations
+  const renameNode = useNexusStore((state) => state.renameNode);
+  const deleteNode = useNexusStore((state) => state.deleteNode);
+  const retryNode = useNexusStore((state) => state.retryNode);
+  const resetExecution = useNexusStore((state) => state.resetExecution);
 
   const { toast } = useToast();
 
@@ -98,18 +87,22 @@ export default function WorkflowPage() {
 
   // Check URL query parameters and initialize store
   useEffect(() => {
-    refreshData();
-    if (!isDemoMode) {
-      fetchAgents().catch(() => {});
+    const params = new URLSearchParams(window.location.search);
+    const urlWorkflowId = params.get('workflowId');
+    
+    // Clear any stale workflow states on page mount if not looking up a specific workflow ID
+    if (!urlWorkflowId) {
+      useNexusStore.getState().resetExecution();
     }
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlPrompt = params.get('prompt');
-      if (urlPrompt) {
-        setPromptInput(urlPrompt);
-        setShowExplanation(true);
-      }
+    useNexusStore.getState().initialize().catch((err) => {
+      console.error('Failed to initialize workspace store:', err);
+    });
+
+    const urlPrompt = params.get('prompt');
+    if (urlPrompt) {
+      setPromptInput(urlPrompt);
+      setShowExplanation(true);
     }
   }, [isDemoMode]);
 
@@ -147,12 +140,16 @@ export default function WorkflowPage() {
           await new Promise(r => setTimeout(r, 600));
         }
       }
-      const wf = await workflowService.generateWorkflow(promptInput, 'balanced', 2.0);
+      
+      // 1. Generate workflow using the global store generateWorkflow action
+      await useNexusStore.getState().generateWorkflow(promptInput, 'balanced', 2.0);
+
       setShowExplanation(true);
       setIsWorkflowSaved(true);
       toast('Workflow generated successfully.', 'success');
       
-      await workflowService.runWorkflow(wf.id);
+      // 2. Start the execution flow immediately
+      await useNexusStore.getState().startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
@@ -163,9 +160,9 @@ export default function WorkflowPage() {
     }
   };
 
-  const handleLaunchSwarm = () => {
+  const handleLaunchSwarm = async () => {
     if (activeWorkflow) {
-      workflowService.runWorkflow(activeWorkflow.id);
+      await useNexusStore.getState().startExecution(activeWorkflow.query, activeWorkflow.routingMode || 'balanced', activeWorkflow.budget || 2.0);
     }
   };
 
@@ -174,7 +171,7 @@ export default function WorkflowPage() {
     const currentAgent = agents.find(a => a.id === node.assignedAgentId);
     if (!currentAgent) return [];
     return agents
-      .filter(a => a.id !== currentAgent.id && (a.category === currentAgent.category || a.skills.some(s => currentAgent.skills.includes(s))))
+      .filter(a => a.id !== currentAgent.id && (a.category === currentAgent.category || a.skills.some((s: any) => currentAgent.skills.includes(s))))
       .slice(0, 2);
   };
 
@@ -720,7 +717,7 @@ export default function WorkflowPage() {
                     <span className="text-[10px] text-gray-500 uppercase">Status</span>
                     <span className={`font-bold capitalize ${
                       activeWorkflow
-                        ? activeWorkflow.status === 'completed' || activeWorkflow.status === 'Demo Completed'
+                        ? activeWorkflow.status === 'completed' || (activeWorkflow.status as string) === 'Demo Completed'
                           ? 'text-primary-neon animate-pulse' 
                           : activeWorkflow.status === 'failed'
                             ? 'text-red-500'
@@ -732,7 +729,7 @@ export default function WorkflowPage() {
                       {activeWorkflow
                         ? (isDemoMode && activeWorkflow.status === 'running'
                           ? 'Running simulated workflow...'
-                          : activeWorkflow.status === 'Demo Completed'
+                          : (activeWorkflow.status as string) === 'Demo Completed'
                             ? 'Demo completed successfully'
                             : activeWorkflow.status)
                         : 'Idle'}

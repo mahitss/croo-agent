@@ -86,7 +86,7 @@ export const useDemoStore = create<DemoState>((set, get) => {
         history: []
       });
       const history = getStored<Transaction[]>('orbit-demo-history', []);
-      const workflow = getStored<Workflow | null>('orbit-demo-workflow', null);
+      const workflow = null as Workflow | null;
 
       set({
         demoWallet: wallet,
@@ -318,7 +318,7 @@ export const useDemoStore = create<DemoState>((set, get) => {
         return { demoWorkflow: updatedWf };
       });
 
-      while (get().isRunning && get().demoWorkflow && get().demoWorkflow.status === 'running') {
+      while (get().isRunning && get().demoWorkflow && get().demoWorkflow?.status === 'running') {
         const wf = get().demoWorkflow!;
         const pendingNodes = wf.nodes.filter(n => n.status === 'pending');
         if (pendingNodes.length === 0) {

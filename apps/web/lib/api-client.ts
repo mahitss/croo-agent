@@ -63,7 +63,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
       
       if (parsedToken) {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('orbit-live-session', parsedToken);
+          localStorage.setItem('orbit_token', parsedToken);
           if (parsedNextRefresh) {
             localStorage.setItem('orbit_refreshtoken', parsedNextRefresh);
           }
@@ -79,12 +79,12 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
 
 function handleSessionExpiration() {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('orbit-live-session');
-    localStorage.removeItem('orbit-live-user');
+    localStorage.removeItem('orbit_token');
+    localStorage.removeItem('orbit_user');
     localStorage.removeItem('orbit_refreshtoken');
     localStorage.removeItem('orbit_login_just_succeeded');
-    sessionStorage.removeItem('orbit-live-session');
-    sessionStorage.removeItem('orbit-live-user');
+    sessionStorage.removeItem('orbit_token');
+    sessionStorage.removeItem('orbit_user');
     document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
@@ -111,7 +111,7 @@ function onRefreshed(token: string) {
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const isServer = typeof window === 'undefined';
-  let token = isServer ? null : localStorage.getItem('orbit-live-session');
+  let token = isServer ? null : localStorage.getItem('orbit_token');
 
   // Verify and auto-refresh token if expired to prevent 401 spam
   if (token && isJwtExpired(token) && !isServer) {
