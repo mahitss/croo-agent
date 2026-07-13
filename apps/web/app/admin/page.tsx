@@ -65,7 +65,13 @@ export default function AdminPage() {
     { name: 'Sentry', status: 'healthy', msg: 'Checking status...', latency: '4ms' }
   ]);
 
+  const initializationState = useAuthStore((state) => state.initializationState);
+
   useEffect(() => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      return;
+    }
     let active = true;
     const fetchHealth = async () => {
       try {
@@ -85,7 +91,7 @@ export default function AdminPage() {
       active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [isDemoMode, initializationState]);
 
   useEffect(() => {
     if (timerActive) {

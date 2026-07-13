@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useNexusStore } from '../store/nexusStore';
+import { useAuthStore } from '../store/authStore';
 import { apiService } from '../services/api';
 import Canvas from '../components/Canvas';
 import ExecutionTracker from '../components/ExecutionTracker';
@@ -498,7 +499,16 @@ function LiveActivityFeed() {
     { type: 'Workflow Run', desc: 'Intention swarm started for "Compliance check"', time: '40s ago' }
   ]);
 
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const initializationState = useAuthStore((state) => state.initializationState);
+
   useEffect(() => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[PORTAL_PAGE] Bypassing activity feed polling for guest session.');
+      return;
+    }
+
     let active = true;
     const fetchFeed = async () => {
       try {
@@ -517,7 +527,7 @@ function LiveActivityFeed() {
       active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [isDemoMode, initializationState]);
 
   return (
     <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
