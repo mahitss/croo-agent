@@ -17,7 +17,8 @@ const AgentDetailModal = dynamic(() => import('../../components/AgentDetailModal
 
 export default function MarketplacePage() {
   const { toast } = useToast();
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const initializationState = useAuthStore((state) => state.initializationState);
   const { isDemoMode } = useMode();
 
   // Search & Filters State
@@ -64,6 +65,12 @@ export default function MarketplacePage() {
 
   // Load agents list from backend dynamically
   const fetchAgents = async (pageToLoad: number, append = false) => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[MARKETPLACE_PAGE] Bypassing protected agents query for guest user.');
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const qParams: any = {
@@ -106,7 +113,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     setCurrentPage(1);
     fetchAgents(1, false);
-  }, [searchTerm, selectedCategory, onlyVerified, sortBy, marketplaceTab, showOnlyFavorites, user]);
+  }, [searchTerm, selectedCategory, onlyVerified, sortBy, marketplaceTab, showOnlyFavorites, user, isDemoMode, initializationState]);
 
   // Load more handler
   const handleLoadMore = () => {

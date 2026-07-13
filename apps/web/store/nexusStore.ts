@@ -140,13 +140,54 @@ interface NexusState {
 export const useNexusStore = create<NexusState>((set, get) => {
   // Sync state changes from useAuthStore
   useAuthStore.subscribe((authState) => {
-    set({
-      user: authState.user,
-      token: authState.token,
-      isDemoMode: authState.isDemoMode,
-      isAuthModalOpen: authState.isAuthModalOpen,
-      authModalTab: authState.authModalTab
-    });
+    const isAuth = !!authState.token && !!authState.user;
+    if (!isAuth) {
+      set({
+        user: null,
+        token: null,
+        isDemoMode: authState.isDemoMode,
+        isAuthModalOpen: authState.isAuthModalOpen,
+        authModalTab: authState.authModalTab,
+        
+        userWallet: {
+          address: '0x0000000000000000000000000000000000000000',
+          balance: 0.0,
+          escrowBalance: 0.0,
+          pendingBalance: 0.0,
+          history: []
+        },
+        demoBalance: 0.0,
+        demoEscrow: 0.0,
+        demoHistory: [],
+        demoTransactions: [],
+        demoWallet: {
+          address: '0x0000000000000000000000000000000000000000',
+          balance: 0.0,
+          escrowBalance: 0.0,
+          pendingBalance: 0.0,
+          history: []
+        },
+        liveBalance: 0.0,
+        liveEscrow: 0.0,
+        liveHistory: [],
+        liveTransactions: [],
+        liveWallet: {
+          address: '0x0000000000000000000000000000000000000000',
+          balance: 0.0,
+          escrowBalance: 0.0,
+          pendingBalance: 0.0,
+          history: []
+        }
+      });
+    } else {
+      set({
+        user: authState.user,
+        token: authState.token,
+        isDemoMode: authState.isDemoMode,
+        isAuthModalOpen: authState.isAuthModalOpen,
+        authModalTab: authState.authModalTab
+      });
+    }
   });
 
   return {
@@ -493,15 +534,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const repos = getRepos(isDemo);
 
       try {
-        // Load agents registry (public)
-        const list = await repos.agents.getAgents();
-        set({ agents: list });
-
         // Guard: skip protected calls in Live mode if guest
         if (!isDemo && authState.initializationState !== 'AUTHENTICATED') {
           logger.info('[NEXUS_STORE] User is unauthenticated in Live Mode. Bypassing wallet & active workflow queries.');
+          set({ agents: [] });
           return;
         }
+
+        // Load agents registry
+        const list = await repos.agents.getAgents();
+        set({ agents: list });
 
         // Load mode-specific wallet metrics
         const wallet = await repos.wallet.getBalance();
