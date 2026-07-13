@@ -82,28 +82,7 @@ export default function Navbar() {
     }
   };
 
-  useEffect(() => {
-    if (token) {
-      const isExpired = () => {
-        try {
-          const parts = token.split('.');
-          if (parts.length !== 3) return false;
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-          if (payload && typeof payload.exp === 'number') {
-            return payload.exp < Math.floor(Date.now() / 1000);
-          }
-          return false;
-        } catch (e) {
-          return true;
-        }
-      };
-
-      if (isExpired()) {
-        console.warn('[JWT_CHECK] Token has expired. Logging out.');
-        logoutUser();
-      }
-    }
-  }, [token, logoutUser]);
+  // Expiry check is managed by api-client.ts automatically to prevent login loops.
 
   const isAuthenticated = !!token && !!user;
   const authLoading = !mounted;

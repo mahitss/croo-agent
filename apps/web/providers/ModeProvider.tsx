@@ -46,6 +46,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const toggleDemoMode = useAuthStore((state) => state.toggleDemoMode);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const initializationState = useAuthStore((state) => state.initializationState);
 
   // Injected services
   const walletService = isDemoMode ? demoWalletService : liveWalletService;
@@ -57,6 +58,12 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const transactions = wallet?.history || [];
 
   const refreshData = async () => {
+    // Only fetch protected data if we are authenticated or in DEMO mode
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[MODE_PROVIDER] Session is not authenticated. Bypassing state loading.');
+      return;
+    }
     try {
       await initialize();
     } catch (err: any) {
@@ -66,11 +73,11 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     initializeAuth();
-  }, []);
+  }, [initializeAuth]);
 
   useEffect(() => {
     refreshData();
-  }, [isDemoMode]);
+  }, [isDemoMode, initializationState]);
 
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage
@@ -78,6 +85,20 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toggleDemoMode();
     toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Mode'}`, 'info');
   };
+
+  // Prevent app render and protected calls until session init finishes
+  if (initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') {
+    return (
+      <div className="flex-1 bg-bg-dark flex items-center justify-center p-6 font-mono min-h-screen">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="w-10 h-10 border-2 border-primary-neon border-t-transparent rounded-full animate-spin"></div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+            [AUTH INIT] Verifying Secure AI swarming session...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ModeContext.Provider

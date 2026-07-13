@@ -1,3 +1,5 @@
+import { useAuthStore } from '../store/authStore';
+
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== "undefined"
@@ -12,7 +14,6 @@ function isJwtExpired(token: string): boolean {
     const parts = token.split('.');
     if (parts.length !== 3) return true;
     
-    // Decode base64url payload
     const base64Url = parts[1];
     let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) {
@@ -36,28 +37,23 @@ function isJwtExpired(token: string): boolean {
     
     const current = Math.floor(Date.now() / 1000);
     const expired = current > (exp - 10);
-    console.log(`[API_CLIENT] Token check: sub=${payload.sub || payload.id}, exp=${exp}, current=${current}, expired=${expired}`);
     return expired;
   } catch (e) {
-    console.error('[API_CLIENT] Failed to decode JWT token:', e);
     return true;
   }
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
-    console.log('[API_CLIENT] Sending refresh payload with token:', refreshToken ? refreshToken.substring(0, 8) + '...' : 'none');
+    console.log('[TOKEN REFRESH] Renewing access token...');
     const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
     });
     
-    console.log('[API_CLIENT] Refresh POST request status:', res.status);
     if (res.ok) {
       const data = await res.json();
-      console.log('[API_CLIENT] Refresh Endpoint raw response:', JSON.stringify(data));
-      
       const parsedToken = data?.data?.token || data?.token;
       const parsedNextRefresh = data?.data?.refreshToken || data?.refreshToken;
       
@@ -75,13 +71,16 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
       }
     }
   } catch (e) {
-    console.error('[API_CLIENT] Failed to execute refreshAccessToken:', e);
+    console.error('[TOKEN REFRESH] Request failed:', e);
   }
   return null;
 }
 
+let redirectLoopGuard = false;
+
 function handleSessionExpiration() {
   if (typeof window !== 'undefined') {
+    console.log('[LOGOUT] Session expired, executing user logout...');
     localStorage.removeItem('orbit_token');
     localStorage.removeItem('orbit_user');
     localStorage.removeItem('orbit_refreshtoken');
@@ -94,11 +93,22 @@ function handleSessionExpiration() {
     document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
+    useAuthStore.setState({ token: null, user: null, initializationState: 'UNAUTHENTICATED' });
     window.dispatchEvent(new Event('nexus_session_expired'));
-    if (window.location.pathname !== '/' && window.location.pathname !== '/settings' && window.location.pathname !== '/wallet') {
-      window.location.href = `/?auth=login&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-    } else if (window.location.pathname !== '/') {
-      window.location.href = `/?auth=login&redirect=${encodeURIComponent(window.location.pathname)}`;
+    
+    if (redirectLoopGuard) return;
+    
+    // Prevent redirect loop if already on login view
+    if (window.location.search.includes('auth=login')) {
+      return;
+    }
+    
+    redirectLoopGuard = true;
+    const destPath = window.location.pathname;
+    if (destPath !== '/' && destPath !== '/settings' && destPath !== '/wallet') {
+      window.location.href = `/?auth=login&redirect=${encodeURIComponent(destPath + window.location.search)}`;
+    } else if (destPath !== '/') {
+      window.location.href = `/?auth=login&redirect=${encodeURIComponent(destPath)}`;
     } else {
       window.location.href = '/?auth=login';
     }
@@ -119,21 +129,49 @@ function onRefreshed(token: string) {
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const isServer = typeof window === 'undefined';
+  
+  // Guard 1: Never fetch protected routes if auth is UNINITIALIZED / CHECKING_SESSION
+  if (!isServer && !url.startsWith('/api/v1/auth/')) {
+    let authState = useAuthStore.getState();
+    if (authState.initializationState === 'UNINITIALIZED' || authState.initializationState === 'CHECKING_SESSION') {
+      console.log(`[QUEUE REQUESTS] Deferring request to ${url} until auth initialization completes...`);
+      await new Promise<void>((resolve) => {
+        const unsubscribe = useAuthStore.subscribe((state) => {
+          if (state.initializationState === 'AUTHENTICATED' || state.initializationState === 'UNAUTHENTICATED') {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+      console.log(`[RETRY REQUESTS] Resubmitting deferred request to ${url}`);
+      authState = useAuthStore.getState();
+    }
+
+    // Abort if unauthenticated guest session
+    if (authState.initializationState === 'UNAUTHENTICATED') {
+      console.warn(`[API_CLIENT] Bypassing protected fetch: User is unauthenticated for path ${url}`);
+      return new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), { status: 401 });
+    }
+  }
+
   const rememberMe = !isServer && localStorage.getItem('orbit_remember_me') === 'true';
   const storage = isServer ? null : (rememberMe ? localStorage : sessionStorage);
   let token = storage ? storage.getItem('orbit_token') : null;
 
-  // Verify and auto-refresh token if expired to prevent 401 spam
+  // Enforce queue during ongoing refresh
   if (token && isJwtExpired(token) && !isServer && storage) {
     const refreshToken = storage.getItem('orbit_refreshtoken');
     if (refreshToken) {
       if (!isRefreshing) {
         isRefreshing = true;
+        console.log(`[QUEUE REQUESTS] Deferring requests. Initializing single token refresh...`);
         refreshAccessToken(refreshToken).then(newToken => {
           isRefreshing = false;
           if (newToken) {
+            console.log(`[RETRY REQUESTS] Token refresh succeeded. Retrying queued requests.`);
             onRefreshed(newToken);
           } else {
+            console.warn(`[LOGOUT] Token refresh failed. Flushing queue.`);
             handleSessionExpiration();
             onRefreshed('');
           }
@@ -164,48 +202,31 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  console.log(`[API_CLIENT] Dispatching Request: ${url}, Auth: ${token ? 'Bearer ' + token.substring(0, 15) + '...' : 'None'}`);
-
   let response = await fetch(`${BASE_URL}${url}`, {
     ...options,
     headers,
   });
 
-  console.log(`[API_CLIENT] Response status: ${response.status} for ${url}`);
-
   // Intercept 401 failures and try to refresh on the fly (Problem 7)
-  if (response.status === 401 && !isServer && storage) {
-    console.warn(`[API_CLIENT] 401 Unauthorized returned for ${url}. Checking temporary login bypass...`);
-    
-    // Check if the login just succeeded flag is set
+  if (response.status === 401 && !isServer && storage && !url.startsWith('/api/v1/auth/')) {
     const justSucceeded = localStorage.getItem('orbit_login_just_succeeded') === 'true';
     if (justSucceeded) {
-      console.warn(`[API_CLIENT] 401 received but login just succeeded. Clearing bypass flag and retrying request once...`);
       localStorage.removeItem('orbit_login_just_succeeded');
-      
-      // Retry request exactly once with the same token
-      response = await fetch(`${BASE_URL}${url}`, {
-        ...options,
-        headers,
-      });
-      
-      console.log(`[API_CLIENT] Retry response status: ${response.status} for ${url}`);
-      if (response.status === 401) {
-        console.error(`[API_CLIENT] Retry still returned 401 for ${url}. Preserving session to prevent login loops.`);
-      }
       return response;
     }
 
-    console.warn('[API_CLIENT] Standard 401 logic: Attempting token refresh...');
     const refreshToken = storage.getItem('orbit_refreshtoken');
     if (refreshToken) {
       if (!isRefreshing) {
         isRefreshing = true;
+        console.log(`[QUEUE REQUESTS] 401 received for ${url}. Deferring requests to run refresh...`);
         refreshAccessToken(refreshToken).then(newToken => {
           isRefreshing = false;
           if (newToken) {
+            console.log(`[RETRY REQUESTS] Token refresh succeeded. Retrying queued requests.`);
             onRefreshed(newToken);
           } else {
+            console.warn(`[LOGOUT] Token refresh failed. Flushing queue.`);
             handleSessionExpiration();
             onRefreshed('');
           }
@@ -229,7 +250,6 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
         response = new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), { status: 401 });
       }
     } else {
-      console.error('[API_CLIENT] Still unauthorized after refresh. Logging out user...');
       handleSessionExpiration();
     }
   }

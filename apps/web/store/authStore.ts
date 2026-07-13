@@ -20,6 +20,14 @@ const console = {
   }
 };
 
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined"
+    ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? "http://localhost:5000"
+      : window.location.origin)
+    : "http://localhost:5000");
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -34,6 +42,7 @@ export interface AuthState {
   user: UserProfile | null;
   token: string | null;
   isCheckingAuth: boolean;
+  initializationState: 'UNINITIALIZED' | 'CHECKING_SESSION' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
   rememberMe: boolean;
   isDemoMode: boolean;
   isAuthModalOpen: boolean;
@@ -93,11 +102,14 @@ function isJwtExpired(token: string): boolean {
   return current > (exp - 10); // 10 second buffer
 }
 
+let initPromise: Promise<boolean> | null = null;
+
 export const useAuthStore = create<AuthState>((set, get) => {
   return {
     user: null,
     token: null,
     isCheckingAuth: true,
+    initializationState: 'UNINITIALIZED',
     rememberMe: true,
     isDemoMode: true,
     isAuthModalOpen: false,
@@ -134,7 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       
       if (delayMs > 0) {
         const timeoutId = setTimeout(async () => {
-          console.log('[AUTH_STORE] Auto-refresh timer fired! Requesting token refresh...');
+          console.log('[TOKEN REFRESH] Auto-refresh timer fired! Requesting token refresh...');
           const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
           const storage = rememberMe ? localStorage : sessionStorage;
           const refreshToken = storage.getItem('orbit_refreshtoken');
@@ -146,7 +158,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
               const nextRefresh = res?.data?.refreshToken || res?.refreshToken;
               
               if (parsedToken) {
-                console.log('[AUTH_STORE] Auto-refresh succeeded.');
+                console.log('[TOKEN REFRESH] Auto-refresh succeeded.');
                 storage.setItem('orbit_token', parsedToken);
                 if (nextRefresh) {
                   storage.setItem('orbit_refreshtoken', nextRefresh);
@@ -154,22 +166,22 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 set({ token: parsedToken });
                 get().scheduleAutoRefresh();
               } else {
-                console.warn('[AUTH_STORE] Auto-refresh token payload missing. Logging out user...');
+                console.warn('[TOKEN REFRESH] Auto-refresh token payload missing. Logging out user...');
                 get().logoutUser();
               }
             } catch (e) {
-              console.error('[AUTH_STORE] Auto-refresh request failed:', e);
+              console.error('[TOKEN REFRESH] Auto-refresh request failed:', e);
               get().logoutUser();
             }
           } else {
-            console.warn('[AUTH_STORE] No refresh token found during auto-refresh. Logging out...');
+            console.warn('[TOKEN REFRESH] No refresh token found during auto-refresh. Logging out...');
             get().logoutUser();
           }
         }, delayMs);
         
         set({ refreshTimeoutId: timeoutId } as any);
       } else {
-        console.log('[AUTH_STORE] Token is already near expiry, refreshing immediately.');
+        console.log('[TOKEN REFRESH] Token is already near expiry, refreshing immediately.');
         const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
         const storage = rememberMe ? localStorage : sessionStorage;
         const refreshToken = storage.getItem('orbit_refreshtoken');
@@ -190,93 +202,103 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     initializeAuth: async () => {
       if (typeof window === 'undefined') return false;
-      console.log('[AUTH_STORE] App startup: Initializing auth state...');
+      if (initPromise) return initPromise;
       
-      const storedDemoMode = localStorage.getItem('orbit_demomode');
-      const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
-      const storage = rememberMe ? localStorage : sessionStorage;
-      
-      const token = storage.getItem('orbit_token');
-      const refreshToken = storage.getItem('orbit_refreshtoken');
-      const userStr = storage.getItem('orbit_user');
-      const parsedUser = userStr ? JSON.parse(userStr) : null;
-      
-      set({
-        isDemoMode: storedDemoMode === null ? true : storedDemoMode === 'true',
-        rememberMe
-      });
-      
-      if (token && !isJwtExpired(token)) {
-        console.log('[AUTH_STORE] Valid token restored on startup.');
+      initPromise = (async () => {
+        console.log('[AUTH INIT] Starting session validation...');
+        set({ initializationState: 'CHECKING_SESSION', isCheckingAuth: true });
+        
+        const storedDemoMode = localStorage.getItem('orbit_demomode');
+        const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+        const storage = rememberMe ? localStorage : sessionStorage;
+        
+        const token = storage.getItem('orbit_token');
+        const refreshToken = storage.getItem('orbit_refreshtoken');
+        const userStr = storage.getItem('orbit_user');
+        const parsedUser = userStr ? JSON.parse(userStr) : null;
+        
         set({
-          token,
-          user: parsedUser,
+          isDemoMode: storedDemoMode === null ? true : storedDemoMode === 'true',
+          rememberMe
+        });
+        
+        if (token && !isJwtExpired(token)) {
+          console.log('[AUTH READY] Valid token restored on startup. User ID:', parsedUser?.id);
+          set({
+            token,
+            user: parsedUser,
+            initializationState: 'AUTHENTICATED',
+            isCheckingAuth: false
+          });
+          get().scheduleAutoRefresh();
+          return true;
+        }
+        
+        // Attempt background silent refresh
+        if (refreshToken) {
+          console.log('[TOKEN REFRESH] Token expired or missing. Attempting silent refresh...');
+          try {
+            const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken })
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              const parsedToken = data?.data?.token || data?.token;
+              const parsedNextRefresh = data?.data?.refreshToken || data?.refreshToken;
+              
+              if (parsedToken) {
+                console.log('[TOKEN REFRESH] Silent refresh succeeded.');
+                storage.setItem('orbit_token', parsedToken);
+                if (parsedNextRefresh) {
+                  storage.setItem('orbit_refreshtoken', parsedNextRefresh);
+                }
+                
+                // Get user profile
+                const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+                  headers: { 'Authorization': `Bearer ${parsedToken}` }
+                });
+                
+                let updatedUser = parsedUser;
+                if (meRes.ok) {
+                  const meData = await meRes.json();
+                  updatedUser = meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser;
+                  storage.setItem('orbit_user', JSON.stringify(updatedUser));
+                }
+                
+                console.log('[AUTH READY] Session restored via refresh token. User ID:', updatedUser?.id);
+                set({
+                  token: parsedToken,
+                  user: updatedUser,
+                  initializationState: 'AUTHENTICATED',
+                  isCheckingAuth: false
+                });
+                get().scheduleAutoRefresh();
+                return true;
+              }
+            }
+          } catch (e) {
+            console.error('[TOKEN REFRESH] Silent refresh failed:', e);
+          }
+        }
+        
+        console.log('[AUTH READY] No valid session restored. Transitioning to UNAUTHENTICATED.');
+        storage.removeItem('orbit_token');
+        storage.removeItem('orbit_user');
+        storage.removeItem('orbit_refreshtoken');
+        
+        set({
+          token: null,
+          user: null,
+          initializationState: 'UNAUTHENTICATED',
           isCheckingAuth: false
         });
-        get().scheduleAutoRefresh();
-        return true;
-      }
+        return false;
+      })();
       
-      // Attempt background silent refresh
-      if (refreshToken) {
-        console.log('[AUTH_STORE] Token expired or missing. Attempting silent refresh...');
-        set({ isCheckingAuth: true });
-        try {
-          const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken })
-          });
-          
-          if (res.ok) {
-            const data = await res.json();
-            const parsedToken = data?.data?.token || data?.token;
-            const parsedNextRefresh = data?.data?.refreshToken || data?.refreshToken;
-            
-            if (parsedToken) {
-              console.log('[AUTH_STORE] Silent refresh succeeded.');
-              storage.setItem('orbit_token', parsedToken);
-              if (parsedNextRefresh) {
-                storage.setItem('orbit_refreshtoken', parsedNextRefresh);
-              }
-              
-              // Get user profile
-              const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-                headers: { 'Authorization': `Bearer ${parsedToken}` }
-              });
-              
-              let updatedUser = parsedUser;
-              if (meRes.ok) {
-                const meData = await meRes.json();
-                updatedUser = meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser;
-                storage.setItem('orbit_user', JSON.stringify(updatedUser));
-              }
-              
-              set({
-                token: parsedToken,
-                user: updatedUser,
-                isCheckingAuth: false
-              });
-              get().scheduleAutoRefresh();
-              return true;
-            }
-          }
-        } catch (e) {
-          console.error('[AUTH_STORE] Silent refresh failed:', e);
-        }
-      }
-      
-      console.log('[AUTH_STORE] No valid session restored. Set checking auth to false.');
-      storage.removeItem('orbit_token');
-      storage.removeItem('orbit_user');
-      storage.removeItem('orbit_refreshtoken');
-      
-      set({
-        token: null,
-        user: null,
-        isCheckingAuth: false
-      });
-      return false;
+      return initPromise;
     },
 
     setAuthModal: (open, tab = 'login') => {
@@ -311,7 +333,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log(`[AUTH_STORE] Login success: updating state. rememberMe: ${rememberMe}`);
-          set({ user: profile, token });
+          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -351,7 +373,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
-        set({ user: localProfile, token: 'local-mock-token' });
+        set({ user: localProfile, token: 'local-mock-token', initializationState: 'AUTHENTICATED' });
         storage.setItem('orbit_token', 'local-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -374,7 +396,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log('[AUTH_STORE] Register success: auto-logging in user');
-          set({ user: profile, token });
+          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -414,7 +436,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
-        set({ user: localProfile, token: 'local-mock-token' });
+        set({ user: localProfile, token: 'local-mock-token', initializationState: 'AUTHENTICATED' });
         storage.setItem('orbit_token', 'local-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -424,11 +446,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logoutUser: async () => {
-      console.log('[AUTH_STORE] Logout initiated: clearing tokens and cache');
+      console.log('[LOGOUT] Clearing credentials and session state...');
       try {
         await apiClient.post<any>('/api/v1/auth/logout', {});
       } catch (e) {
-        console.warn('[AUTH_STORE] Logout backend request failed, continuing local clear:', e);
+        // Continue local clear
       }
       
       const currentTimeoutId = (get() as any).refreshTimeoutId;
@@ -437,7 +459,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ refreshTimeoutId: null } as any);
       }
 
-      set({ user: null, token: null });
+      set({ user: null, token: null, initializationState: 'UNAUTHENTICATED' });
       localStorage.removeItem('orbit_token');
       localStorage.removeItem('orbit_user');
       localStorage.removeItem('orbit_refreshtoken');
@@ -449,14 +471,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
       document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      initPromise = null;
     },
 
     logoutEverywhere: async () => {
-      console.log('[AUTH_STORE] Logout everywhere initiated: clearing all sessions from database');
+      console.log('[LOGOUT] Clearing credentials and session state (Everywhere)...');
       try {
         await apiClient.post<any>('/api/v1/auth/logout', {});
       } catch (e) {
-        console.warn('[AUTH_STORE] Logout everywhere request failed, continuing local clear:', e);
+        // Continue local clear
       }
       
       const currentTimeoutId = (get() as any).refreshTimeoutId;
@@ -465,7 +488,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ refreshTimeoutId: null } as any);
       }
 
-      set({ user: null, token: null });
+      set({ user: null, token: null, initializationState: 'UNAUTHENTICATED' });
       localStorage.removeItem('orbit_token');
       localStorage.removeItem('orbit_user');
       localStorage.removeItem('orbit_refreshtoken');
@@ -477,6 +500,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      initPromise = null;
     },
 
     loginOAuth: async (provider) => {
@@ -497,7 +521,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const storage = rememberMe ? localStorage : sessionStorage;
       localStorage.setItem('orbit_remember_me', String(rememberMe));
       
-      set({ user: localProfile, token: `oauth-${provider}-token` });
+      set({ user: localProfile, token: `oauth-${provider}-token`, initializationState: 'AUTHENTICATED' });
       storage.setItem('orbit_token', `oauth-${provider}-token`);
       storage.setItem('orbit_user', JSON.stringify(localProfile));
       localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -518,7 +542,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log('[AUTH_STORE] Google login success: updating state');
-          set({ user: profile, token });
+          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -558,7 +582,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
-        set({ user: localProfile, token: 'google-mock-token' });
+        set({ user: localProfile, token: 'google-mock-token', initializationState: 'AUTHENTICATED' });
         storage.setItem('orbit_token', 'google-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -600,6 +624,7 @@ if (typeof window !== 'undefined') {
       rememberMe,
       token: token || null,
       user: parsedUser,
+      initializationState: token && !isJwtExpired(token) ? 'AUTHENTICATED' : 'UNINITIALIZED',
       isCheckingAuth: !!storage.getItem('orbit_refreshtoken')
     });
     console.log('[AUTH_STORE] Module-level synchronous hydration completed successfully.');
@@ -622,6 +647,7 @@ if (typeof window !== 'undefined') {
         useAuthStore.setState({
           token: event.newValue,
           user: parsedUser,
+          initializationState: 'AUTHENTICATED',
           isCheckingAuth: false
         });
         useAuthStore.getState().scheduleAutoRefresh();
@@ -632,8 +658,7 @@ if (typeof window !== 'undefined') {
   // Listen for refresh events dispatched by API client
   window.addEventListener('orbit_token_refreshed', (e: any) => {
     if (e.detail?.token) {
-      useAuthStore.setState({ token: e.detail.token });
+      useAuthStore.setState({ token: e.detail.token, initializationState: 'AUTHENTICATED' });
     }
   });
 }
-
