@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { useNexusStore } from '../store/nexusStore';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
+import { useUserWallet } from '../hooks/useUserWallet';
 import { demoWalletService } from '../services/demo/wallet';
 import { liveWalletService } from '../services/live/wallet';
 import { demoWorkflowService } from '../services/demo/workflow';
@@ -32,6 +33,7 @@ interface ModeContextProps {
   
   toggleMode: () => void;
   refreshData: () => Promise<void>;
+  settleUserWallet: () => Promise<{ success: boolean; message?: string }>;
 }
 
 const ModeContext = createContext<ModeContextProps | undefined>(undefined);
@@ -39,12 +41,8 @@ const ModeContext = createContext<ModeContextProps | undefined>(undefined);
 export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
   
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
-  const isRunning = useNexusStore((state) => state.isRunning);
-  const wallet = useNexusStore((state) => state.userWallet);
-  const executionLogs = useNexusStore((state) => state.executionLogs);
-  const appState = useNexusStore((state) => state.appState);
+  const { isDemoMode, userWallet: wallet, initialize, settleUserWallet } = useUserWallet();
+  const { activeWorkflow, isRunning, executionLogs, appState, resetExecution } = useActiveWorkflow();
   
   const toggleDemoMode = useAuthStore((state) => state.toggleDemoMode);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
@@ -60,7 +58,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshData = async () => {
     try {
-      await useNexusStore.getState().initialize();
+      await initialize();
     } catch (err: any) {
       toast(`State loading failed: ${err.message || err}`, 'error');
     }
@@ -76,7 +74,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage
-    useNexusStore.getState().resetExecution();
+    resetExecution();
     toggleDemoMode();
     toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Mode'}`, 'info');
   };
@@ -96,7 +94,8 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isRunning,
         appState,
         toggleMode,
-        refreshData
+        refreshData,
+        settleUserWallet
       }}
     >
       {children}

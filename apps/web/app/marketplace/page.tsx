@@ -1,30 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const isProd = process.env.NODE_ENV === 'production';
-const console = {
-  log: (...args: any[]) => {
-    if (!isProd) globalThis.console.log(...args);
-  },
-  warn: (...args: any[]) => {
-    if (!isProd) globalThis.console.warn(...args);
-  },
-  error: (...args: any[]) => {
-    globalThis.console.error(...args);
-  },
-  debug: (...args: any[]) => {
-    if (!isProd) globalThis.console.debug(...args);
-  },
-  info: (...args: any[]) => {
-    if (!isProd) globalThis.console.info(...args);
-  }
-};
-import { useNexusStore, seedAgents } from '../../store/nexusStore';
+import { useNexusStore } from '../../store/nexusStore';
 import { useMode } from '../../providers/ModeProvider';
+import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../lib/api-client';
-import { Agent } from '@nexus-ai/types';
-import { Search, Award, Layers, Sparkles, ArrowRight, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck } from 'lucide-react';
+import { Search, Award, Layers, Sparkles, Star, SlidersHorizontal, ArrowUpDown, ShieldCheck, Download, Plus, Eye, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '../../components/Toast';
 import { SkeletonCard } from '../../components/Skeleton';
@@ -35,390 +16,298 @@ const AgentDetailModal = dynamic(() => import('../../components/AgentDetailModal
 });
 
 export default function MarketplacePage() {
-  const agents = useNexusStore((state) => state.agents) ?? [];
-  const initialize = useNexusStore((state) => state.initialize);
   const { toast } = useToast();
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  
-  const marketplaceTab = useNexusStore((state) => state.marketplaceTab);
-  const setMarketplaceTab = useNexusStore((state) => state.setMarketplaceTab);
-  
+  const { user } = useAuthStore();
+  const { isDemoMode } = useMode();
+
   // Search & Filters State
-  const searchTerm = useNexusStore((state) => state.marketplaceSearchTerm);
-  const setSearchTerm = useNexusStore((state) => state.setMarketplaceSearchTerm);
-  const selectedCategory = useNexusStore((state) => state.marketplaceCategory);
-  const setSelectedCategory = useNexusStore((state) => state.setMarketplaceCategory);
-  const selectedAgent = useNexusStore((state) => state.marketplaceSelectedAgent);
-  const setSelectedAgent = useNexusStore((state) => state.setMarketplaceSelectedAgent);
-  const onlyVerified = useNexusStore((state) => state.marketplaceOnlyVerified);
-  const setOnlyVerified = useNexusStore((state) => state.setMarketplaceOnlyVerified);
-  const minTrustScore = useNexusStore((state) => state.marketplaceMinTrustScore);
-  const setMinTrustScore = useNexusStore((state) => state.setMarketplaceMinTrustScore);
-  const maxPrice = useNexusStore((state) => state.marketplaceMaxPrice);
-  const setMaxPrice = useNexusStore((state) => state.setMarketplaceMaxPrice);
-  const sortBy = useNexusStore((state) => state.marketplaceSortBy);
-  const setSortBy = useNexusStore((state) => state.setMarketplaceSortBy);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [onlyVerified, setOnlyVerified] = useState(false);
+  const [minTrustScore, setMinTrustScore] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(0.50);
+  const [sortBy, setSortBy] = useState('trustScore');
+  const [marketplaceTab, setMarketplaceTab] = useState<'all' | 'trending' | 'featured' | 'verified'>('all');
+
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [installed, setInstalled] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
-  // Pagination states
+  // Backend Paginated Loading
+  const [agentsList, setAgentsList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [hasMore, setHasMore] = useState(true);
+  const [totalAgentsCount, setTotalAgentsCount] = useState(0);
+
+  // Selected agent for details overlay modal
+  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
 
   // Matchmaker State
-  const matchmakerPrompt = useNexusStore((state) => state.marketplaceMatchmakerPrompt);
-  const setMatchmakerPrompt = useNexusStore((state) => state.setMarketplaceMatchmakerPrompt);
+  const [matchmakerPrompt, setMatchmakerPrompt] = useState('');
   const [isMatching, setIsMatching] = useState(false);
-  const matchedStack = useNexusStore((state) => state.marketplaceMatchedStack);
-  const setMatchedStack = useNexusStore((state) => state.setMarketplaceMatchedStack);
+  const [matchedStack, setMatchedStack] = useState<any | null>(null);
+
+  // Publish Form State
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [pubName, setPubName] = useState('');
+  const [pubDesc, setPubDesc] = useState('');
+  const [pubCategory, setPubCategory] = useState('Research');
+  const [pubSkills, setPubSkills] = useState('');
+  const [pubPrice, setPubPrice] = useState(0.10);
+  const [pubLatency, setPubLatency] = useState(1000);
+  const [pubEndpoint, setPubEndpoint] = useState('');
+  const [pubLogoUrl, setPubLogoUrl] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const categories = ['All', 'Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'];
 
-  const { isDemoMode } = useMode();
-
-  useEffect(() => {
-    initialize();
-    
-    // Load favorites from local storage if client-side
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('orbit_favorites');
-      if (stored) {
-        try {
-          setFavorites(JSON.parse(stored));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+  // Load agents list from backend dynamically
+  const fetchAgents = async (pageToLoad: number, append = false) => {
+    setIsLoading(true);
+    try {
+      const qParams: any = {
+        page: pageToLoad,
+        limit: 6,
+        search: searchTerm,
+        category: selectedCategory,
+        sortBy: sortBy,
+        verifiedOnly: onlyVerified ? 'true' : 'false',
+      };
       
-      const params = new URLSearchParams(window.location.search);
-      const urlQuery = params.get('search');
-      if (urlQuery) {
-        setSearchTerm(urlQuery);
+      // Pass user ID if logged in to get favorite / install states
+      if (user) {
+        qParams.userId = user.id;
       }
-    }
-    const timer = setTimeout(() => setIsInitialLoading(false), 800);
 
-    const refreshData = () => {
-      initialize();
-    };
-
-    window.addEventListener('storage', refreshData);
-    window.addEventListener('nexus_store_update', refreshData);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('storage', refreshData);
-      window.removeEventListener('nexus_store_update', refreshData);
-    };
-  }, [initialize, isDemoMode]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory, onlyVerified, minTrustScore, maxPrice, sortBy, showOnlyFavorites]);
-
-  const toggleFavorite = (agentId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    let updated = [...favorites];
-    const activeAgents = agents.length > 0 ? agents : seedAgents;
-    const match = activeAgents.find(a => {
-      console.log("Object before id access:", a);
-      if (!a) {
-        console.log("File: apps/web/app/marketplace/page.tsx");
-        console.log("Function: toggleFavorite");
-        console.log("Variable name: a");
-        console.log("Expected value: Agent object");
-        console.log("Actual value: undefined");
-        console.log("Why it is undefined: Available agents list contains an undefined entry.");
+      const searchStr = new URLSearchParams(qParams).toString();
+      const res = await apiClient.get<any>(`/api/v1/agents?${searchStr}`);
+      if (res.success && res.data) {
+        if (append) {
+          setAgentsList(prev => {
+            const existingIds = prev.map(a => a.id);
+            const filtered = res.data.filter((a: any) => !existingIds.includes(a.id));
+            return [...prev, ...filtered];
+          });
+        } else {
+          setAgentsList(res.data);
+        }
+        setTotalAgentsCount(res.pagination?.total || res.data.length);
+        setHasMore(pageToLoad < (res.pagination?.pages || 1));
       }
-      return a && a.id === agentId;
-    });
-    const name = match ? match.name : 'Agent';
-    if (favorites.includes(agentId)) {
-      updated = updated.filter(id => id !== agentId);
-      toast(`Removed ${name} from favorites`, 'info');
-    } else {
-      updated.push(agentId);
-      toast(`Added ${name} to favorites!`, 'success');
-    }
-    setFavorites(updated);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('orbit_favorites', JSON.stringify(updated));
+    } catch (err: any) {
+      toast(`Failed to load agents: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // Triggers loading when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchAgents(1, false);
+  }, [searchTerm, selectedCategory, onlyVerified, sortBy, marketplaceTab, showOnlyFavorites, user]);
+
+  // Load more handler
+  const handleLoadMore = () => {
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchAgents(nextPage, true);
+  };
+
+  // Sync favorites & installed sets
+  useEffect(() => {
+    const favs = agentsList.filter(a => a.isFavorite).map(a => a.id);
+    const insts = agentsList.filter(a => a.isInstalled).map(a => a.id);
+    setFavorites(favs);
+    setInstalled(insts);
+  }, [agentsList]);
+
+  // Favorite toggle endpoint call
+  const handleToggleFavorite = async (agentId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast('Please login to add favorites', 'error');
+      return;
+    }
+    try {
+      const res = await apiClient.post<any>(`/api/v1/agents/${agentId}/favorite`);
+      if (res.success) {
+        if (res.isFavorite) {
+          setFavorites(prev => [...prev, agentId]);
+          toast('Added to favorites!', 'success');
+        } else {
+          setFavorites(prev => prev.filter(id => id !== agentId));
+          toast('Removed from favorites', 'info');
+        }
+        setAgentsList(prev => prev.map(a => a.id === agentId ? { ...a, isFavorite: res.isFavorite } : a));
+      }
+    } catch (err: any) {
+      toast(`Favorite update error: ${err.message}`, 'error');
+    }
+  };
+
+  // Install toggle endpoint call
+  const handleToggleInstall = async (agentId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast('Please login to install agents', 'error');
+      return;
+    }
+    try {
+      const res = await apiClient.post<any>(`/api/v1/agents/${agentId}/install`);
+      if (res.success) {
+        if (res.isInstalled) {
+          setInstalled(prev => [...prev, agentId]);
+          toast('Agent installed in workspace successfully!', 'success');
+        } else {
+          setInstalled(prev => prev.filter(id => id !== agentId));
+          toast('Agent uninstalled from workspace', 'info');
+        }
+        setAgentsList(prev => prev.map(a => a.id === agentId ? { 
+          ...a, 
+          isInstalled: res.isInstalled, 
+          downloads: res.isInstalled ? a.downloads + 1 : Math.max(0, a.downloads - 1) 
+        } : a));
+      }
+    } catch (err: any) {
+      toast(`Installation error: ${err.message}`, 'error');
+    }
+  };
+
+  // Publish agent request
+  const handlePublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast('Please login to publish agents', 'error');
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      const res = await apiClient.post<any>('/api/v1/agents', {
+        name: pubName,
+        description: pubDesc,
+        category: pubCategory,
+        skills: pubSkills.split(',').map(s => s.trim()).filter(Boolean),
+        price: Number(pubPrice),
+        latency: Number(pubLatency),
+        endpoint: pubEndpoint,
+        logoUrl: pubLogoUrl,
+        ownerId: user.id,
+      });
+
+      if (res.success) {
+        toast('Agent published successfully!', 'success');
+        setIsPublishModalOpen(false);
+        setPubName('');
+        setPubDesc('');
+        setPubSkills('');
+        setPubEndpoint('');
+        setPubLogoUrl('');
+        fetchAgents(1, false);
+      } else {
+        toast(res.message || 'Failed to publish agent', 'error');
+      }
+    } catch (err: any) {
+      toast(`Publishing error: ${err.message}`, 'error');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  // Matchmaker Engine
   const handleMatchmaker = async () => {
     if (!matchmakerPrompt.trim()) return;
-    console.log("STEP START: handleMatchmaker");
     setIsMatching(true);
-    const activeAgents = agents.length > 0 ? agents : seedAgents;
     try {
-      console.log("FETCH START: POST /api/v1/ai/plan");
       const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
         query: matchmakerPrompt,
         routingMode: 'balanced',
         budget: 2.0
       });
-      console.log("FETCH RETURNED: POST /api/v1/ai/plan");
-      console.log("HTTP STATUS: 200");
-      console.log("RAW RESPONSE:", JSON.stringify(planRes));
-      console.log("PARSED RESPONSE:", planRes);
 
-      if (planRes.success && planRes.data) {
-        console.log("TRANSFORMED OBJECT START");
-        const assignedIds: string[] = [];
-        const chainItems = planRes.data.nodes.map((node: any) => {
-          const cap = node.capability.toLowerCase();
-          
-          let candidates = activeAgents.filter(a => {
-            console.log("Object before id access:", a);
-            if (!a) {
-              console.log("File: apps/web/app/marketplace/page.tsx");
-              console.log("Function: handleMatchmaker filter");
-              console.log("Variable name: a");
-              console.log("Expected value: Agent object");
-              console.log("Actual value: undefined");
-              console.log("Why it is undefined: Available agents list contains an undefined entry.");
-              return false;
-            }
-            return (a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || 
-                   (a.category && a.category.toLowerCase().includes(cap));
-          });
-          if (candidates.length === 0) candidates = activeAgents;
-          
-          const prices = candidates.map(c => c.price || 0);
-          const latencies = candidates.map(c => c.latency || 0);
-          const maxPrice = Math.max(...prices, 0.5);
-          const maxLatency = Math.max(...latencies, 3000);
-          
-          let bestAgent = candidates[0] || activeAgents[0];
-          let bestScore = -1;
-          let bestReason = 'Optimal selection';
-          
-          candidates.forEach(agent => {
-            console.log("Object before id access:", agent);
-            if (!agent) {
-              console.log("File: apps/web/app/marketplace/page.tsx");
-              console.log("Function: handleMatchmaker forEach");
-              console.log("Variable name: agent");
-              console.log("Expected value: Agent object");
-              console.log("Actual value: undefined");
-              console.log("Why it is undefined: Match candidates contains an undefined entry.");
-              return;
-            }
-            const costScore = 1 - (agent.price / maxPrice);
-            const trustScore = (agent.trustScore || 0) / 100;
-            const latencyScore = 1 - (agent.latency / maxLatency);
-            const accuracyScore = (agent.accuracy || 0) / 100;
-            const successScore = (100 - (agent.failureRate || 0)) / 100;
-            
-            let score = (costScore * 0.2) + (trustScore * 0.25) + (latencyScore * 0.15) + (accuracyScore * 0.2) + (successScore * 0.2);
-            
-            // Diversity penalty
-            const duplicateCount = assignedIds.filter(id => id === agent.id).length;
-            if (duplicateCount > 0) {
-              score -= (0.35 * duplicateCount);
-            }
-            
-            if (score > bestScore) {
-              bestScore = score;
-              bestAgent = agent;
-              
-              const reasons: string[] = [];
-              const isCheapest = agent.price === Math.min(...prices);
-              const isFastest = agent.latency === Math.min(...latencies);
-              const isHighTrust = (agent.trustScore || 0) >= 95;
-              
-              if (isFastest) reasons.push('Fastest');
-              if (isCheapest) reasons.push('Lowest cost');
-              if (isHighTrust) reasons.push(`${agent.trustScore}% trust success`);
-              if (agent.accuracy && agent.accuracy >= 95) reasons.push('Highest accuracy');
-              
-              bestReason = reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'Optimal selection';
-            }
-          });
-          
-          console.log("Object before id access:", bestAgent);
-          if (!bestAgent) {
-            console.log("File: apps/web/app/marketplace/page.tsx");
-            console.log("Function: handleMatchmaker chainItems");
-            console.log("Variable name: bestAgent");
-            console.log("Expected value: Agent object");
-            console.log("Actual value: undefined");
-            console.log("Why it is undefined: Best matched candidate resolves to undefined (candidates list empty).");
-            return {
-              nodeId: node.id,
-              stageName: node.label || node.task || node.id.toUpperCase(),
-              capability: node.capability,
-              agentId: 'no-agent',
-              agentName: 'No compatible agent found',
-              reason: 'None available',
-              cost: 0,
-              time: '0ms',
-              trustScore: 0
-            };
-          }
-
-          assignedIds.push(bestAgent.id);
-          return {
-            nodeId: node.id,
-            stageName: node.label || node.task || node.id.toUpperCase(),
-            capability: node.capability,
-            agentId: bestAgent.id,
-            agentName: bestAgent.name || 'Agent',
-            reason: bestReason,
-            cost: bestAgent.price || 0,
-            time: `${bestAgent.latency || 0}ms`,
-            trustScore: bestAgent.trustScore || 0
-          };
-        });
-
-        // Compute dynamic estimated budget and latency based on selected agents
-        const totalCost = planRes.data.nodes.reduce((sum: number, n: any) => {
-          const cap = n.capability.toLowerCase();
-          const matched = activeAgents.find(a => {
-            console.log("Object before id access:", a);
-            return a && ((a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || (a.category && a.category.toLowerCase().includes(cap)));
-          }) || activeAgents[0];
-          
-          console.log("Object before id access:", matched);
-          if (!matched) {
-            console.log("File: apps/web/app/marketplace/page.tsx");
-            console.log("Function: handleMatchmaker totalCost reduce");
-            console.log("Variable name: matched");
-            console.log("Expected value: Agent object");
-            console.log("Actual value: undefined");
-            console.log("Why it is undefined: Matched registry agent resolved to undefined.");
-            return sum;
-          }
-          return sum + (matched.price || 0);
-        }, 0);
-        
-        const maxLatencyVal = Math.max(...planRes.data.nodes.map((n: any) => {
-          const cap = n.capability.toLowerCase();
-          const matched = activeAgents.find(a => {
-            console.log("Object before id access:", a);
-            return a && ((a.skills && a.skills.some(s => s.toLowerCase().includes(cap))) || (a.category && a.category.toLowerCase().includes(cap)));
-          }) || activeAgents[0];
-
-          console.log("Object before id access:", matched);
-          if (!matched) {
-            console.log("File: apps/web/app/marketplace/page.tsx");
-            console.log("Function: handleMatchmaker maxLatencyVal map");
-            console.log("Variable name: matched");
-            console.log("Expected value: Agent object");
-            console.log("Actual value: undefined");
-            console.log("Why it is undefined: Matched registry agent resolved to undefined.");
-            return 0;
-          }
-          return matched.latency || 0;
+      if (planRes.success && planRes.workflow) {
+        const chainItems = planRes.workflow.map((node: any) => ({
+          nodeId: node.id,
+          stageName: node.task || node.id.toUpperCase(),
+          capability: node.capability,
+          agentId: node.agentId,
+          agentName: node.id.toUpperCase(),
+          reason: 'Best match capability',
+          cost: node.cost || 0.10,
+          time: `${node.duration || 1}s`,
+          trustScore: 95
         }));
 
-        const transformedObject = {
+        setMatchedStack({
           chain: chainItems,
-          cost: totalCost || planRes.data.estimated_cost || 0.33,
-          time: `${Math.round(maxLatencyVal / 1000) || 5}s`
-        };
-        console.log("TRANSFORMED OBJECT:", transformedObject);
-        setMatchedStack(transformedObject);
+          cost: planRes.estimated_cost || 0.30,
+          time: `${planRes.estimated_duration_seconds || 5}s`
+        });
       }
-      console.log("NEXT STEP: Swarm stack generation complete");
     } catch (err: any) {
-      console.error("FULL ERROR");
-      console.error(err);
-      console.error(err.stack);
-      toast(`Matchmaking error: ${err.message || err}`, 'error');
-      throw err;
+      toast(`Matchmaker calculation failed: ${err.message}`, 'error');
     } finally {
       setIsMatching(false);
     }
   };
 
-  // Filter Logic
-  const filteredAgents = agents.filter(agent => {
-    console.log("Object before id access:", agent);
-    if (!agent) {
-      console.log("File: apps/web/app/marketplace/page.tsx");
-      console.log("Function: filteredAgents filter");
-      console.log("Variable name: agent");
-      console.log("Expected value: Agent object");
-      console.log("Actual value: undefined");
-      console.log("Why it is undefined: Marketplace agents list filter received undefined item.");
-      return false;
-    }
-    const matchesSearch = agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agent.skills && agent.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-      (agent.tags && agent.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
-      
-    const matchesCategory = selectedCategory === 'All' || agent.category === selectedCategory;
-    const matchesVerified = !onlyVerified || agent.trustScore >= 95;
+  // Local matching filters
+  const displayedAgents = agentsList.filter(agent => {
+    const matchesFavorites = !showOnlyFavorites || favorites.includes(agent.id);
     const matchesTrust = agent.trustScore >= minTrustScore;
     const matchesPrice = agent.price <= maxPrice;
-    const matchesFavorites = !showOnlyFavorites || favorites.includes(agent.id);
-
-    // Marketplace App-Store style tabs
+    
+    // Tab filters
     let matchesTab = true;
     if (marketplaceTab === 'trending') {
-      matchesTab = agent.verificationCount >= 100;
+      matchesTab = agent.downloads >= 5 || agent.verificationCount >= 10;
     } else if (marketplaceTab === 'featured') {
-      matchesTab = agent.rating >= 4.8 && agent.verificationCount >= 80;
+      matchesTab = agent.rating >= 4.5;
     } else if (marketplaceTab === 'verified') {
-      matchesTab = agent.trustScore >= 96;
+      matchesTab = agent.verificationStatus === 'verified';
     }
 
-    return matchesSearch && matchesCategory && matchesVerified && matchesTrust && matchesPrice && matchesFavorites && matchesTab;
+    return matchesFavorites && matchesTrust && matchesPrice && matchesTab;
   });
 
-  // Sort Logic
-  const sortedAgents = [...filteredAgents].sort((a, b) => {
-    if (sortBy === 'trustScore') return b.trustScore - a.trustScore;
-    if (sortBy === 'priceAsc') return a.price - b.price;
-    if (sortBy === 'priceDesc') return b.price - a.price;
-    if (sortBy === 'latency') return a.latency - b.latency;
-    if (sortBy === 'verificationCount') return b.verificationCount - a.verificationCount;
-    return 0;
-  });
-
-  // Pagination calculations
-  const totalPages = Math.ceil(sortedAgents.length / itemsPerPage) || 1;
-  const paginatedAgents = sortedAgents.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const avgTrustScore = agents.length > 0 
-    ? (agents.reduce((sum, a) => sum + Number(a.trustScore), 0) / agents.length).toFixed(1) 
-    : '96.3';
+  const avgTrustScore = agentsList.length > 0 
+    ? (agentsList.reduce((sum, a) => sum + Number(a.trustScore), 0) / agentsList.length).toFixed(1) 
+    : '96.5';
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+    <div className="flex-grow max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
       
       {/* Header banner */}
       <div className="relative glass-card p-8 rounded-3xl border border-border-dark bg-gradient-to-br from-bg-dark via-black/80 to-primary-neon/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,255,163,0.05),transparent_45%)]"></div>
         <div className="relative z-10">
           <h1 className="text-3xl font-extrabold text-white flex items-center gap-2 tracking-tight">
-            <Layers className="w-8 h-8 text-primary-neon animate-spin-slow" />
-            Agent Registry & Marketplace
+            <Layers className="w-8 h-8 text-primary-neon" />
+            Agent App Store
           </h1>
           <p className="text-sm text-gray-400 mt-2 max-w-xl">
-            Discover, evaluate, and hire verified autonomous nodes. Connect, run workflow pipelines, and pay with zero friction.
+            Discover, evaluate, and install verified autonomous swarms. Lock secure USDC pricing channels.
           </p>
         </div>
-        <div className="flex gap-6 text-xs font-mono text-gray-500 relative z-10">
-          <div className="flex flex-col border-l border-border-dark pl-4">
-            <span className="text-[10px] uppercase text-gray-600 tracking-wider">Total Registered</span>
-            <span className="text-white text-lg font-extrabold mt-1">{agents.length} Nodes</span>
-          </div>
-          <div className="flex flex-col border-l border-border-dark pl-4">
-            <span className="text-[10px] uppercase text-gray-600 tracking-wider">Avg Trust Score</span>
-            <span className="text-primary-neon text-lg font-extrabold mt-1">{avgTrustScore}%</span>
-          </div>
+        <div className="flex gap-4 relative z-10 shrink-0">
+          <button
+            onClick={() => {
+              if (!user) {
+                toast('Please login to publish agents', 'error');
+                return;
+              }
+              setIsPublishModalOpen(true);
+            }}
+            className="bg-primary-neon text-black text-xs font-bold px-5 py-3 rounded-xl hover:brightness-110 flex items-center gap-1.5 transition-all font-mono"
+          >
+            <Plus className="w-4 h-4" />
+            Publish Swarm Node
+          </button>
         </div>
       </div>
 
-      {/* AI Swarm Matchmaker (Competitive Differentiator) */}
+      {/* AI Swarm Matchmaker */}
       <div className="glass-card p-6 rounded-2xl border border-primary-neon/20 bg-primary-neon/5 flex flex-col gap-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary-neon/5 blur-[100px] rounded-full"></div>
         <div className="flex items-center gap-2">
@@ -451,194 +340,60 @@ export default function MarketplacePage() {
           </button>
         </div>
 
-        {matchedStack && (() => {
-          const groupedAgents = matchedStack.chain.reduce((groups: Record<string, any>, step: any) => {
-            if (!groups[step.agentId]) {
-              groups[step.agentId] = {
-                agentName: step.agentName,
-                agentId: step.agentId,
-                cost: step.cost,
-                time: step.time,
-                trustScore: step.trustScore,
-                stages: []
-              };
-            }
-            groups[step.agentId].stages.push({
-              nodeId: step.nodeId,
-              stageName: step.stageName,
-              capability: step.capability,
-              reason: step.reason
-            });
-            return groups;
-          }, {} as Record<string, any>);
-
-          return (
-            <div className="border border-border-dark bg-black/85 p-6 rounded-2xl flex flex-col gap-6 mt-3 transition-all relative z-10 w-full">
-              
-              {/* Header Info */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-border-dark/50 pb-4 gap-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white font-mono flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
-                    OPTIMAL SWARM STACK COMPILATION
-                  </h3>
-                  <span className="text-[10px] text-gray-500 font-mono">Dynamic Agent Allocation Pipeline for input prompt</span>
-                </div>
-                <div className="flex items-center gap-6 shrink-0 font-mono text-xs w-full md:w-auto justify-between md:justify-end">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-gray-500 uppercase">Total Swarm Cost</span>
-                    <span className="text-secondary-neon font-bold text-sm mt-0.5">{matchedStack.cost.toFixed(2)} USDC</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-gray-500 uppercase">Max Pipeline Latency</span>
-                    <span className="text-white font-bold text-sm mt-0.5">{matchedStack.time}</span>
-                  </div>
-                  <Link
-                    href={`/workflow?prompt=${encodeURIComponent(matchmakerPrompt)}`}
-                    className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-bold px-5 py-2.5 rounded-lg hover:brightness-110 transition-all font-sans"
-                  >
-                    Create Workflow &rarr;
-                  </Link>
-                </div>
+        {matchedStack && (
+          <div className="border border-border-dark bg-black/85 p-6 rounded-2xl flex flex-col gap-6 mt-3 transition-all relative z-10 w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-border-dark/50 pb-4 gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-white font-mono flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
+                  OPTIMAL SWARM STACK COMPILATION
+                </h3>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Column 1 & 2: Execution Sequence */}
-                <div className="lg:col-span-2 flex flex-col gap-4">
-                  <h4 className="text-xs font-bold text-gray-400 font-mono uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-primary-neon" />
-                    Sequence of Execution Stages
-                  </h4>
-                  <div className="flex flex-col gap-3">
-                    {matchedStack.chain.map((step: any, idx: number) => (
-                      <div key={step.nodeId || idx} className="flex flex-col gap-2 relative">
-                        <div className="bg-white/5 border border-border-dark p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-primary-neon/20 transition-all">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-primary-neon font-mono font-bold">{step.nodeId}</span>
-                              <span className="text-xs font-extrabold text-white">{step.stageName}</span>
-                            </div>
-                            <span className="text-[10px] text-gray-400 font-mono font-normal">Capability: {step.capability}</span>
-                            <span className="text-[10px] text-gray-500 font-mono mt-1">
-                              Selected Agent: <strong className="text-white font-bold">{step.agentName}</strong> ({step.reason})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-[10px] font-mono text-gray-400 shrink-0 border-t md:border-t-0 pt-2 md:pt-0 w-full md:w-auto justify-between md:justify-end">
-                            {step.trustScore !== undefined && (
-                              <div className="flex flex-col items-end">
-                                <span className="text-[9px] text-gray-500">TRUST SCORE</span>
-                                <span className="text-white font-bold">{step.trustScore}%</span>
-                              </div>
-                            )}
-                            <div className="flex flex-col items-end">
-                              <span className="text-[9px] text-gray-500">STAGE FEE</span>
-                              <span className="text-primary-neon font-bold">{step.cost.toFixed(2)} USDC</span>
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <span className="text-[9px] text-gray-500">LATENCY</span>
-                              <span className="text-white font-bold">{step.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                        {idx < matchedStack.chain.length - 1 && (
-                          <div className="flex justify-center my-0.5">
-                            <span className="text-gray-600 font-bold">&darr;</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              <div className="flex items-center gap-6 shrink-0 font-mono text-xs w-full md:w-auto justify-between md:justify-end">
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-gray-500 uppercase">Total Swarm Cost</span>
+                  <span className="text-secondary-neon font-bold text-sm mt-0.5">{matchedStack.cost.toFixed(2)} USDC</span>
                 </div>
-
-                {/* Column 3: Consolidated Swarm Allocation */}
-                <div className="lg:col-span-1 flex flex-col gap-4 border-t lg:border-t-0 lg:border-l border-border-dark pt-6 lg:pt-0 lg:pl-6">
-                  <h4 className="text-xs font-bold text-gray-400 font-mono uppercase tracking-wider flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary-neon" />
-                    Consolidated Swarm Organization
-                  </h4>
-                  <p className="text-[10px] text-gray-500 font-mono leading-relaxed">
-                    The matching engine allocates roles based on agent capability scores. Multi-stage reuse (the same agent handling multiple stages) indicates high cost efficiency and avoids cold-start latency overrides.
-                  </p>
-                  
-                  <div className="flex flex-col gap-4 mt-2">
-                    {(() => {
-                      const getAgentDisplayInfo = (agentId: string) => {
-                        const id = agentId.toLowerCase();
-                        const agentsMap: Record<string, { name: string; emoji: string }> = {
-                          'agent-research-1': { name: 'Research Agent', emoji: '🔍' },
-                          'agent-research-2': { name: 'Research Agent', emoji: '⚡' },
-                          'agent-finance-1': { name: 'Finance Agent', emoji: '📊' },
-                          'agent-legal-1': { name: 'Legal Agent', emoji: '⚖' },
-                          'agent-code-1': { name: 'Coding Agent', emoji: '💻' },
-                          'agent-security-1': { name: 'Security Agent', emoji: '🔒' },
-                          'agent-translate-1': { name: 'Translation Agent', emoji: '🌐' },
-                          'agent-verify-1': { name: 'Verification Agent', emoji: '🛡' },
-                        };
-                        if (agentsMap[id]) return agentsMap[id];
-                        if (id.startsWith('agent-search') || id.startsWith('agent-research')) return { name: 'Research Agent', emoji: '🔍' };
-                        if (id.startsWith('agent-translate')) return { name: 'Translation Agent', emoji: '🌐' };
-                        if (id.startsWith('agent-verify')) return { name: 'Verification Agent', emoji: '🛡' };
-                        if (id.startsWith('agent-finance')) return { name: 'Finance Agent', emoji: '📊' };
-                        if (id.startsWith('agent-legal')) return { name: 'Legal Agent', emoji: '⚖' };
-                        if (id.startsWith('agent-code')) return { name: 'Coding Agent', emoji: '💻' };
-                        if (id.startsWith('agent-security')) return { name: 'Security Agent', emoji: '🔒' };
-                        return { name: 'Agent', emoji: '🤖' };
-                      };
-
-                      return Object.values(groupedAgents).map((group: any) => (
-                        <div key={group.agentId} className="border border-border-dark bg-black/40 p-4 rounded-xl flex flex-col gap-3 hover:border-primary-neon/10 transition-all">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h5 className="text-xs font-bold text-white leading-tight">{group.agentName}</h5>
-                              <span className="text-[9px] text-gray-400 font-mono italic">Role: {getAgentDisplayInfo(group.agentId).name}</span>
-                              <span className="text-[8px] text-gray-500 font-mono block mt-0.5">ID: {group.agentId}</span>
-                            </div>
-                            {group.trustScore !== undefined && (
-                              <span className="text-[8px] bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded font-mono font-bold shrink-0">
-                                {group.trustScore}% TRUST
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Quick Agent Meta */}
-                          <div className="grid grid-cols-2 gap-2 text-[9px] font-mono text-gray-400 bg-white/2 p-2 rounded-lg border border-border-dark/30">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Fee:</span>
-                              <span className="text-white font-bold">{Number(group.cost).toFixed(2)} USDC</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Latency:</span>
-                              <span className="text-white font-bold">{group.time}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5 border-t border-border-dark/50 pt-2">
-                            <span className="text-[9px] text-gray-400 uppercase font-mono tracking-wider">Assigned Stages ({group.stages.length}):</span>
-                            {group.stages.map((stage: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-2 text-[10px] text-white font-mono bg-white/5 px-2.5 py-1.5 rounded-lg border border-border-dark/30">
-                                <span className="text-primary-neon font-bold">✓</span>
-                                <div className="flex flex-col w-full">
-                                  <div className="flex justify-between items-center w-full">
-                                    <span className="font-extrabold text-white">{stage.stageName}</span>
-                                    <span className="text-[8px] bg-white/5 border border-border-dark px-1.5 py-0.2 rounded text-gray-400 tracking-wide font-normal">{stage.capability.toUpperCase()}</span>
-                                  </div>
-                                  <span className="text-[9px] text-gray-400 font-mono font-normal mt-0.5">{stage.reason}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-gray-500 uppercase">Max Pipeline Latency</span>
+                  <span className="text-white font-bold text-sm mt-0.5">{matchedStack.time}</span>
                 </div>
-
+                <Link
+                  href={`/workflow?prompt=${encodeURIComponent(matchmakerPrompt)}`}
+                  className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-bold px-5 py-2.5 rounded-lg hover:brightness-110 transition-all font-sans"
+                >
+                  Create Workflow &rarr;
+                </Link>
               </div>
-
             </div>
-          );
-        })()}
+
+            <div className="flex flex-col gap-3">
+              {matchedStack.chain.map((step: any, idx: number) => (
+                <div key={step.nodeId || idx} className="flex flex-col gap-2">
+                  <div className="bg-white/5 border border-border-dark p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-primary-neon/20 transition-all">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-primary-neon font-mono font-bold">{step.nodeId}</span>
+                        <span className="text-xs font-extrabold text-white">{step.stageName}</span>
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-mono">Capability: {step.capability}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] font-mono text-gray-400 shrink-0">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] text-gray-500">STAGE FEE</span>
+                        <span className="text-primary-neon font-bold">{step.cost.toFixed(2)} USDC</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] text-gray-500">LATENCY</span>
+                        <span className="text-white font-bold">{step.time}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Section */}
@@ -710,7 +465,7 @@ export default function MarketplacePage() {
                 onChange={(e) => setOnlyVerified(e.target.checked)}
                 className="rounded border-border-dark text-primary-neon focus:ring-primary-neon bg-black/60 w-4 h-4"
               />
-              <span>Only Verified Nodes (≥95%)</span>
+              <span>Only CAP Verified</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-300">
               <input 
@@ -775,13 +530,13 @@ export default function MarketplacePage() {
               <option value="priceAsc">Price: Low to High</option>
               <option value="priceDesc">Price: High to Low</option>
               <option value="latency">Fastest Latency</option>
-              <option value="verificationCount">Jobs Completed</option>
             </select>
           </div>
         </div>
 
         {/* Agents Grid List */}
         <div className="lg:col-span-3 flex flex-col gap-4">
+          
           {/* App-Store tabs selector */}
           <div className="flex flex-wrap gap-2 border-b border-border-dark pb-3">
             {[
@@ -805,55 +560,34 @@ export default function MarketplacePage() {
           </div>
 
           <div className="flex justify-between items-center text-xs text-gray-500 font-mono">
-            <span>Found {sortedAgents.length} active swarm agent nodes</span>
+            <span>Found {displayedAgents.length} active swarm agent nodes</span>
             <span>Sorted by {sortBy}</span>
           </div>
 
-          {isInitialLoading ? (
+          {isLoading && currentPage === 1 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
             </div>
-          ) : sortedAgents.length === 0 ? (
+          ) : displayedAgents.length === 0 ? (
             <div className="glass-card py-20 text-center text-gray-500 italic rounded-2xl border border-border-dark flex flex-col items-center gap-2">
               <span className="text-sm">No agents match your active search filters.</span>
-              <button 
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedCategory('All');
-                  setOnlyVerified(false);
-                  setMinTrustScore(0);
-                  setMaxPrice(0.5);
-                  setShowOnlyFavorites(false);
-                }}
-                className="text-xs text-primary-neon font-bold hover:underline"
-              >
-                Clear Filters
-              </button>
             </div>
           ) : (
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {paginatedAgents.map((agent) => {
-                  console.log("Object before id access:", agent);
-                  if (!agent) {
-                    console.log("File: apps/web/app/marketplace/page.tsx");
-                    console.log("Function: paginatedAgents map");
-                    console.log("Variable name: agent");
-                    console.log("Expected value: Agent object");
-                    console.log("Actual value: undefined");
-                    console.log("Why it is undefined: Paginated list contains undefined entry.");
-                    return null;
-                  }
+                {displayedAgents.map((agent) => {
+                  if (!agent) return null;
                   const isFav = favorites.includes(agent.id);
+                  const isInst = installed.includes(agent.id);
                   return (
                     <div 
                       key={agent.id} 
                       onClick={() => setSelectedAgent(agent)}
-                      className="glass-card glass-card-hover p-6 rounded-2xl border border-border-dark flex flex-col justify-between h-[390px] relative overflow-hidden cursor-pointer transition-all duration-300"
+                      className="glass-card glass-card-hover p-6 rounded-2xl border border-border-dark flex flex-col justify-between h-[410px] relative overflow-hidden cursor-pointer transition-all duration-300"
                     >
-                      {/* Top Layer Info */}
+                      {/* Top Info */}
                       <div>
                         <div className="flex justify-between items-center mb-3">
                           <span className="text-[9px] bg-white/5 border border-border-dark px-2.5 py-1 rounded-md text-gray-400 font-mono uppercase tracking-wider">
@@ -862,12 +596,12 @@ export default function MarketplacePage() {
                           
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={(e) => toggleFavorite(agent.id, e)}
+                              onClick={(e) => handleToggleFavorite(agent.id, e)}
                               className="text-gray-500 hover:text-yellow-500 transition-all p-1 hover:bg-white/5 rounded-md"
                             >
                               <Star className={`w-4 h-4 ${isFav ? 'text-yellow-500 fill-yellow-500' : ''}`} />
                             </button>
-                            {agent.trustScore >= 95 && (
+                            {agent.verificationStatus === 'verified' && (
                               <span className="text-primary-neon bg-primary-neon/10 border border-primary-neon/20 px-2 py-0.5 rounded text-[8px] font-mono font-extrabold uppercase tracking-wide flex items-center gap-0.5">
                                 <ShieldCheck className="w-3.5 h-3.5" />
                                 VERIFIED
@@ -880,17 +614,14 @@ export default function MarketplacePage() {
                           {agent.name}
                           <span className="text-[10px] text-gray-500 font-mono font-normal">v{agent.version}</span>
                         </h3>
-                        <span className="text-[9px] text-gray-400 font-mono italic mb-2.5 block">
-                          Role: {agent.category} Agent
-                        </span>
                         
-                        <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 mb-4">
+                        <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 mb-4 mt-2">
                           {agent.description}
                         </p>
 
-                        {/* Skills Tags */}
+                        {/* Skills */}
                         <div className="flex flex-wrap gap-1 mb-4">
-                          {agent.skills && agent.skills.slice(0, 3).map((skill, idx) => (
+                          {agent.skills && agent.skills.slice(0, 3).map((skill: string, idx: number) => (
                             <span 
                               key={idx} 
                               className="text-[9px] bg-black/40 border border-border-dark text-gray-300 px-2.5 py-1 rounded-lg"
@@ -898,54 +629,48 @@ export default function MarketplacePage() {
                               {skill}
                             </span>
                           ))}
-                          {agent.skills && agent.skills.length > 3 && (
-                            <span className="text-[9px] text-gray-500 font-mono flex items-center pl-1">
-                              +{agent.skills.length - 3} more
-                            </span>
-                          )}
                         </div>
                       </div>
 
-                      {/* Bottom stats details */}
+                      {/* Stats details */}
                       <div className="pt-4 border-t border-border-dark">
-                        
-                        {/* Trust Gauges */}
                         <div className="grid grid-cols-2 gap-3 mb-4 text-[10px] font-mono">
                           <div className="flex flex-col">
                             <span className="text-gray-500">Trust Score</span>
                             <span className="text-white font-extrabold mt-0.5">{agent.trustScore}%</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-gray-500">Success Rate</span>
-                            <span className="text-white font-extrabold mt-0.5">{agent.accuracy}%</span>
-                          </div>
-                          <div className="flex flex-col">
                             <span className="text-gray-500">Latency (SLA)</span>
                             <span className="text-white font-extrabold mt-0.5">{agent.latency}ms</span>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-gray-500">Completed Jobs</span>
-                            <span className="text-white font-extrabold mt-0.5">{agent.verificationCount}</span>
-                          </div>
                         </div>
 
-                        {/* Creator Profile */}
                         <div className="flex justify-between items-center text-[9px] font-mono text-gray-500 mb-2">
-                          <span>CREATOR:</span>
-                          <span className="text-white font-bold uppercase">Orbit Labs</span>
+                          <span className="flex items-center gap-1">
+                            <Download className="w-3.5 h-3.5 text-gray-500" />
+                            DOWNLOADS:
+                          </span>
+                          <span className="text-white font-bold">{agent.downloads || 0}</span>
                         </div>
 
-                        {/* Pricing Footer */}
-                        <div className="flex justify-between items-center pt-3 border-t border-dashed border-border-dark">
+                        {/* Install / Uninstall Actions */}
+                        <div className="flex justify-between items-center pt-3 border-t border-dashed border-border-dark gap-2">
                           <div className="flex flex-col">
                             <span className="text-[9px] text-gray-500 font-mono">Service Fee</span>
                             <span className="text-sm font-extrabold text-primary-neon font-mono mt-0.5">
-                              {agent.price.toFixed(2)} <span className="text-[10px] text-gray-400">USDC</span>
+                              {Number(agent.price || 0).toFixed(2)} <span className="text-[10px] text-gray-400 font-normal">USDC</span>
                             </span>
                           </div>
-                          <span className="text-[9px] text-gray-600 font-mono truncate max-w-[100px]" title={agent.walletAddress}>
-                            {agent.walletAddress}
-                          </span>
+                          <button
+                            onClick={(e) => handleToggleInstall(agent.id, e)}
+                            className={`text-[10px] font-bold px-4 py-2 rounded-xl transition-all font-mono flex items-center gap-1 ${
+                              isInst 
+                                ? 'bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/25' 
+                                : 'bg-primary-neon text-black hover:brightness-110'
+                            }`}
+                          >
+                            {isInst ? 'Uninstall' : 'Install'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -953,25 +678,15 @@ export default function MarketplacePage() {
                 })}
               </div>
 
-              {/* Pagination Selector buttons */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-4 font-mono text-xs border-t border-border-dark pt-6">
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="flex justify-center items-center mt-6">
                   <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    className="bg-white/5 border border-border-dark disabled:opacity-30 hover:bg-white/10 px-4 py-2 rounded-xl text-white font-bold transition-all"
+                    onClick={handleLoadMore}
+                    disabled={isLoading}
+                    className="bg-white/5 border border-border-dark hover:bg-white/10 px-8 py-3.5 rounded-xl text-white font-mono text-xs font-bold transition-all disabled:opacity-50"
                   >
-                    &larr; Previous Page
-                  </button>
-                  <span className="text-gray-400">
-                    Page <strong className="text-white">{currentPage}</strong> of {totalPages}
-                  </span>
-                  <button
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    className="bg-white/5 border border-border-dark disabled:opacity-30 hover:bg-white/10 px-4 py-2 rounded-xl text-white font-bold transition-all"
-                  >
-                    Next Page &rarr;
+                    {isLoading ? 'Loading Swarms...' : 'Load More Swarm Nodes'}
                   </button>
                 </div>
               )}
@@ -980,6 +695,139 @@ export default function MarketplacePage() {
         </div>
         
       </div>
+
+      {/* Publish Agent Modal Form */}
+      {isPublishModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          <form 
+            onSubmit={handlePublish}
+            className="glass-card border border-border-dark w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl flex flex-col p-6 gap-4 bg-gradient-to-b from-bg-dark to-black text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-border-dark pb-3">
+              <h2 className="text-sm font-extrabold text-white flex items-center gap-1.5 uppercase font-mono">
+                <Plus className="w-5 h-5 text-primary-neon" />
+                Publish Swarm Node
+              </h2>
+              <button 
+                type="button" 
+                onClick={() => setIsPublishModalOpen(false)}
+                className="text-gray-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">AGENT NAME</label>
+                <input 
+                  type="text" 
+                  required
+                  value={pubName} 
+                  onChange={(e) => setPubName(e.target.value)}
+                  placeholder="e.g. LegalSwarm Pro"
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">CATEGORY</label>
+                <select 
+                  value={pubCategory}
+                  onChange={(e) => setPubCategory(e.target.value)}
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                >
+                  <option value="Research">Research</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Legal">Legal</option>
+                  <option value="Coding">Coding</option>
+                  <option value="Security">Security</option>
+                  <option value="Translation">Translation</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 font-mono">DESCRIPTION</label>
+              <textarea 
+                required
+                value={pubDesc}
+                onChange={(e) => setPubDesc(e.target.value)}
+                placeholder="Detailed capabilities, execution limits, and agent profiles description..."
+                className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none resize-none h-[75px]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 font-mono">CAPABILITIES / SKILLS (comma-separated)</label>
+              <input 
+                type="text" 
+                required
+                value={pubSkills}
+                onChange={(e) => setPubSkills(e.target.value)}
+                placeholder="e.g. contracts, verification, audit"
+                className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">BASE COST (USDC)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required
+                  value={pubPrice}
+                  onChange={(e) => setPubPrice(parseFloat(e.target.value))}
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">SLA LATENCY LIMIT (ms)</label>
+                <input 
+                  type="number" 
+                  required
+                  value={pubLatency}
+                  onChange={(e) => setPubLatency(parseInt(e.target.value))}
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">ENDPOINT URL</label>
+                <input 
+                  type="text" 
+                  required
+                  value={pubEndpoint}
+                  onChange={(e) => setPubEndpoint(e.target.value)}
+                  placeholder="https://swarm.api/v1"
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 font-mono">LOGO IMAGE URL</label>
+                <input 
+                  type="text" 
+                  value={pubLogoUrl}
+                  onChange={(e) => setPubLogoUrl(e.target.value)}
+                  placeholder="https://image-source.com/logo.png"
+                  className="bg-black/60 border border-border-dark focus:border-primary-neon/50 p-2.5 rounded-lg text-white outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isPublishing}
+              className="bg-primary-neon text-black font-extrabold py-3 rounded-xl hover:brightness-110 transition-all font-mono uppercase tracking-wider mt-2"
+            >
+              {isPublishing ? 'Publishing Swarm Node...' : 'Register Swarm Node'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {selectedAgent && (
         <AgentDetailModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />

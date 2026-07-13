@@ -249,4 +249,68 @@ export class WalletController {
       return { success: false, message: `Wallet service unreachable: ${err.message}` };
     }
   }
+
+  @Post('wallet/escrow/lock')
+  @UseGuards(GatewayAuthGuard)
+  async escrowLock(@Req() req: any, @Body() body: any) {
+    try {
+      const payload = { ...body, userId: req.user.id };
+      const res = await fetch(`${this.walletUrl}/wallet/escrow/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('wallet/escrow/release')
+  @UseGuards(GatewayAuthGuard)
+  async escrowRelease(@Req() req: any, @Body() body: any) {
+    try {
+      const payload = { ...body, userId: req.user.id };
+      const res = await fetch(`${this.walletUrl}/wallet/escrow/release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('wallet/escrow/refund')
+  @UseGuards(GatewayAuthGuard)
+  async escrowRefund(@Req() req: any, @Body() body: any) {
+    try {
+      const payload = { ...body, userId: req.user.id };
+      const res = await fetch(`${this.walletUrl}/wallet/escrow/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
+  }
+
+  @Post('wallet/settlement')
+  @UseGuards(GatewayAuthGuard)
+  async settlement(@Req() req: any, @Body() body: any) {
+    try {
+      const payload = { ...body, userId: req.user.id };
+      const res = await fetch(`${this.walletUrl}/wallet/settlement`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Wallet service unreachable: ${err.message}` };
+    }
+  }
 }

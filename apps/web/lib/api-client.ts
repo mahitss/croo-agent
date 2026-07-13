@@ -63,10 +63,13 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
       
       if (parsedToken) {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('orbit_token', parsedToken);
+          const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+          const storage = rememberMe ? localStorage : sessionStorage;
+          storage.setItem('orbit_token', parsedToken);
           if (parsedNextRefresh) {
-            localStorage.setItem('orbit_refreshtoken', parsedNextRefresh);
+            storage.setItem('orbit_refreshtoken', parsedNextRefresh);
           }
+          window.dispatchEvent(new CustomEvent('orbit_token_refreshed', { detail: { token: parsedToken } }));
         }
         return parsedToken;
       }
@@ -85,13 +88,18 @@ function handleSessionExpiration() {
     localStorage.removeItem('orbit_login_just_succeeded');
     sessionStorage.removeItem('orbit_token');
     sessionStorage.removeItem('orbit_user');
+    sessionStorage.removeItem('orbit_refreshtoken');
     document.cookie = "orbit_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
     window.dispatchEvent(new Event('nexus_session_expired'));
-    if (window.location.pathname !== '/') {
+    if (window.location.pathname !== '/' && window.location.pathname !== '/settings' && window.location.pathname !== '/wallet') {
+      window.location.href = `/?auth=login&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+    } else if (window.location.pathname !== '/') {
+      window.location.href = `/?auth=login&redirect=${encodeURIComponent(window.location.pathname)}`;
+    } else {
       window.location.href = '/?auth=login';
     }
   }
@@ -105,17 +113,19 @@ function subscribeTokenRefresh(cb: (token: string) => void) {
 }
 
 function onRefreshed(token: string) {
-  refreshSubscribers.map(cb => cb(token));
+  refreshSubscribers.forEach(cb => cb(token));
   refreshSubscribers = [];
 }
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const isServer = typeof window === 'undefined';
-  let token = isServer ? null : localStorage.getItem('orbit_token');
+  const rememberMe = !isServer && localStorage.getItem('orbit_remember_me') === 'true';
+  const storage = isServer ? null : (rememberMe ? localStorage : sessionStorage);
+  let token = storage ? storage.getItem('orbit_token') : null;
 
   // Verify and auto-refresh token if expired to prevent 401 spam
-  if (token && isJwtExpired(token) && !isServer) {
-    const refreshToken = localStorage.getItem('orbit_refreshtoken');
+  if (token && isJwtExpired(token) && !isServer && storage) {
+    const refreshToken = storage.getItem('orbit_refreshtoken');
     if (refreshToken) {
       if (!isRefreshing) {
         isRefreshing = true;
@@ -125,6 +135,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
             onRefreshed(newToken);
           } else {
             handleSessionExpiration();
+            onRefreshed('');
           }
         });
       }
@@ -136,7 +147,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
       });
 
       const newToken = await retryOriginalRequest;
-      token = newToken;
+      token = newToken || null;
     } else {
       handleSessionExpiration();
       return new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), { status: 401 });
@@ -163,7 +174,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   console.log(`[API_CLIENT] Response status: ${response.status} for ${url}`);
 
   // Intercept 401 failures and try to refresh on the fly (Problem 7)
-  if (response.status === 401 && !isServer) {
+  if (response.status === 401 && !isServer && storage) {
     console.warn(`[API_CLIENT] 401 Unauthorized returned for ${url}. Checking temporary login bypass...`);
     
     // Check if the login just succeeded flag is set
@@ -186,20 +197,38 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     }
 
     console.warn('[API_CLIENT] Standard 401 logic: Attempting token refresh...');
-    const refreshToken = localStorage.getItem('orbit_refreshtoken');
+    const refreshToken = storage.getItem('orbit_refreshtoken');
     if (refreshToken) {
-      const newToken = await refreshAccessToken(refreshToken);
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshAccessToken(refreshToken).then(newToken => {
+          isRefreshing = false;
+          if (newToken) {
+            onRefreshed(newToken);
+          } else {
+            handleSessionExpiration();
+            onRefreshed('');
+          }
+        });
+      }
+
+      const retryOriginalRequest = new Promise<string>((resolve) => {
+        subscribeTokenRefresh((t: string) => {
+          resolve(t);
+        });
+      });
+
+      const newToken = await retryOriginalRequest;
       if (newToken) {
         headers['Authorization'] = `Bearer ${newToken}`;
-        // Retry once
         response = await fetch(`${BASE_URL}${url}`, {
           ...options,
           headers,
         });
+      } else {
+        response = new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), { status: 401 });
       }
-    }
-
-    if (response.status === 401) {
+    } else {
       console.error('[API_CLIENT] Still unauthorized after refresh. Logging out user...');
       handleSessionExpiration();
     }

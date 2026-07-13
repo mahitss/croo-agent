@@ -24,7 +24,7 @@ export class CryptoService {
     return checkHash === hash;
   }
 
-  signJwt(payload: any, expiresInSeconds: number = 3600): string {
+  signJwt(payload: any, expiresInSeconds: number = 900): string {
     const header = { alg: 'HS256', typ: 'JWT' };
     const iat = Math.floor(Date.now() / 1000);
     const exp = iat + expiresInSeconds;

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMode } from '../providers/ModeProvider';
 import { useAuthStore } from '../store/authStore';
-import { useNexusStore } from '../store/nexusStore';
+import { useUserWallet } from '../hooks/useUserWallet';
 import { useToast } from './Toast';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { 
@@ -60,8 +60,7 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const userWallet = useNexusStore((state) => state.userWallet);
+  const { isDemoMode, userWallet } = useUserWallet();
   const { toggleMode: toggleDemoMode } = useMode();
   
   const user = useAuthStore((state) => state.user);

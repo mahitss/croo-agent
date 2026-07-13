@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useNexusStore } from '../store/nexusStore';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
+import { useUserWallet } from '../hooks/useUserWallet';
 import { 
   Sparkles, Compass, RotateCcw, X, ArrowRight, ArrowLeft, 
   Play, Pause, Eye, EyeOff, ShieldAlert, CheckCircle, 
@@ -110,9 +111,8 @@ const DEMO_STAGES: DemoStage[] = [
 ];
 
 export default function DemoBanner() {
-  const resetDemoMode = useNexusStore((state) => state.resetDemoMode);
-  const setUserQuery = useNexusStore((state) => state.setUserQuery);
-  const startExecution = useNexusStore((state) => state.startExecution);
+  const { resetDemoMode } = useUserWallet();
+  const { setUserQuery, startExecution } = useActiveWorkflow();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();

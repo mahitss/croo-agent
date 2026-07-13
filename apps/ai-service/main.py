@@ -17,6 +17,7 @@ import yaml
 import logging
 
 from providers import LLMProviderManager, LLMResult
+from memory import PersistentMemoryStore
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -27,6 +28,7 @@ start_time = time.time()
 
 # Instantiate Provider Manager
 provider_manager = LLMProviderManager()
+memory_store = PersistentMemoryStore()
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 # Request Models
@@ -34,6 +36,7 @@ class PlanRequest(BaseModel):
     query: str
     routing_mode: Optional[str] = "balanced"
     budget: Optional[float] = 2.0
+    user_id: Optional[str] = "user-1"
 
 class EstimateRequest(BaseModel):
     workflow_id: str
@@ -65,12 +68,60 @@ class StreamRequest(BaseModel):
     system_prompt: Optional[str] = None
     provider: Optional[str] = None
 
+class RouteRequest(BaseModel):
+    prompt: str
+    task_type: Optional[str] = None
+    model_override: Optional[str] = None
+    system_prompt: Optional[str] = None
+    user_id: Optional[str] = "user-1"
+
+class MemoryStoreRequest(BaseModel):
+    id: str
+    user_id: str
+    memory_type: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+class MemoryQueryRequest(BaseModel):
+    user_id: str
+    query: str
+    memory_type: Optional[str] = None
+    limit: Optional[int] = 3
+
+class PreferenceRequest(BaseModel):
+    user_id: str
+    pref_key: str
+    pref_value: str
+
+class PreferenceGetRequest(BaseModel):
+    user_id: str
+
+class CompressRequest(BaseModel):
+    session_id: str
+    user_id: str
+
+class RouteResponse(BaseModel):
+    success: bool
+    content: str
+    model_used: str
+    provider: str
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    latency_ms: int
+
 # Response Models
 class TaskNodeResponse(BaseModel):
     id: str
     capability: str
     dependencies: List[str]
     task: Optional[str] = None
+    agentId: Optional[str] = None
+    cost: Optional[float] = 0.15
+    duration: Optional[int] = 5
+    retries: Optional[int] = 3
+    positionX: Optional[int] = 0
+    positionY: Optional[int] = 0
 
 class PlanResponse(BaseModel):
     workflow: List[TaskNodeResponse]
@@ -170,6 +221,98 @@ candidates = [
         "rating": 4.85
     }
 ]
+
+def fetch_agents() -> List[Dict[str, Any]]:
+    agent_url = os.environ.get("AGENT_SERVICE_URL", "http://127.0.0.1:5002/api/v1")
+    try:
+        req = urllib.request.Request(f"{agent_url}/agents", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            if res_data.get("success") and isinstance(res_data.get("data"), list):
+                agents_list = []
+                for a in res_data["data"]:
+                    pricing = a.get("pricingModel", {}) or {}
+                    price = float(pricing.get("basePrice") or 0.10)
+                    skills = [c.get("capability") for c in a.get("capabilities", [])] if a.get("capabilities") else []
+                    if not skills and a.get("role"):
+                        skills.append(a["role"].lower())
+                    
+                    agents_list.append({
+                        "id": a.get("id"),
+                        "name": a.get("displayName") or a.get("name") or "Agent",
+                        "category": a.get("role") or "General",
+                        "skills": skills,
+                        "price": price,
+                        "trust": float(a.get("trustScore") or 90.0),
+                        "success_rate": 100.0 - float(a.get("failureRate") or 5.0),
+                        "latency": int(a.get("latency") or 1000),
+                        "rating": float(a.get("rating") or 4.5)
+                    })
+                if agents_list:
+                    return agents_list
+    except Exception as e:
+        logger.error(f"Failed to fetch live agents from agent-service: {e}. Using seed list.")
+    
+    return candidates
+
+def calculate_node_positions(nodes: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+    # 1. Topological sorting & Cycle detection
+    node_ids = [n["id"] for n in nodes]
+    adj = {nid: [] for nid in node_ids}
+    in_degree = {nid: 0 for nid in node_ids}
+    
+    for n in nodes:
+        # Clean up any non-existent dependencies
+        valid_deps = []
+        for dep in n.get("dependencies", []):
+            if dep in adj:
+                valid_deps.append(dep)
+                adj[dep].append(n["id"])
+                in_degree[n["id"]] += 1
+        n["dependencies"] = valid_deps
+
+    # Topological traversal to calculate levels
+    levels = {nid: 0 for nid in node_ids}
+    queue = [nid for nid, deg in in_degree.items() if deg == 0]
+    processed_count = 0
+    
+    while queue:
+        curr = queue.pop(0)
+        processed_count += 1
+        for neighbor in adj[curr]:
+            levels[neighbor] = max(levels[neighbor], levels[curr] + 1)
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+                
+    # Cycle detection
+    if processed_count != len(nodes):
+        logger.error("Cyclic dependency detected in generated workflow DAG.")
+        return None
+        
+    # Group nodes by level
+    nodes_by_level = {}
+    for nid, lvl in levels.items():
+        if lvl not in nodes_by_level:
+            nodes_by_level[lvl] = []
+        nodes_by_level[lvl].append(nid)
+        
+    # Assign coordinates
+    positioned_nodes = []
+    for n in nodes:
+        nid = n["id"]
+        lvl = levels[nid]
+        lvl_nodes = nodes_by_level[lvl]
+        idx = lvl_nodes.index(nid)
+        
+        x = lvl * 280 + 100
+        y = (idx - (len(lvl_nodes) - 1) / 2) * 150 + 200
+        
+        n["positionX"] = int(x)
+        n["positionY"] = int(y)
+        positioned_nodes.append(n)
+        
+    return positioned_nodes
 
 def score_agent(agent: Dict[str, Any], profile: str) -> float:
     rating_score = (agent["rating"] / 5.0) * 100.0
@@ -332,25 +475,40 @@ def plan_workflow(req: PlanRequest):
         except Exception as e:
             logger.error(f"Failed to parse cached plan: {e}")
 
-    
+    # Automatic Retrieval & Context Optimization
+    user_id = req.user_id or "user-1"
+    memories = memory_store.semantic_retrieve(user_id=user_id, query=req.query, limit=3)
+    context_str = ""
+    if memories:
+        context_str = "\n".join([f"- {m['content']}" for m in memories])
+        logger.info(f"Automatically retrieved {len(memories)} semantic memory contexts for planner.")
+
     # Load system prompt and planner template
     system_prompt = get_prompt_template("system", "system_v1.yaml")
+    if context_str:
+        system_prompt = f"Relevant Long-term Memory Context:\n{context_str}\n\n{system_prompt}"
     planner_template = get_prompt_template("planner", "planner_v3.yaml")
     
     if not planner_template:
         planner_template = (
-            "You are the Lead Swarm Architect for NEXUS AI.\n"
-            "Decompose the user query into a Directed Acyclic Graph (DAG) task plan.\n\n"
-            "Query: {{ query }}\n"
+            "You are the NEXUS AI Workflow Planner. Your goal is to analyze the user's prompt and dynamically build a customized, optimal Directed Acyclic Graph (DAG) workflow of task nodes to resolve the user request.\n\n"
+            "Query Prompt: {{ query }}\n"
             "Budget Ceiling: {{ budget }} USDC\n"
             "Routing Profile: {{ routing_mode }}\n\n"
-            "Output strict JSON matching: {\"workflow\": [{\"id\": \"node-1\", \"capability\": \"research\", \"dependencies\": []}], \"estimated_cost\": 1.25, \"estimated_duration_seconds\": 65, \"confidence\": 0.95}"
+            "Available Agents & Capabilities:\n"
+            "{{ agents_list }}\n\n"
+            "Output strict JSON matching the schema: {\"workflow\": [{\"id\": \"node-1\", \"task\": \"Task Title\", \"capability\": \"research\", \"assignedAgentId\": \"agent-research-1\", \"dependencies\": [], \"retries\": 3}], \"confidence\": 0.95}"
         )
     
+    # Load live agents
+    active_agents = fetch_agents()
+    agents_summary = json.dumps(active_agents, indent=2)
+
     prompt = planner_template
     prompt = prompt.replace("{{ query }}", req.query)
     prompt = prompt.replace("{{ budget }}", str(req.budget))
     prompt = prompt.replace("{{ routing_mode }}", req.routing_mode or "balanced")
+    prompt = prompt.replace("{{ agents_list }}", agents_summary)
 
     planner_model = os.environ.get("PLANNER_MODEL", "google/gemini-flash-1.5")
     result = provider_manager.execute_with_retry_and_fallback(
@@ -367,22 +525,86 @@ def plan_workflow(req: PlanRequest):
             parsed = json.loads(cleaned)
             
             workflow_list = []
-            for idx, item in enumerate(parsed.get("workflow", [])):
+            raw_nodes = parsed.get("workflow", [])
+            
+            # Run layout coordinate placement and cycle validation
+            positioned_nodes = calculate_node_positions(raw_nodes)
+            if positioned_nodes is None:
+                logger.warn("Cycle detected in LLM generated graph. Resolving dependencies sequentially to sanitize.")
+                # Sequential recovery chain to guarantee acyclic graph
+                for idx, node in enumerate(raw_nodes):
+                    node["dependencies"] = [raw_nodes[idx-1]["id"]] if idx > 0 else []
+                positioned_nodes = calculate_node_positions(raw_nodes) or raw_nodes
+            
+            # Map & validate nodes
+            for idx, item in enumerate(positioned_nodes):
                 node_id = item.get("id") or item.get("task") or f"node-{idx+1}"
                 capability = item.get("capability") or "research"
                 dependencies = item.get("dependencies") or []
                 task = item.get("task") or item.get("label") or node_id.upper()
+                retries = int(item.get("retries") or 3)
+                
+                # Check assignedAgentId validity
+                agent_id = item.get("assignedAgentId") or item.get("agentId")
+                if not any(a["id"] == agent_id for a in active_agents):
+                    # fallback to scoring and matching capability
+                    matched = [a for a in active_agents if capability in a["skills"]]
+                    if matched:
+                        scored = sorted(matched, key=lambda a: score_agent(a, req.routing_mode or "balanced"), reverse=True)
+                        agent_id = scored[0]["id"]
+                    else:
+                        agent_id = active_agents[0]["id"]
+                
+                # Get agent details
+                agent_info = next((a for a in active_agents if a["id"] == agent_id), active_agents[0])
+                cost = float(agent_info["price"])
+                duration = int(agent_info["latency"] / 1000 or 1)
+
                 workflow_list.append(TaskNodeResponse(
                     id=node_id,
                     capability=capability,
                     dependencies=dependencies,
-                    task=task
+                    task=task,
+                    agentId=agent_id,
+                    cost=cost,
+                    duration=duration,
+                    retries=retries,
+                    positionX=item.get("positionX", 100),
+                    positionY=item.get("positionY", 200)
                 ))
+            
+            # Programmatically calculate total cost (sum of all nodes)
+            total_cost = sum(n.cost for n in workflow_list)
+            
+            # Programmatically calculate critical path duration (parallel latency)
+            node_duration = {n.id: n.duration for n in workflow_list}
+            adj = {n.id: [] for n in workflow_list}
+            in_degree = {n.id: 0 for n in workflow_list}
+            for n in workflow_list:
+                for dep in n.dependencies:
+                    if dep in adj:
+                        adj[dep].append(n.id)
+                        in_degree[n.id] += 1
+            
+            earliest_completion = {n.id: n.duration for n in workflow_list}
+            queue = [nid for nid, deg in in_degree.items() if deg == 0]
+            while queue:
+                curr = queue.pop(0)
+                for neighbor in adj[curr]:
+                    earliest_completion[neighbor] = max(
+                        earliest_completion[neighbor],
+                        earliest_completion[curr] + node_duration[neighbor]
+                    )
+                    in_degree[neighbor] -= 1
+                    if in_degree[neighbor] == 0:
+                        queue.append(neighbor)
+            
+            total_duration = max(earliest_completion.values()) if earliest_completion else 0
             
             plan = PlanResponse(
                 workflow=workflow_list,
-                estimated_cost=float(parsed.get("estimated_cost") or 1.25),
-                estimated_duration_seconds=int(parsed.get("estimated_duration_seconds") or 65),
+                estimated_cost=round(total_cost, 4),
+                estimated_duration_seconds=int(total_duration),
                 confidence=float(parsed.get("confidence") or 0.95),
                 prompt_tokens=result.prompt_tokens,
                 completion_tokens=result.completion_tokens
@@ -408,7 +630,7 @@ def plan_workflow(req: PlanRequest):
                 status_code=502,
                 content={
                     "success": False,
-                    "message": "All AI planner models are currently unavailable. Please try again shortly.",
+                    "message": f"Parsing failed for plan generation: {str(e)}",
                     "modelsTried": models_tried
                 }
             )
@@ -692,7 +914,6 @@ def stream_response(req: StreamRequest):
             except Exception as e:
                 logger.error(f"OpenAI stream failed: {e}. Falling back to chunked full generation.")
                 
-        # Generic fallback chunk generator
         chat_model = os.environ.get("CHAT_MODEL", "google/gemini-flash-1.5")
         result = provider_manager.execute_with_retry_and_fallback(
             prompt=req.prompt,
@@ -714,6 +935,102 @@ def stream_response(req: StreamRequest):
             yield f"data: {json.dumps({'error': result.error_message})}\n\n"
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.post("/route", response_model=RouteResponse)
+def route_prompt(req: RouteRequest):
+    if not req.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
+    
+    # Automatic Retrieval & Context Optimization
+    user_id = req.user_id or "user-1"
+    memories = memory_store.semantic_retrieve(user_id=user_id, query=req.prompt, limit=3)
+    context_str = ""
+    if memories:
+        context_str = "\n".join([f"- {m['content']}" for m in memories])
+        logger.info(f"Automatically retrieved {len(memories)} semantic memory contexts for model router.")
+    
+    sys_prompt = req.system_prompt or ""
+    if context_str:
+        sys_prompt = f"Relevant Long-term Memory Context:\n{context_str}\n\n{sys_prompt}"
+
+    result = provider_manager.route_model(
+        prompt=req.prompt,
+        task_type=req.task_type,
+        model_override=req.model_override,
+        system_prompt=sys_prompt
+    )
+    
+    if result.success:
+        return RouteResponse(
+            success=True,
+            content=result.content,
+            model_used=result.model,
+            provider=result.provider,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            cost=result.cost,
+            latency_ms=result.latency_ms
+        )
+    else:
+        raise HTTPException(status_code=503, detail=result.error_message or "Model Router failed.")
+
+@app.post("/memory/store")
+def store_memory(req: MemoryStoreRequest):
+    try:
+        memory_store.store_memory(
+            memory_id=req.id,
+            user_id=req.user_id,
+            memory_type=req.memory_type,
+            content=req.content,
+            metadata=req.metadata
+        )
+        return {"success": True, "message": "Memory stored successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/query")
+def query_memory(req: MemoryQueryRequest):
+    try:
+        results = memory_store.semantic_retrieve(
+            user_id=req.user_id,
+            query=req.query,
+            limit=req.limit or 3
+        )
+        return {"success": True, "data": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/preferences")
+def set_preference(req: PreferenceRequest):
+    try:
+        memory_store.set_preference(
+            user_id=req.user_id,
+            key=req.pref_key,
+            value=req.pref_value
+        )
+        return {"success": True, "message": "Preference saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/preferences/get")
+def get_preferences(req: PreferenceGetRequest):
+    try:
+        prefs = memory_store.get_preferences(user_id=req.user_id)
+        return {"success": True, "data": prefs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/compress")
+def compress_memory(req: CompressRequest):
+    try:
+        summary = memory_store.compress_conversation(
+            session_id=req.session_id,
+            user_id=req.user_id,
+            provider_manager_instance=provider_manager
+        )
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -29,7 +29,7 @@ import {
   useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useNexusStore } from '../store/nexusStore';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
 import { useMode } from '../providers/ModeProvider';
 import AgentNode from './AgentNode';
 import dagre from '@dagrejs/dagre';
@@ -92,7 +92,7 @@ const getLayoutedElements = (nodes: any[], edges: any[], direction = 'TB') => {
 };
 
 function CanvasInner({ onSelectNode }: CanvasProps) {
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const { activeWorkflow } = useActiveWorkflow();
   const { fitView } = useReactFlow();
   
   // Render count tracking

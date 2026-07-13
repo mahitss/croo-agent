@@ -82,5 +82,6 @@ export interface WalletState {
   address: string;
   balance: number;
   escrowBalance: number;
+  pendingBalance: number;
   history: Transaction[];
 }

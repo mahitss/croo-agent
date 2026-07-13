@@ -125,7 +125,7 @@ export class AuthController {
     const token = dto.idToken || dto.credential;
     console.log('[GOOGLE_OAUTH_BACKEND] Received google login request body:', JSON.stringify(dto));
     try {
-      return await this.authService.googleLogin(token);
+      return await this.authService.googleLogin(token, dto.rememberMe);
     } catch (error: any) {
       if (error.status) throw error;
       return { success: false, message: `Google login error: ${error.message}` };

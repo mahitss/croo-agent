@@ -307,34 +307,292 @@ export class WalletController {
   @HttpCode(HttpStatus.OK)
   async withdrawFunds(@Body() body: any) {
     try {
-      const address = body.address || '0xUserWalletAddress789c';
-      const wallet = await this.prisma.wallet.findFirst({
-        where: { address }
-      });
-      if (wallet) {
-        await this.prisma.transaction.create({
-          data: {
-            walletId: wallet.id,
-            type: 'withdraw',
-            amount: body.amount || 50.0,
-            status: 'pending',
-            reference: body.recipientAddress,
-          },
-        });
+      const amount = Number(body.amount || 0);
+      if (amount <= 0) {
+        return { success: false, message: 'Invalid withdrawal amount' };
       }
+
+      let wallet = null;
+      if (body.userId) {
+        wallet = await this.prisma.wallet.findFirst({ where: { userId: body.userId } });
+      }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({ where: { address: body.address } });
+      }
+
+      if (!wallet) {
+        return { success: false, message: 'Wallet not found' };
+      }
+
+      let balance = await this.prisma.balance.findUnique({
+        where: { walletId: wallet.id }
+      });
+
+      if (!balance || Number(balance.available) < amount) {
+        return { success: false, message: 'Insufficient funds for withdrawal' };
+      }
+
+      // Decrement available, increment pending
+      await this.prisma.balance.update({
+        where: { walletId: wallet.id },
+        data: {
+          available: Number(balance.available) - amount,
+          pending: Number(balance.pending) + amount,
+        }
+      });
+
+      await this.prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'withdraw',
+          amount,
+          status: 'pending',
+          reference: body.recipientAddress || 'External Bank Transfer',
+        },
+      });
   
       return {
         success: true,
-        message: 'Withdrawal request successfully queued on-chain',
+        message: 'Withdrawal request successfully queued and funds moved to pending settlement',
         data: {
           requestId: `wdr-${Date.now()}`,
-          amount: body.amount || 50.0,
+          amount,
           address: body.recipientAddress,
           status: 'pending',
         },
       };
     } catch (error: any) {
       return { success: false, message: `Database error withdrawing funds: ${error.message}` };
+    }
+  }
+
+  @Post('wallet/escrow/lock')
+  @HttpCode(HttpStatus.OK)
+  async escrowLock(@Body() body: { userId?: string; address?: string; amount: number; reference?: string }) {
+    try {
+      const amount = Number(body.amount || 0);
+      if (amount <= 0) {
+        return { success: false, message: 'Invalid escrow lock amount' };
+      }
+
+      let wallet = null;
+      if (body.userId) {
+        wallet = await this.prisma.wallet.findFirst({ where: { userId: body.userId } });
+      }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({ where: { address: body.address } });
+      }
+
+      if (!wallet) {
+        return { success: false, message: 'Wallet not found' };
+      }
+
+      let balance = await this.prisma.balance.findUnique({
+        where: { walletId: wallet.id }
+      });
+
+      if (!balance || Number(balance.available) < amount) {
+        return { success: false, message: 'Insufficient funds for escrow hold lock' };
+      }
+
+      await this.prisma.balance.update({
+        where: { walletId: wallet.id },
+        data: {
+          available: Number(balance.available) - amount,
+          reserved: Number(balance.reserved) + amount,
+        }
+      });
+
+      await this.prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'escrow_hold',
+          amount,
+          status: 'completed',
+          reference: body.reference || 'Escrow Lock',
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Escrow lock completed',
+        data: { amount }
+      };
+    } catch (error: any) {
+      return { success: false, message: `Database error locking escrow: ${error.message}` };
+    }
+  }
+
+  @Post('wallet/escrow/release')
+  @HttpCode(HttpStatus.OK)
+  async escrowRelease(@Body() body: { userId?: string; address?: string; amount: number; reference?: string }) {
+    try {
+      const amount = Number(body.amount || 0);
+      if (amount <= 0) {
+        return { success: false, message: 'Invalid escrow release amount' };
+      }
+
+      let wallet = null;
+      if (body.userId) {
+        wallet = await this.prisma.wallet.findFirst({ where: { userId: body.userId } });
+      }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({ where: { address: body.address } });
+      }
+
+      if (!wallet) {
+        return { success: false, message: 'Wallet not found' };
+      }
+
+      let balance = await this.prisma.balance.findUnique({
+        where: { walletId: wallet.id }
+      });
+
+      if (!balance || Number(balance.reserved) < amount) {
+        return { success: false, message: 'Insufficient escrow locked balance for payout release' };
+      }
+
+      await this.prisma.balance.update({
+        where: { walletId: wallet.id },
+        data: {
+          reserved: Number(balance.reserved) - amount,
+        }
+      });
+
+      await this.prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'escrow_release',
+          amount,
+          status: 'completed',
+          reference: body.reference || 'Agent Payout SLA Released',
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Escrow payout released successfully',
+        data: { amount }
+      };
+    } catch (error: any) {
+      return { success: false, message: `Database error releasing escrow: ${error.message}` };
+    }
+  }
+
+  @Post('wallet/escrow/refund')
+  @HttpCode(HttpStatus.OK)
+  async escrowRefund(@Body() body: { userId?: string; address?: string; amount: number; reference?: string }) {
+    try {
+      const amount = Number(body.amount || 0);
+      if (amount <= 0) {
+        return { success: false, message: 'Invalid escrow refund amount' };
+      }
+
+      let wallet = null;
+      if (body.userId) {
+        wallet = await this.prisma.wallet.findFirst({ where: { userId: body.userId } });
+      }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({ where: { address: body.address } });
+      }
+
+      if (!wallet) {
+        return { success: false, message: 'Wallet not found' };
+      }
+
+      let balance = await this.prisma.balance.findUnique({
+        where: { walletId: wallet.id }
+      });
+
+      if (!balance || Number(balance.reserved) < amount) {
+        return { success: false, message: 'Insufficient escrow locked balance for refund' };
+      }
+
+      await this.prisma.balance.update({
+        where: { walletId: wallet.id },
+        data: {
+          reserved: Number(balance.reserved) - amount,
+          available: Number(balance.available) + amount,
+        }
+      });
+
+      await this.prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'deposit',
+          amount,
+          status: 'completed',
+          reference: body.reference || 'Escrow SLA Return Refund',
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Escrow lock successfully refunded to available balance',
+        data: { amount }
+      };
+    } catch (error: any) {
+      return { success: false, message: `Database error refunding escrow: ${error.message}` };
+    }
+  }
+
+  @Post('wallet/settlement')
+  @HttpCode(HttpStatus.OK)
+  async settlement(@Body() body: { userId?: string; address?: string }) {
+    try {
+      let wallet = null;
+      if (body.userId) {
+        wallet = await this.prisma.wallet.findFirst({ where: { userId: body.userId } });
+      }
+      if (!wallet && body.address) {
+        wallet = await this.prisma.wallet.findFirst({ where: { address: body.address } });
+      }
+
+      if (!wallet) {
+        return { success: false, message: 'Wallet not found' };
+      }
+
+      const pendingTransactions = await this.prisma.transaction.findMany({
+        where: {
+          walletId: wallet.id,
+          type: 'withdraw',
+          status: 'pending'
+        }
+      });
+
+      if (pendingTransactions.length === 0) {
+        return { success: true, message: 'No pending withdrawals to settle', settledAmount: 0 };
+      }
+
+      let totalSettled = 0;
+      for (const tx of pendingTransactions) {
+        await this.prisma.transaction.update({
+          where: { id: tx.id },
+          data: { status: 'completed' }
+        });
+        totalSettled += Number(tx.amount);
+      }
+
+      let balance = await this.prisma.balance.findUnique({
+        where: { walletId: wallet.id }
+      });
+
+      if (balance) {
+        await this.prisma.balance.update({
+          where: { walletId: wallet.id },
+          data: {
+            pending: Math.max(0, Number(balance.pending) - totalSettled)
+          }
+        });
+      }
+
+      return {
+        success: true,
+        message: `Successfully settled ${pendingTransactions.length} pending withdrawal requests.`,
+        settledAmount: totalSettled
+      };
+    } catch (error: any) {
+      return { success: false, message: `Database error performing settlements: ${error.message}` };
     }
   }
 

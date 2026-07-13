@@ -22,6 +22,7 @@ const console = {
   }
 };
 import { useNexusStore } from '../store/nexusStore';
+import { useAuthStore } from '../store/authStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
 
@@ -36,6 +37,8 @@ export default function AuthModal() {
   const forgotPassword = useNexusStore((state) => state.forgotPassword);
   const verifyEmail = useNexusStore((state) => state.verifyEmail);
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const rememberMe = useAuthStore((state) => state.rememberMe);
+  const setRememberMe = useAuthStore((state) => state.setRememberMe);
   const { toast } = useToast();
 
   const [tab, setTab] = useState<'login' | 'register' | 'forgot' | 'verify'>(authModalTab as any);
@@ -110,6 +113,14 @@ export default function AuthModal() {
                       : 'Successfully signed in with Google!';
                     toast(msg, 'success');
                     setAuthModal(false);
+                    if (typeof window !== 'undefined') {
+                      const params = new URLSearchParams(window.location.search);
+                      const redirectUrl = params.get('redirect');
+                      if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                        return;
+                      }
+                    }
                   }
                 } catch (err: any) {
                   toast(`Google login failed: ${err.message}`, 'error');
@@ -173,6 +184,14 @@ export default function AuthModal() {
         if (ok) {
           toast('Successfully signed in to Orbit!', 'success');
           setAuthModal(false);
+          if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const redirectUrl = params.get('redirect');
+            if (redirectUrl) {
+              window.location.href = redirectUrl;
+              return;
+            }
+          }
         }
       } else if (tab === 'register') {
         const ok = await registerUser(email, username, password, displayName, role);
@@ -368,7 +387,16 @@ export default function AuthModal() {
           )}
 
           {tab === 'login' && (
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center px-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-border-dark bg-black/60 text-primary-neon focus:ring-primary-neon/20 focus:ring-offset-black w-3.5 h-3.5 accent-primary-neon cursor-pointer"
+                />
+                <span className="text-[10px] text-gray-400 font-mono">Remember Me</span>
+              </label>
               <button 
                 type="button"
                 onClick={() => setTab('forgot')}

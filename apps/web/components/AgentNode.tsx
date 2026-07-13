@@ -1,7 +1,7 @@
 'use client';
 
 import { Handle, Position } from '@xyflow/react';
-import { useNexusStore } from '../store/nexusStore';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
 import { 
   CheckCircle2, 
   HelpCircle, 
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export default function AgentNode({ data }: { data: any }) {
-  const agents = useNexusStore((state) => state.agents);
+  const { agents } = useActiveWorkflow();
   const assignedAgent = agents.find(a => a.id === data.assignedAgentId);
 
   const getAgentDisplayInfo = (agentId: string) => {

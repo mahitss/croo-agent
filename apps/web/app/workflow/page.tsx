@@ -21,7 +21,10 @@ const console = {
   }
 };
 import Canvas from '../../components/Canvas';
-import { useNexusStore, seedAgents } from '../../store/nexusStore';
+import { useActiveWorkflow } from '../../hooks/useActiveWorkflow';
+import { useUserWallet } from '../../hooks/useUserWallet';
+import { useAgents } from '../../hooks/useAgents';
+import { seedAgents } from '../../store/nexusStore';
 import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '../../components/Toast';
@@ -38,22 +41,22 @@ const PLANNING_STEPS = [
 
 
 export default function WorkflowPage() {
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
-  const isRunning = useNexusStore((state) => state.isRunning);
-  const user = useNexusStore((state) => state.user);
-  const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
-
-  const promptTokens = useNexusStore((state) => state.promptTokens);
-  const completionTokens = useNexusStore((state) => state.completionTokens);
-  const totalTokens = useNexusStore((state) => state.totalTokens);
-  const estimatedCost = useNexusStore((state) => state.estimatedCost);
-
-  // Custom Node Operations
-  const renameNode = useNexusStore((state) => state.renameNode);
-  const deleteNode = useNexusStore((state) => state.deleteNode);
-  const retryNode = useNexusStore((state) => state.retryNode);
-  const resetExecution = useNexusStore((state) => state.resetExecution);
+  const { isDemoMode, initialize } = useUserWallet();
+  const { agents } = useAgents();
+  const {
+    activeWorkflow,
+    isRunning,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    estimatedCost,
+    generateWorkflow,
+    startExecution,
+    resetExecution,
+    renameNode,
+    deleteNode,
+    retryNode
+  } = useActiveWorkflow();
 
   const { toast } = useToast();
 
@@ -92,10 +95,10 @@ export default function WorkflowPage() {
     
     // Clear any stale workflow states on page mount if not looking up a specific workflow ID
     if (!urlWorkflowId) {
-      useNexusStore.getState().resetExecution();
+      resetExecution();
     }
 
-    useNexusStore.getState().initialize().catch((err) => {
+    initialize().catch((err) => {
       console.error('Failed to initialize workspace store:', err);
     });
 
@@ -142,14 +145,14 @@ export default function WorkflowPage() {
       }
       
       // 1. Generate workflow using the global store generateWorkflow action
-      await useNexusStore.getState().generateWorkflow(promptInput, 'balanced', 2.0);
+      await generateWorkflow(promptInput, 'balanced', 2.0);
 
       setShowExplanation(true);
       setIsWorkflowSaved(true);
       toast('Workflow generated successfully.', 'success');
       
       // 2. Start the execution flow immediately
-      await useNexusStore.getState().startExecution(promptInput, 'balanced', 2.0);
+      await startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
@@ -162,7 +165,7 @@ export default function WorkflowPage() {
 
   const handleLaunchSwarm = async () => {
     if (activeWorkflow) {
-      await useNexusStore.getState().startExecution(activeWorkflow.query, activeWorkflow.routingMode || 'balanced', activeWorkflow.budget || 2.0);
+      await startExecution(activeWorkflow.query, activeWorkflow.routingMode || 'balanced', activeWorkflow.budget || 2.0);
     }
   };
 

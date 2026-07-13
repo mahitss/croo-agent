@@ -1,12 +1,15 @@
 import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UseGuards, Req, HttpException } from '@nestjs/common';
 import { handleGatewayError } from '../utils/gateway-error';
 import { GatewayAuthGuard } from '../guards/auth.guard';
+import { NexusGateway } from '../gateway/nexus.gateway';
 
 @Controller('api/v1')
 export class WorkflowsController {
   private readonly workflowUrl = process.env.WORKFLOW_SERVICE_URL || 'http://127.0.0.1:5003/api/v1';
   private readonly aiUrl = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000';
   private readonly walletUrl = process.env.WALLET_SERVICE_URL || 'http://127.0.0.1:5005/api/v1';
+
+  constructor(private readonly nexusGateway: NexusGateway) {}
 
   private getMode(req: any, body?: any): 'LIVE' | 'DEMO' {
     const modeHeader = req.headers['x-execution-mode'];
@@ -125,6 +128,28 @@ export class WorkflowsController {
         }, HttpStatus.PAYMENT_REQUIRED);
       }
 
+      // 4. Lock estimated cost in escrow
+      try {
+        const lockRes = await fetch(`${this.walletUrl}/wallet/escrow/lock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, amount: estimatedCost, reference: `Workflow SLA Lock | Run ID: ${id}` }),
+        });
+        const lockData = await lockRes.json();
+        if (!lockData.success) {
+          throw new HttpException({
+            success: false,
+            message: `Escrow hold failed: ${lockData.message || 'Unknown error'}`
+          }, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+      } catch (e: any) {
+        if (e instanceof HttpException) throw e;
+        throw new HttpException({
+          success: false,
+          message: `Failed to lock escrow reserves: ${e.message}`
+        }, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
       try {
         const res = await fetch(`${this.workflowUrl}/workflows/${id}/run`, {
           method: 'POST',
@@ -158,10 +183,13 @@ export class WorkflowsController {
   }
 
   @Post('workflows/:id/pause')
-  async pauseWorkflow(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async pauseWorkflow(@Req() req: any, @Param('id') id: string) {
     const start = Date.now();
     try {
-      const res = await fetch(`${this.workflowUrl}/workflows/${id}/pause`, { method: 'POST' });
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/pause`, {
+        method: 'POST',
+      });
       return await res.json();
     } catch (err: any) {
       return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/pause`, start);
@@ -169,10 +197,13 @@ export class WorkflowsController {
   }
 
   @Post('workflows/:id/resume')
-  async resumeWorkflow(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async resumeWorkflow(@Req() req: any, @Param('id') id: string) {
     const start = Date.now();
     try {
-      const res = await fetch(`${this.workflowUrl}/workflows/${id}/resume`, { method: 'POST' });
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/resume`, {
+        method: 'POST',
+      });
       return await res.json();
     } catch (err: any) {
       return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/resume`, start);
@@ -180,13 +211,30 @@ export class WorkflowsController {
   }
 
   @Post('workflows/:id/cancel')
-  async cancelWorkflow(@Param('id') id: string) {
+  @UseGuards(GatewayAuthGuard)
+  async cancelWorkflow(@Req() req: any, @Param('id') id: string) {
     const start = Date.now();
     try {
-      const res = await fetch(`${this.workflowUrl}/workflows/${id}/cancel`, { method: 'POST' });
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/cancel`, {
+        method: 'POST',
+      });
       return await res.json();
     } catch (err: any) {
       return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/cancel`, start);
+    }
+  }
+
+  @Post('workflows/:id/retry')
+  @UseGuards(GatewayAuthGuard)
+  async retryWorkflow(@Req() req: any, @Param('id') id: string) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.workflowUrl}/workflows/${id}/retry`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'Workflow Service', `POST /workflows/${id}/retry`, start);
     }
   }
 
@@ -355,25 +403,60 @@ export class WorkflowsController {
         return handleGatewayError(err, 'AI Service', 'POST /plan', start, rawResponse, responseBody);
       }
     } else {
-      // DEMO mode planning
-      return {
-        success: true,
-        message: 'Intention plan generated successfully (Demo Mode)',
-        data: {
-          prompt_tokens: 1040,
-          completion_tokens: 320,
-          estimated_cost: 0.0,
-          nodes: [
-            { id: 'research', capability: 'research', label: 'InsightFinder Pro analysis', task: 'InsightFinder Pro analysis' },
-            { id: 'finance', capability: 'finance', label: 'FinAnalytica asset valuation', task: 'FinAnalytica asset valuation' },
-            { id: 'legal', capability: 'legal', label: 'LexGuard contract audit', task: 'LexGuard contract audit' }
-          ],
-          edges: [
-            { id: 'edge-0', source: 'research', target: 'finance' },
-            { id: 'edge-1', source: 'finance', target: 'legal' }
-          ]
+      // DEMO mode planning - invoke AI planner dynamically but override cost to 0
+      let rawResponse: Response | undefined;
+      let responseBody = '';
+      try {
+        rawResponse = await fetch(`${this.aiUrl}/plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: body.query, routing_mode: body.routingMode, budget: body.budget }),
+        });
+        
+        responseBody = await rawResponse.text();
+        const data = JSON.parse(responseBody);
+        if (!rawResponse.ok || !data || !data.workflow) {
+          return {
+            success: false,
+            message: data?.message || data?.detail || `AI planner service failed to return valid DAG workflow (status ${rawResponse.status})`
+          };
         }
-      };
+
+        return {
+          success: true,
+          message: 'Intention plan generated successfully (Demo Mode)',
+          data: {
+            nodes: data.workflow.map((node: any) => ({
+              id: node.id,
+              capability: node.capability,
+              label: node.task || node.id.toUpperCase(),
+              task: node.task || node.id.toUpperCase(),
+              agentId: node.agentId,
+            })),
+            edges: (() => {
+              const list: any[] = [];
+              let edgeIdx = 0;
+              data.workflow.forEach((node: any) => {
+                if (node.dependencies && Array.isArray(node.dependencies)) {
+                  node.dependencies.forEach((dep: string) => {
+                    list.push({
+                      id: `edge-${edgeIdx++}`,
+                      source: dep,
+                      target: node.id,
+                    });
+                  });
+                }
+              });
+              return list;
+            })(),
+            prompt_tokens: data.prompt_tokens || 0,
+            completion_tokens: data.completion_tokens || 0,
+            estimated_cost: 0.0, // Demo mode is free
+          },
+        };
+      } catch (err: any) {
+        return handleGatewayError(err, 'AI Service', 'POST /plan (Demo)', start, rawResponse, responseBody);
+      }
     }
   }
 
@@ -406,4 +489,107 @@ export class WorkflowsController {
       return handleGatewayError(err, 'AI Service', 'POST /verify', start);
     }
   }
+
+  @Post('ai/route')
+  async routeModel(@Body() body: any) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.aiUrl}/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: body.prompt,
+          task_type: body.taskType,
+          model_override: body.modelOverride,
+          system_prompt: body.systemPrompt,
+        }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /route', start);
+    }
+  }
+
+  @Post('workflows/events/publish')
+  async publishEvent(@Body() body: any) {
+    this.nexusGateway.broadcastEvent(body.event, body.payload);
+    return { success: true };
+  }
+
+  @Post('memory/store')
+  async storeMemory(@Body() body: any) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.aiUrl}/memory/store`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /memory/store', start);
+    }
+  }
+
+  @Post('memory/query')
+  async queryMemory(@Body() body: any) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.aiUrl}/memory/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /memory/query', start);
+    }
+  }
+
+  @Post('memory/preferences')
+  async setPreference(@Body() body: any) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.aiUrl}/memory/preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /memory/preferences', start);
+    }
+  }
+
+  @Get('memory/preferences')
+  async getPreferences(@Req() req: any) {
+    const start = Date.now();
+    const userId = req.query.userId || 'user-1';
+    try {
+      const res = await fetch(`${this.aiUrl}/memory/preferences/get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /memory/preferences/get', start);
+    }
+  }
+
+  @Post('memory/compress')
+  async compressMemory(@Body() body: any) {
+    const start = Date.now();
+    try {
+      const res = await fetch(`${this.aiUrl}/memory/compress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return handleGatewayError(err, 'AI Service', 'POST /memory/compress', start);
+    }
+  }
 }
+

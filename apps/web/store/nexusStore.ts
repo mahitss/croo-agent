@@ -4,24 +4,43 @@ import { apiService } from '../services/api';
 import { apiClient } from '../lib/api-client';
 import { useAuthStore } from './authStore';
 
-const isProd = process.env.NODE_ENV === 'production';
-const console = {
-  log: (...args: any[]) => {
-    if (!isProd) globalThis.console.log(...args);
-  },
-  warn: (...args: any[]) => {
-    if (!isProd) globalThis.console.warn(...args);
-  },
-  error: (...args: any[]) => {
-    globalThis.console.error(...args);
-  },
-  debug: (...args: any[]) => {
-    if (!isProd) globalThis.console.debug(...args);
-  },
-  info: (...args: any[]) => {
-    if (!isProd) globalThis.console.info(...args);
-  }
-};
+// Import repositories
+import {
+  AgentRepository,
+  WorkflowRepository,
+  WalletRepository,
+  AnalyticsRepository
+} from '../services/repositories';
+import { DemoAgentRepository, seedAgents } from '../services/demo/DemoAgentRepository';
+import { LiveAgentRepository } from '../services/live/LiveAgentRepository';
+import { DemoWorkflowRepository } from '../services/demo/DemoWorkflowRepository';
+import { LiveWorkflowRepository } from '../services/live/LiveWorkflowRepository';
+import { DemoWalletRepository } from '../services/demo/DemoWalletRepository';
+import { LiveWalletRepository } from '../services/live/LiveWalletRepository';
+import { DemoAnalyticsRepository } from '../services/demo/DemoAnalyticsRepository';
+import { LiveAnalyticsRepository } from '../services/live/LiveAnalyticsRepository';
+import { logger } from '../utils/logger';
+import { errorHandler } from '../utils/errorHandler';
+
+// Re-export seed agents for component backwards compatibility
+export { seedAgents };
+
+// Instantiate concrete singletons
+const demoAgentRepo = new DemoAgentRepository();
+const liveAgentRepo = new LiveAgentRepository();
+const demoWorkflowRepo = new DemoWorkflowRepository();
+const liveWorkflowRepo = new LiveWorkflowRepository();
+const demoWalletRepo = new DemoWalletRepository();
+const liveWalletRepo = new LiveWalletRepository();
+const demoAnalyticsRepo = new DemoAnalyticsRepository();
+const liveAnalyticsRepo = new LiveAnalyticsRepository();
+
+const getRepos = (isDemoMode: boolean) => ({
+  agents: isDemoMode ? demoAgentRepo : liveAgentRepo,
+  workflow: isDemoMode ? demoWorkflowRepo : liveWorkflowRepo,
+  wallet: isDemoMode ? demoWalletRepo : liveWalletRepo,
+  analytics: isDemoMode ? demoAnalyticsRepo : liveAnalyticsRepo
+});
 
 interface NexusState {
   agents: Agent[];
@@ -37,6 +56,7 @@ interface NexusState {
   totalTokens: number;
   estimatedCost: number;
   appState: 'planning' | 'draft' | 'running' | 'completed' | 'history';
+  isLoading: boolean;
 
   // Mode-isolated wallet states
   demoBalance: number;
@@ -54,21 +74,16 @@ interface NexusState {
   liveWallet: WalletState;
   
   // Auth & Mode States
-  user: { id: string; email: string; username: string; role: 'user' | 'creator' | 'admin'; displayName?: string; avatarUrl?: string; } | null;
+  user: any | null;
   token: string | null;
   isDemoMode: boolean;
   isAuthModalOpen: boolean;
   authModalTab: 'login' | 'register' | 'forgot' | 'verify';
   isWorkflowSaved: boolean;
   unsavedWorkflowTemplate: any | null;
-  saveWorkflow: () => Promise<void>;
-  generateLocalDemoWorkflow: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Workflow;
-  runLocalDemoSimulation: (workflow: Workflow) => Promise<void>;
   isSidebarCollapsed: boolean;
   isMobileSidebarOpen: boolean;
-  toggleSidebar: () => void;
-  setMobileSidebarOpen: (val: boolean) => void;
-
+  
   // Marketplace Persistent States
   marketplaceTab: 'all' | 'trending' | 'featured' | 'verified';
   marketplaceSearchTerm: string;
@@ -81,6 +96,9 @@ interface NexusState {
   marketplaceMatchmakerPrompt: string;
   marketplaceMatchedStack: any | null;
 
+  // Actions
+  toggleSidebar: () => void;
+  setMobileSidebarOpen: (val: boolean) => void;
   setMarketplaceTab: (tab: 'all' | 'trending' | 'featured' | 'verified') => void;
   setMarketplaceSearchTerm: (term: string) => void;
   setMarketplaceCategory: (cat: string) => void;
@@ -92,7 +110,6 @@ interface NexusState {
   setMarketplaceMatchmakerPrompt: (val: string) => void;
   setMarketplaceMatchedStack: (stack: any) => void;
   
-  // Actions
   setUserQuery: (query: string) => void;
   generateWorkflow: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Promise<void>;
   startExecution: (query: string, routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced', budget: number) => Promise<void>;
@@ -106,6 +123,7 @@ interface NexusState {
   registerAgent: (agent: Omit<Agent, 'id' | 'rating' | 'reviewsCount' | 'trustScore' | 'verificationCount' | 'failureRate' | 'walletAddress' | 'status'>) => Promise<void>;
   depositUserWallet: (amount: number) => Promise<{ success: boolean; message?: string }>;
   withdrawUserWallet: (amount: number) => Promise<void>;
+  settleUserWallet: () => Promise<{ success: boolean; message?: string }>;
   initialize: () => Promise<void>;
   resetDemoMode: () => void;
   logExecution: (phase: ExecutionLog['phase'], message: string, type?: ExecutionLog['type'], metadata?: any) => void;
@@ -116,515 +134,31 @@ interface NexusState {
   loginUser: (usernameOrEmail: string, password: string) => Promise<boolean>;
   registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
   logoutUser: () => Promise<void>;
-  loginOAuth: (provider: 'google' | 'github') => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<boolean>;
-  verifyEmail: (code: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  toggleDemoMode: () => void;
+  logoutEverywhere: () => Promise<void>;
 }
-
-export const seedAgents: Agent[] = [
-  {
-    id: 'agent-research-1',
-    name: 'InsightFinder Pro',
-    version: '1.2.0',
-    description: 'Deep-dive academic and market research agent. Summarizes complex documents and extracts tabular data.',
-    category: 'Research',
-    skills: ['market analysis', 'web scraping', 'data synthesis', 'academic lookup'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/research-1/invoke',
-    price: 0.15,
-    rating: 4.8,
-    reviewsCount: 342,
-    walletAddress: '0x32A4B...98e2',
-    trustScore: 95,
-    latency: 1200,
-    accuracy: 94,
-    verificationCount: 88,
-    failureRate: 2,
-    status: 'active',
-    tags: ['deep-research', 'data-extraction']
-  },
-  {
-    id: 'agent-research-2',
-    name: 'QuickScan',
-    version: '2.0.1',
-    description: 'Ultra-fast search and summarization agent. Perfect for low-latency tasks.',
-    category: 'Research',
-    skills: ['web search', 'news summary', 'topic extraction'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/research-2/invoke',
-    price: 0.05,
-    rating: 4.4,
-    reviewsCount: 154,
-    walletAddress: '0x8F21c...d8A3',
-    trustScore: 88,
-    latency: 450,
-    accuracy: 89,
-    verificationCount: 42,
-    failureRate: 4,
-    status: 'active',
-    tags: ['fast', 'news']
-  },
-  {
-    id: 'agent-finance-1',
-    name: 'FinAnalytica',
-    version: '0.9.5',
-    description: 'Performs asset valuation, ticker audit, balance sheet analysis, and generates charts.',
-    category: 'Finance',
-    skills: ['balance sheet analysis', 'financial modeling', 'ticker trends', 'charts'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/finance-1/invoke',
-    price: 0.25,
-    rating: 4.9,
-    reviewsCount: 220,
-    walletAddress: '0x99C2d...a3F1',
-    trustScore: 98,
-    latency: 1600,
-    accuracy: 97,
-    verificationCount: 124,
-    failureRate: 1,
-    status: 'active',
-    tags: ['equity', 'charts']
-  },
-  {
-    id: 'agent-legal-1',
-    name: 'LexGuard',
-    version: '1.0.0',
-    description: 'Analyzes contracts for compliance, flags high-risk clauses, and performs privacy policy audits.',
-    category: 'Legal',
-    skills: ['contract parsing', 'compliance checks', 'risk analysis'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/legal-1/invoke',
-    price: 0.35,
-    rating: 4.7,
-    reviewsCount: 98,
-    walletAddress: '0xEF512...0D8B',
-    trustScore: 96,
-    latency: 2000,
-    accuracy: 96,
-    verificationCount: 65,
-    failureRate: 3,
-    status: 'active',
-    tags: ['compliance', 'contract']
-  },
-  {
-    id: 'agent-code-1',
-    name: 'CodeCraft',
-    version: '3.1.0',
-    description: 'Generates robust react hooks, api endpoints, and writes unit tests in TypeScript.',
-    category: 'Coding',
-    skills: ['react components', 'express endpoints', 'unit testing', 'refactoring'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/code-1/invoke',
-    price: 0.30,
-    rating: 4.9,
-    reviewsCount: 512,
-    walletAddress: '0x1A2B3...4C5D',
-    trustScore: 97,
-    latency: 2200,
-    accuracy: 98,
-    verificationCount: 215,
-    failureRate: 1.5,
-    status: 'active',
-    tags: ['typescript', 'react']
-  },
-  {
-    id: 'agent-security-1',
-    name: 'SentriScan',
-    version: '1.4.0',
-    description: 'Static application security testing (SAST). Flags vulnerabilities, SQL injection, and XSS leaks.',
-    category: 'Security',
-    skills: ['vulnerability scan', 'dependency audit', 'code safety'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/security-1/invoke',
-    price: 0.40,
-    rating: 4.95,
-    reviewsCount: 180,
-    walletAddress: '0xDD44e...29c4',
-    trustScore: 99,
-    latency: 1400,
-    accuracy: 99.5,
-    verificationCount: 110,
-    failureRate: 0.2,
-    status: 'active',
-    tags: ['audit', 'sast']
-  },
-  {
-    id: 'agent-translate-1',
-    name: 'Translatio',
-    version: '2.1.0',
-    description: 'High-accuracy translation with cultural idioms adjustment. Supports 45+ languages.',
-    category: 'Translation',
-    skills: ['translation', 'localization', 'grammar audit'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/translate-1/invoke',
-    price: 0.08,
-    rating: 4.6,
-    reviewsCount: 190,
-    walletAddress: '0x55B1a...cc4D',
-    trustScore: 93,
-    latency: 550,
-    accuracy: 93,
-    verificationCount: 78,
-    failureRate: 2.5,
-    status: 'active',
-    tags: ['localization', 'fast']
-  },
-  {
-    id: 'agent-verify-1',
-    name: 'ConsensuVerify',
-    version: '1.0.2',
-    description: 'Independent consensus verification engine. Cross-checks information against multiple nodes.',
-    category: 'Security',
-    skills: ['verification', 'consensus calculation', 'output grading'],
-    endpoint: 'https://api.orbitai.dev/api/v1/agents/verify-1/invoke',
-    price: 0.10,
-    rating: 4.85,
-    reviewsCount: 290,
-    walletAddress: '0x88AAa...77bB',
-    trustScore: 98,
-    latency: 800,
-    accuracy: 98,
-    verificationCount: 250,
-    failureRate: 0.8,
-    status: 'active',
-    tags: ['verification', 'consensus']
-  }
-];
-
-function selectBestAgent(capability: string, assignedIds: string[], dbAgents: Agent[]): { agent: Agent; reason: string } {
-  const cap = capability.toLowerCase();
-  
-  let candidates = dbAgents.filter(a => 
-    a.skills.some(s => s.toLowerCase().includes(cap)) || 
-    a.category.toLowerCase().includes(cap)
-  );
-  
-  if (candidates.length === 0) {
-    candidates = dbAgents;
-  }
-  
-  const prices = candidates.map(c => c.price);
-  const latencies = candidates.map(c => c.latency);
-  const maxPrice = Math.max(...prices, 0.5);
-  const maxLatency = Math.max(...latencies, 3000);
-  
-  let bestAgent = candidates[0] || dbAgents[0];
-  let bestScore = -1;
-  let bestReason = 'Optimal selection';
-  
-  candidates.forEach(agent => {
-    const costScore = 1 - (agent.price / maxPrice);
-    const trustScore = agent.trustScore / 100;
-    const latencyScore = 1 - (agent.latency / maxLatency);
-    const accuracyScore = agent.accuracy / 100;
-    const successScore = (100 - agent.failureRate) / 100;
-    
-    let score = (costScore * 0.2) + (trustScore * 0.25) + (latencyScore * 0.15) + (accuracyScore * 0.2) + (successScore * 0.2);
-    
-    const duplicateCount = assignedIds.filter(id => id === agent.id).length;
-    if (duplicateCount > 0) {
-      score -= (0.35 * duplicateCount); // diversity penalty
-    }
-    
-    if (score > bestScore) {
-      bestScore = score;
-      bestAgent = agent;
-      
-      const reasons: string[] = [];
-      const isCheapest = agent.price === Math.min(...prices);
-      const isFastest = agent.latency === Math.min(...latencies);
-      const isHighTrust = agent.trustScore >= 95;
-      
-      if (isFastest) reasons.push('Fastest');
-      if (isCheapest) reasons.push('Lowest cost');
-      if (isHighTrust) reasons.push(`${agent.trustScore}% trust success`);
-      if (agent.accuracy >= 95) reasons.push('Highest accuracy');
-      
-      if (reasons.length > 0) {
-        bestReason = reasons.slice(0, 3).join(', ');
-      } else {
-        bestReason = 'Optimal selection';
-      }
-    }
-  });
-  
-  return { agent: bestAgent, reason: bestReason };
-}
-
-function computeWorkflowStatus(nodes: TaskNode[]): 'pending' | 'running' | 'completed' | 'failed' {
-  if (!nodes || nodes.length === 0) return 'pending';
-  const hasFailed = nodes.some(n => n.status === 'failed');
-  if (hasFailed) return 'failed';
-  const hasRunning = nodes.some(n => n.status === 'running');
-  if (hasRunning) return 'running';
-  const allCompleted = nodes.every(n => n.status === 'completed');
-  if (allCompleted) return 'completed';
-  return 'pending';
-}
-
-function logWorkflowStatusChange(workflowId: string, status: string, nodes: TaskNode[]) {
-  const completed = nodes.filter(n => n.status === 'completed').length;
-  const running = nodes.filter(n => n.status === 'running').length;
-  const failed = nodes.filter(n => n.status === 'failed').length;
-  const pending = nodes.filter(n => n.status === 'pending').length;
-  console.log(`[STATUS_CHANGE] Workflow ID: ${workflowId} | Workflow Status: ${status.toUpperCase()} | Completed Nodes: ${completed} | Running Nodes: ${running} | Failed Nodes: ${failed} | Pending Nodes: ${pending}`);
-}
-
-const demoRoles = [
-  { category: 'Research', name: 'InsightFinder Pro', skill: 'research' },
-  { category: 'Finance', name: 'FinAnalytica', skill: 'finance' },
-  { category: 'Legal', name: 'LexGuard Compliance', skill: 'legal' },
-  { category: 'Marketing', name: 'PromoPulse AI', skill: 'marketing' },
-  { category: 'QA', name: 'CodeVerify QA', skill: 'qa' },
-  { category: 'Security', name: 'SentriScan Security', skill: 'security' },
-  { category: 'Sales', name: 'LeadSphere Conversions', skill: 'sales' },
-  { category: 'Data', name: 'SchemaSync Data Engine', skill: 'data' },
-  { category: 'Operations', name: 'OptimaSwarm Ops', skill: 'operations' },
-  { category: 'Compliance', name: 'ReguRadar Audit', skill: 'compliance' },
-  { category: 'Analytics', name: 'MetricsMind Engine', skill: 'analytics' },
-  { category: 'Engineering', name: 'CodeCraft Engineer', skill: 'engineering' }
-];
-
-const demoTemplates = [
-  {
-    name: 'Pattern A - Finance/Legal Split',
-    nodes: [
-      { id: 'n1', label: 'Research Phase', capability: 'Research', posX: 120, posY: 220 },
-      { id: 'n2', label: 'Financial Audit', capability: 'Finance', posX: 320, posY: 120 },
-      { id: 'n3', label: 'Legal Review', capability: 'Legal', posX: 320, posY: 320 },
-      { id: 'n4', label: 'Final Consolidation', capability: 'Compliance', posX: 520, posY: 220 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n1', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n4' }
-    ]
-  },
-  {
-    name: 'Pattern B - Sequential Pipeline',
-    nodes: [
-      { id: 'n1', label: 'Initial Research', capability: 'Research', posX: 100, posY: 200 },
-      { id: 'n2', label: 'Swarm Planning', capability: 'Operations', posX: 260, posY: 200 },
-      { id: 'n3', label: 'Financial Check', capability: 'Finance', posX: 420, posY: 200 },
-      { id: 'n4', label: 'Compliance Audit', capability: 'Compliance', posX: 580, posY: 200 },
-      { id: 'n5', label: 'Final Output', capability: 'Data', posX: 740, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n3', target: 'n4' },
-      { source: 'n4', target: 'n5' }
-    ]
-  },
-  {
-    name: 'Pattern C - Multi-Angle Decision',
-    nodes: [
-      { id: 'n1', label: 'Market Ingestion', capability: 'Data', posX: 100, posY: 220 },
-      { id: 'n2', label: 'Marketing Strategy', capability: 'Marketing', posX: 280, posY: 80 },
-      { id: 'n3', label: 'Legal Safeguard', capability: 'Legal', posX: 280, posY: 170 },
-      { id: 'n4', label: 'Risk Analysis', capability: 'Compliance', posX: 280, posY: 270 },
-      { id: 'n5', label: 'Financial Modeling', capability: 'Finance', posX: 280, posY: 360 },
-      { id: 'n6', label: 'Strategic Decision', capability: 'Operations', posX: 480, posY: 220 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n1', target: 'n3' },
-      { source: 'n1', target: 'n4' },
-      { source: 'n1', target: 'n5' },
-      { source: 'n2', target: 'n6' },
-      { source: 'n3', target: 'n6' },
-      { source: 'n4', target: 'n6' },
-      { source: 'n5', target: 'n6' }
-    ]
-  },
-  {
-    name: 'Pattern D - Parallel Inputs with Aggregator',
-    nodes: [
-      { id: 'n1', label: 'Research Stream', capability: 'Research', posX: 100, posY: 90 },
-      { id: 'n2', label: 'Finance Stream', capability: 'Finance', posX: 100, posY: 180 },
-      { id: 'n3', label: 'Security Scan', capability: 'Security', posX: 100, posY: 270 },
-      { id: 'n4', label: 'Legal Audit', capability: 'Legal', posX: 100, posY: 360 },
-      { id: 'n5', label: 'Data Aggregator', capability: 'Data', posX: 320, posY: 220 },
-      { id: 'n6', label: 'Executive Report', capability: 'Analytics', posX: 540, posY: 220 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n5' },
-      { source: 'n2', target: 'n5' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n5' },
-      { source: 'n5', target: 'n6' }
-    ]
-  },
-  {
-    name: 'Pattern E - Planner Fan-Out/Fan-In',
-    nodes: [
-      { id: 'n1', label: 'Core Ingestion', capability: 'Data', posX: 100, posY: 250 },
-      { id: 'n2', label: 'Swarm Planner', capability: 'Operations', posX: 250, posY: 250 },
-      { id: 'n3', label: 'Legal Analysis', capability: 'Legal', posX: 420, posY: 100 },
-      { id: 'n4', label: 'Budget Allocation', capability: 'Finance', posX: 420, posY: 200 },
-      { id: 'n5', label: 'Marketing Target', capability: 'Marketing', posX: 420, posY: 300 },
-      { id: 'n6', label: 'Quality Assurance', capability: 'QA', posX: 420, posY: 400 },
-      { id: 'n7', label: 'Consolidated Outcome', capability: 'Analytics', posX: 600, posY: 250 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n2', target: 'n5' },
-      { source: 'n2', target: 'n6' },
-      { source: 'n3', target: 'n7' },
-      { source: 'n4', target: 'n7' },
-      { source: 'n5', target: 'n7' },
-      { source: 'n6', target: 'n7' }
-    ]
-  },
-  {
-    name: 'Pattern F - Cross-Functional Parallel Streams',
-    nodes: [
-      { id: 'n1', label: 'Initiation Stage', capability: 'Operations', posX: 80, posY: 200 },
-      { id: 'n2', label: 'Business Development', capability: 'Sales', posX: 240, posY: 100 },
-      { id: 'n3', label: 'Technical Prototype', capability: 'Data', posX: 240, posY: 300 },
-      { id: 'n4', label: 'Market Assessment', capability: 'Marketing', posX: 420, posY: 100 },
-      { id: 'n5', label: 'Security & QA Review', capability: 'Security', posX: 420, posY: 300 },
-      { id: 'n6', label: 'Deployment Strategy', capability: 'Compliance', posX: 580, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n1', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n6' },
-      { source: 'n5', target: 'n6' }
-    ]
-  },
-  {
-    name: 'Pattern G - Data Ingestion & Analytics Pipeline',
-    nodes: [
-      { id: 'n1', label: 'Data Ingestion', capability: 'Data', posX: 90, posY: 200 },
-      { id: 'n2', label: 'Data Refining', capability: 'QA', posX: 240, posY: 200 },
-      { id: 'n3', label: 'Market Trend Analysis', capability: 'Analytics', posX: 390, posY: 100 },
-      { id: 'n4', label: 'Operations Sync', capability: 'Operations', posX: 390, posY: 300 },
-      { id: 'n5', label: 'Legal Compliance Audit', capability: 'Compliance', posX: 540, posY: 200 },
-      { id: 'n6', label: 'Production Release', capability: 'Sales', posX: 690, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n5' },
-      { source: 'n5', target: 'n6' }
-    ]
-  },
-  {
-    name: 'Pattern H - Convergent V-Shape Execution',
-    nodes: [
-      { id: 'n1', label: 'Marketing Blast', capability: 'Marketing', posX: 100, posY: 90 },
-      { id: 'n2', label: 'Sales Funneling', capability: 'Sales', posX: 100, posY: 310 },
-      { id: 'n3', label: 'Operational Dispatch', capability: 'Operations', posX: 280, posY: 200 },
-      { id: 'n4', label: 'Performance Analytics', capability: 'Analytics', posX: 460, posY: 200 },
-      { id: 'n5', label: 'Regulatory Filing', capability: 'Compliance', posX: 640, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n3' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n3', target: 'n4' },
-      { source: 'n4', target: 'n5' }
-    ]
-  },
-  {
-    name: 'Pattern I - Diamond Validation Pipeline',
-    nodes: [
-      { id: 'n1', label: 'Job Initialization', capability: 'Operations', posX: 100, posY: 200 },
-      { id: 'n2', label: 'Auditing Upper Bound', capability: 'Finance', posX: 300, posY: 100 },
-      { id: 'n3', label: 'Auditing Lower Bound', capability: 'Security', posX: 300, posY: 300 },
-      { id: 'n4', label: 'Consensus Calibration', capability: 'QA', posX: 500, posY: 200 },
-      { id: 'n5', label: 'Report Dispatcher', capability: 'Data', posX: 700, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n1', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n4' },
-      { source: 'n4', target: 'n5' }
-    ]
-  },
-  {
-    name: 'Pattern J - Double Diamond Complex DAG',
-    nodes: [
-      { id: 'n1', label: 'Boot Initialization', capability: 'Operations', posX: 60, posY: 250 },
-      { id: 'n2', label: 'Payload Parser', capability: 'Data', posX: 200, posY: 250 },
-      { id: 'n3', label: 'Financial Appraisal', capability: 'Finance', posX: 340, posY: 130 },
-      { id: 'n4', label: 'Legal Soundness Audit', capability: 'Legal', posX: 340, posY: 370 },
-      { id: 'n5', label: 'Risk Quantification', capability: 'Compliance', posX: 480, posY: 130 },
-      { id: 'n6', label: 'Security Vulnerability Test', capability: 'Security', posX: 480, posY: 370 },
-      { id: 'n7', label: 'Consolidated Aggregation', capability: 'QA', posX: 620, posY: 250 },
-      { id: 'n8', label: 'Final Output Dispatcher', capability: 'Sales', posX: 760, posY: 250 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n6' },
-      { source: 'n5', target: 'n7' },
-      { source: 'n6', target: 'n7' },
-      { source: 'n7', target: 'n8' }
-    ]
-  },
-  {
-    name: 'Pattern K - Sequential Verification Grid',
-    nodes: [
-      { id: 'n1', label: 'Operations Dispatch', capability: 'Operations', posX: 80, posY: 200 },
-      { id: 'n2', label: 'Research Analysis', capability: 'Research', posX: 240, posY: 100 },
-      { id: 'n3', label: 'Legal Safeguard Audit', capability: 'Legal', posX: 240, posY: 300 },
-      { id: 'n4', label: 'Security Auditing Scan', capability: 'Security', posX: 400, posY: 100 },
-      { id: 'n5', label: 'Financial Performance Logs', capability: 'Analytics', posX: 400, posY: 300 },
-      { id: 'n6', label: 'Quality Assurance Review', capability: 'QA', posX: 560, posY: 200 },
-      { id: 'n7', label: 'Compliance Signoff', capability: 'Compliance', posX: 720, posY: 200 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n1', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n6' },
-      { source: 'n5', target: 'n6' },
-      { source: 'n6', target: 'n7' }
-    ]
-  },
-  {
-    name: 'Pattern L - Dual Diamond Tree',
-    nodes: [
-      { id: 'n1', label: 'Operations Sync', capability: 'Operations', posX: 60, posY: 250 },
-      { id: 'n2', label: 'Data Processing Stack', capability: 'Data', posX: 180, posY: 250 },
-      { id: 'n3', label: 'Finance Appraisal', capability: 'Finance', posX: 300, posY: 140 },
-      { id: 'n4', label: 'Security Vulnerability Test', capability: 'Security', posX: 300, posY: 360 },
-      { id: 'n5', label: 'Marketing Target Matrix', capability: 'Marketing', posX: 440, posY: 140 },
-      { id: 'n6', label: 'Sales Lead Conversion', capability: 'Sales', posX: 440, posY: 360 },
-      { id: 'n7', label: 'Quality Assurance Consensus', capability: 'QA', posX: 580, posY: 250 },
-      { id: 'n8', label: 'Analytics Performance Logs', capability: 'Analytics', posX: 700, posY: 250 },
-      { id: 'n9', label: 'Compliance Audit Signoff', capability: 'Compliance', posX: 820, posY: 250 }
-    ],
-    edges: [
-      { source: 'n1', target: 'n2' },
-      { source: 'n2', target: 'n3' },
-      { source: 'n2', target: 'n4' },
-      { source: 'n3', target: 'n5' },
-      { source: 'n4', target: 'n6' },
-      { source: 'n5', target: 'n7' },
-      { source: 'n6', target: 'n7' },
-      { source: 'n7', target: 'n8' },
-      { source: 'n8', target: 'n9' }
-    ]
-  }
-];
 
 export const useNexusStore = create<NexusState>((set, get) => {
+  // Sync state changes from useAuthStore
+  useAuthStore.subscribe((authState) => {
+    set({
+      user: authState.user,
+      token: authState.token,
+      isDemoMode: authState.isDemoMode,
+      isAuthModalOpen: authState.isAuthModalOpen,
+      authModalTab: authState.authModalTab
+    });
+  });
+
   return {
     agents: [],
     activeWorkflow: null,
     executionLogs: [],
+    isLoading: false,
     userWallet: {
       address: '0xDemoWalletAddress789c',
       balance: 100.0,
       escrowBalance: 0.0,
+      pendingBalance: 0.0,
       history: []
     },
     demoBalance: 100.0,
@@ -636,6 +170,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       address: '0xDemoWalletAddress789c',
       balance: 100.0,
       escrowBalance: 0.0,
+      pendingBalance: 0.0,
       history: []
     },
     liveBalance: 0.0,
@@ -647,6 +182,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       address: '0x0000000000000000000000000000000000000000',
       balance: 0.0,
       escrowBalance: 0.0,
+      pendingBalance: 0.0,
       history: []
     },
     agentWallets: {},
@@ -671,6 +207,20 @@ export const useNexusStore = create<NexusState>((set, get) => {
     marketplaceMatchmakerPrompt: '',
     marketplaceMatchedStack: null,
 
+    // Auth state defaults
+    user: useAuthStore.getState().user,
+    token: useAuthStore.getState().token,
+    isDemoMode: useAuthStore.getState().isDemoMode,
+    isAuthModalOpen: useAuthStore.getState().isAuthModalOpen,
+    authModalTab: useAuthStore.getState().authModalTab,
+    isWorkflowSaved: true,
+    unsavedWorkflowTemplate: null,
+    isSidebarCollapsed: false,
+    isMobileSidebarOpen: false,
+
+    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+    setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
+    
     setMarketplaceTab: (tab) => set({ marketplaceTab: tab }),
     setMarketplaceSearchTerm: (term) => set({ marketplaceSearchTerm: term }),
     setMarketplaceCategory: (cat) => set({ marketplaceCategory: cat }),
@@ -681,39 +231,19 @@ export const useNexusStore = create<NexusState>((set, get) => {
     setMarketplaceSortBy: (val) => set({ marketplaceSortBy: val }),
     setMarketplaceMatchmakerPrompt: (val) => set({ marketplaceMatchmakerPrompt: val }),
     setMarketplaceMatchedStack: (stack) => set({ marketplaceMatchedStack: stack }),
-    
-    // Auth & Mode Defaults
-    user: useAuthStore.getState().user,
-    token: useAuthStore.getState().token,
-    isDemoMode: useAuthStore.getState().isDemoMode,
-    isAuthModalOpen: useAuthStore.getState().isAuthModalOpen,
-    authModalTab: useAuthStore.getState().authModalTab,
-    isWorkflowSaved: true,
-    unsavedWorkflowTemplate: null,
-    isSidebarCollapsed: false,
-    isMobileSidebarOpen: false,
-    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
-    setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
 
     setUserQuery: (query) => set({ userQuery: query }),
 
     resetExecution: () => {
-      console.log('[CLEAR_EXECUTION_STATE] Resetting active workflow and execution logs.');
-      
+      logger.info('Resetting active workflow and execution logs.');
       if (typeof window !== 'undefined') {
-        const lastId = localStorage.getItem('orbit_last_workflow_id');
         localStorage.removeItem('orbit_last_workflow_id');
-        if (lastId) {
-          localStorage.removeItem(`orbit_workflow_data_${lastId}`);
-          localStorage.removeItem(`orbit_workflow_metadata_${lastId}`);
-        }
         const params = new URLSearchParams(window.location.search);
         params.delete('workflowId');
         const searchStr = params.toString();
         const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
         window.history.pushState({ path: newUrl }, '', newUrl);
       }
-
       set({
         activeWorkflow: null,
         executionLogs: [],
@@ -741,1285 +271,199 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
     },
 
-    renameNode: (nodeId, newName) => {
-      const activeWorkflow = get().activeWorkflow;
-      if (activeWorkflow) {
-        const updatedNodes = activeWorkflow.nodes.map(n => n.id === nodeId ? { ...n, name: newName } : n);
-        set({ activeWorkflow: { ...activeWorkflow, nodes: updatedNodes } });
-      }
-    },
+    // Optimistic Updates for Node Rename
+    renameNode: async (nodeId, newName) => {
+      const wf = get().activeWorkflow;
+      if (!wf) return;
 
-    deleteNode: (nodeId) => {
-      const activeWorkflow = get().activeWorkflow;
-      if (activeWorkflow) {
-        const updatedNodes = activeWorkflow.nodes.filter(n => n.id !== nodeId);
-        const updatedEdges = activeWorkflow.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
-        const computedStatus = computeWorkflowStatus(updatedNodes);
-        logWorkflowStatusChange(activeWorkflow.id, computedStatus, updatedNodes);
-        set({ activeWorkflow: { ...activeWorkflow, status: computedStatus, nodes: updatedNodes, edges: updatedEdges } });
-      }
-    },
-
-    retryNode: (nodeId) => {
-      const activeWorkflow = get().activeWorkflow;
-      if (activeWorkflow) {
-        const updatedNodes = activeWorkflow.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const, retryCount: (n.retryCount || 0) + 1 } : n);
-        const computedStatus = computeWorkflowStatus(updatedNodes);
-        logWorkflowStatusChange(activeWorkflow.id, computedStatus, updatedNodes);
-        set({ activeWorkflow: { ...activeWorkflow, status: computedStatus, nodes: updatedNodes } });
-      }
-    },
-
-    cancelWorkflow: () => {
-      const activeWorkflow = get().activeWorkflow;
-      if (activeWorkflow) {
-        logWorkflowStatusChange(activeWorkflow.id, 'failed', activeWorkflow.nodes);
-        set({ 
-          activeWorkflow: { ...activeWorkflow, status: 'failed' as const },
-          isRunning: false,
-          currentPhaseIndex: 0
-        });
-      }
-    },
-
-    registerAgent: async (agent) => {
-      try {
-        const res = await apiClient.post<any>('/api/v1/agents', agent);
-        if (res.success && res.data) {
-          await get().initialize();
-        } else {
-          throw new Error(res.message || 'Failed to register agent in backend');
-        }
-      } catch (err: any) {
-        console.error('Failed to register agent in database, falling back locally:', err);
-        const newAgent: Agent = {
-          ...agent,
-          id: `agent-custom-${Date.now()}`,
-          rating: 5.0,
-          reviewsCount: 0,
-          trustScore: 100,
-          verificationCount: 0,
-          failureRate: 0,
-          walletAddress: `0x${Math.random().toString(16).substring(2, 10).toUpperCase()}...${Math.random().toString(16).substring(2, 6)}`,
-          status: 'active'
-        };
-
-        set((state) => {
-          const updatedAgents = [...state.agents, newAgent];
-          const updatedWallets = { ...state.agentWallets };
-          updatedWallets[newAgent.id] = {
-            address: newAgent.walletAddress,
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
-          };
-          return {
-            agents: updatedAgents,
-            agentWallets: updatedWallets
-          };
-        });
-      }
-    },
-
-    depositUserWallet: async (amount) => {
-      const state = get();
-      
-      // ─── DEMO MODE ────────────────────────────────────────────────────────
-      if (state.isDemoMode) {
-        const tx: Transaction = {
-          id: `tx-deposit-${Date.now()}`,
-          senderAddress: 'EXTERNAL_BANK',
-          receiverAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
-          amount,
-          type: 'deposit',
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substring(2, 42)
-        };
-        const newDemoBalance = state.demoBalance + amount;
-        const newDemoHistory = [tx, ...state.demoHistory];
-
-        localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
-        localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-        const updatedDemoWallet = {
-          address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-          balance: newDemoBalance,
-          escrowBalance: state.demoEscrow,
-          history: newDemoHistory
-        };
-
-        set({
-          demoBalance: newDemoBalance,
-          demoHistory: newDemoHistory,
-          demoTransactions: newDemoHistory,
-          demoWallet: updatedDemoWallet,
-          userWallet: updatedDemoWallet
-        });
-        return { success: true };
-      }
-
-      // ─── LIVE MODE (Razorpay Checkout) ────────────────────────────────────
-      return new Promise<{ success: boolean; message?: string }>(async (resolve) => {
-        try {
-          const loadScript = (src: string) => {
-            return new Promise((r) => {
-              const script = document.createElement('script');
-              script.src = src;
-              script.onload = () => r(true);
-              script.onerror = () => r(false);
-              document.body.appendChild(script);
-            });
-          };
-
-          const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
-          if (!scriptLoaded) {
-            resolve({ success: false, message: 'Razorpay SDK failed to load. Are you offline?' });
-            return;
-          }
-
-          const orderRes = await apiClient.post<any>('/api/v1/payments/create-order', {
-            amount,
-            userId: state.user?.id || 'user-1'
-          });
-
-          if (!orderRes.success) {
-            resolve({ success: false, message: orderRes.message || 'Failed to create Razorpay Order' });
-            return;
-          }
-
-          const options = {
-            key: orderRes.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TBsVCd1MfWIKnW',
-            amount: orderRes.amount * 100,
-            currency: orderRes.currency,
-            name: 'Orbit AI Operating System',
-            description: 'Sandbox/Live Credits Deposit',
-            order_id: orderRes.orderId,
-            handler: async (response: any) => {
-              try {
-                const verifyRes = await apiClient.post<any>('/api/v1/payments/verify', {
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpayPaymentId: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                  userId: state.user?.id || 'user-1',
-                  amount
-                });
-
-                if (verifyRes.success) {
-                  await get().initialize();
-                  resolve({ success: true });
-                } else {
-                  resolve({ success: false, message: verifyRes.message || 'Signature validation failed' });
-                }
-              } catch (err: any) {
-                console.error('Razorpay verification error:', err);
-                resolve({ success: false, message: err.message || 'Verification request failed' });
-              }
-            },
-            modal: {
-              ondismiss: () => {
-                resolve({ success: false, message: 'Payment cancelled by user' });
-              }
-            },
-            prefill: {
-              name: state.user?.displayName || state.user?.username || 'Orbit User',
-              email: state.user?.email || 'user@orbitai.dev'
-            },
-            theme: {
-              color: '#00ffcc'
-            }
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-        } catch (err: any) {
-          console.error('Failed to initiate Razorpay payment checkout flow:', err);
-          resolve({ success: false, message: err.message || 'Failed to initialize checkout' });
-        }
-      });
-    },
-
-    withdrawUserWallet: async (amount) => {
-      const state = get();
-      if (state.userWallet.balance < amount) return;
-      
-      if (state.isDemoMode) {
-        const tx: Transaction = {
-          id: `tx-withdraw-${Date.now()}`,
-          senderAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
-          receiverAddress: 'EXTERNAL_BANK',
-          amount,
-          type: 'withdrawal',
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substring(2, 42),
-          paymentMethod: 'Mock Credits'
-        };
-        const newDemoBalance = state.demoBalance - amount;
-        const newDemoHistory = [tx, ...state.demoHistory];
-
-        localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
-        localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-        const updatedDemoWallet = {
-          address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-          balance: newDemoBalance,
-          escrowBalance: state.demoEscrow,
-          history: newDemoHistory
-        };
-
-        set({
-          demoBalance: newDemoBalance,
-          demoHistory: newDemoHistory,
-          demoTransactions: newDemoHistory,
-          demoWallet: updatedDemoWallet,
-          userWallet: updatedDemoWallet
-        });
-        return;
-      }
+      // Local optimistic update
+      const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, name: newName } : n);
+      const updatedWf = { ...wf, nodes: updatedNodes };
+      set({ activeWorkflow: updatedWf });
 
       try {
-        const res = await apiClient.post<any>('/api/v1/wallet/withdraw', {
-          amount,
-          recipientAddress: 'EXTERNAL_BANK'
-        });
-        if (res.success) {
-          await get().initialize();
-        } else {
-          throw new Error(res.message || 'Failed to request withdrawal from backend');
-        }
+        const repos = getRepos(get().isDemoMode);
+        const resolved = await repos.workflow.renameNode(wf.id, nodeId, newName);
+        set({ activeWorkflow: resolved });
       } catch (err) {
-        console.error('Failed to register withdrawal in database, falling back locally:', err);
-        const tx: Transaction = {
-          id: `tx-withdraw-${Date.now()}`,
-          senderAddress: state.liveWalletAddress || '0x0000000000000000000000000000000000000000',
-          receiverAddress: 'EXTERNAL_BANK',
-          amount,
-          type: 'withdrawal',
-          timestamp: new Date().toISOString(),
-          status: 'completed',
-          txHash: '0x' + Math.random().toString(16).substring(2, 42)
-        };
-        const updatedLiveWallet = {
-          ...state.liveWallet,
-          balance: state.liveWallet.balance - amount,
-          history: [tx, ...state.liveWallet.history]
-        };
-        set({
-          liveBalance: updatedLiveWallet.balance,
-          liveHistory: updatedLiveWallet.history,
-          liveTransactions: updatedLiveWallet.history,
-          liveWallet: updatedLiveWallet,
-          userWallet: updatedLiveWallet
-        });
+        logger.error('Failed to rename node:', err);
+        // Revert on error
+        set({ activeWorkflow: wf });
+      }
+    },
+
+    // Optimistic Updates for Node Delete
+    deleteNode: async (nodeId) => {
+      const wf = get().activeWorkflow;
+      if (!wf) return;
+
+      // Local optimistic update
+      const updatedNodes = wf.nodes.filter(n => n.id !== nodeId);
+      const updatedEdges = wf.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+      const updatedWf = { ...wf, nodes: updatedNodes, edges: updatedEdges };
+      set({ activeWorkflow: updatedWf });
+
+      try {
+        const repos = getRepos(get().isDemoMode);
+        const resolved = await repos.workflow.deleteNode(wf.id, nodeId);
+        set({ activeWorkflow: resolved });
+      } catch (err) {
+        logger.error('Failed to delete node:', err);
+        // Revert on error
+        set({ activeWorkflow: wf });
+      }
+    },
+
+    // Optimistic Updates for Node Retry
+    retryNode: async (nodeId) => {
+      const wf = get().activeWorkflow;
+      if (!wf) return;
+
+      // Local optimistic update
+      const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const } : n);
+      const updatedWf = { ...wf, nodes: updatedNodes };
+      set({ activeWorkflow: updatedWf });
+
+      try {
+        const repos = getRepos(get().isDemoMode);
+        const resolved = await repos.workflow.retryNode(wf.id, nodeId);
+        set({ activeWorkflow: resolved });
+      } catch (err) {
+        logger.error('Failed to retry node:', err);
+        // Revert on error
+        set({ activeWorkflow: wf });
       }
     },
 
     generateWorkflow: async (query, routingMode, budget) => {
-      console.log('[STRUCTURED_LOG] START_GENERATE', { query, routingMode, budget });
-      const state = get();
-      if (state.isDemoMode) {
-        const localWf = get().generateLocalDemoWorkflow(query, routingMode, budget);
+      logger.info('Generating workflow:', { query, routingMode, budget });
+      set({ isLoading: true });
+      try {
+        const repos = getRepos(get().isDemoMode);
+        const wf = await repos.workflow.generateWorkflow(query, routingMode, budget);
         
-        localStorage.setItem(`orbit_workflow_metadata_${localWf.id}`, JSON.stringify({
-          query,
-          routingMode,
-          budget,
-          promptTokens: get().promptTokens,
-          completionTokens: get().completionTokens,
-          totalTokens: get().totalTokens,
-          estimatedCost: get().estimatedCost,
-          nodeTitles: localWf.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
-          agentSelectionReasons: localWf.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
-        }));
-        localStorage.setItem('orbit_last_workflow_id', localWf.id);
-
         if (typeof window !== 'undefined') {
-          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${localWf.id}`;
+          localStorage.setItem('orbit_last_workflow_id', wf.id);
+          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${wf.id}`;
           window.history.pushState({ path: newUrl }, '', newUrl);
         }
 
-        set({ activeWorkflow: localWf, userQuery: query, appState: 'draft', isWorkflowSaved: true, unsavedWorkflowTemplate: null });
-        console.log('[STRUCTURED_LOG] RENDER_WORKFLOW_SUCCESS (Local Demo)', { workflowId: localWf.id });
-        return;
-      }
-      const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
+        // Mock token statistics update
+        const pt = Math.floor(2000 + Math.random() * 4000);
+        const ct = Math.floor(1000 + Math.random() * 2000);
+        const cost = Math.round((pt * 0.00015 + ct * 0.0006) * 100) / 100;
 
-      if (!dbAgents || dbAgents.length === 0) {
-        throw new Error('Marketplace failure: No candidate agents found in registry');
-      }
-
-      let planRes;
-      const url = `${process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:10000" : window.location.origin) : "http://localhost:10000")}/api/v1/ai/plan`;
-
-      console.log("URL:", url);
-
-      try {
-          console.log("FETCH START");
-          console.log("fetch reference type:", typeof fetch);
-          console.log("fetch reference string:", String(fetch));
-
-          const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-            "x-execution-mode": state.isDemoMode ? "DEMO" : "LIVE"
-          };
-          if (state.token) {
-            headers["Authorization"] = `Bearer ${state.token}`;
-          }
-
-          const response = await fetch(url,{
-              method:"POST",
-              headers,
-              body:JSON.stringify({
-                  query,
-                  routingMode,
-                  budget
-              })
-          });
-
-          console.log("FETCH RETURNED");
-          console.log("STATUS:",response.status);
-
-          const text = await response.text();
-          console.log("RAW RESPONSE:",text);
-
-          planRes = JSON.parse(text);
-      }
-      catch(err){
-          console.error("===== REAL ERROR =====");
-          console.error(err);
-
-          if(err instanceof Error){
-              console.error("MESSAGE:", err.message);
-              console.error("STACK:", err.stack);
-              console.error("NAME:", err.name);
-          }
-          throw err;
-      }
-
-      if (!planRes || !planRes.success || !planRes.data) {
-        throw new Error(planRes?.message || 'AI Planner failed to generate DAG');
-      }
-
-      console.log('[STRUCTURED_LOG] PLAN_SUCCESS', { nodesCount: planRes.data.nodes?.length });
-
-      const promptTokens = planRes.data.prompt_tokens || 0;
-      const completionTokens = planRes.data.completion_tokens || 0;
-      const totalTokens = promptTokens + completionTokens;
-      const estCost = planRes.data.estimated_cost || 0;
-
-      set({
-        promptTokens,
-        completionTokens,
-        totalTokens,
-        estimatedCost: estCost
-      });
-
-      const assignedIds: string[] = [];
-      const nodeTitles: Record<string, string> = {};
-      const agentSelectionReasons: Record<string, string> = {};
-
-      let nodes: TaskNode[] = [];
-      try {
-        nodes = planRes.data.nodes.map((n: any, idx: number) => {
-          const cap = n.capability.toLowerCase();
-          const { agent, reason } = selectBestAgent(cap, assignedIds, dbAgents);
-
-          console.log("Matched Agent", agent);
-          console.log("Available Agents", dbAgents);
-          console.log("Planner Node", n);
-          console.log("Capability", n.capability);
-
-          const agentId = agent ? agent.id : 'no-agent';
-          const agentName = agent ? agent.name : 'No compatible agent found';
-          const agentPrice = agent ? agent.price : 0;
-          const agentLatency = agent ? agent.latency : 0;
-
-          if (agent) {
-            assignedIds.push(agent.id);
-          }
-
-          const nodeTitle = n.label || n.id.toUpperCase();
-          nodeTitles[n.id] = nodeTitle;
-          nodeTitles[idx] = nodeTitle;
-          agentSelectionReasons[n.id] = reason;
-          agentSelectionReasons[idx] = reason;
-
-          return {
-            id: n.id,
-            name: nodeTitle,
-            task: nodeTitle,
-            description: `Execute capability: ${cap}. Selected because: ${reason}`,
-            capability: cap,
-            costEstimate: agentPrice,
-            timeEstimate: agentLatency,
-            status: 'pending' as const,
-            assignedAgentId: agentId,
-            assignedAgent: agentName
-          };
+        set({
+          activeWorkflow: wf,
+          userQuery: query,
+          appState: 'draft',
+          isWorkflowSaved: true,
+          promptTokens: pt,
+          completionTokens: ct,
+          totalTokens: pt + ct,
+          estimatedCost: cost
         });
-      } catch (err: any) {
-        throw new Error(`Marketplace failure: ${err.message || err}`);
-      }
-
-      const edges = planRes.data.edges.map((e: any) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target
-      }));
-
-      const workflowTemplate = {
-        title: query.slice(0, 40) + '...',
-        userId: 'user-1',
-        estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
-        nodes: nodes.map((n, idx) => ({
-          id: n.id,
-          agentId: n.assignedAgentId,
-          capability: n.capability,
-          status: 'pending' as const,
-          positionX: 100 + idx * 180,
-          positionY: 200
-        })),
-        edges: edges.map((e: any) => ({
-          sourceNode: e.source,
-          targetNode: e.target
-        }))
-      };
-
-      let dbWorkflow: any = null;
-      let persistError: string | null = null;
-
-      try {
-        const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
-        if (wfCreate.success && wfCreate.data) {
-          dbWorkflow = wfCreate.data;
-          set({ isWorkflowSaved: true, unsavedWorkflowTemplate: null });
-          console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId: dbWorkflow.id });
-        } else {
-          persistError = wfCreate.message || 'Failed to create workflow template in database';
-        }
-      } catch (err: any) {
-        persistError = err.message || err;
-      }
-
-      if (persistError) {
-        console.warn('[STRUCTURED_LOG] SAVE_WORKFLOW_FAILED', { error: persistError });
-        set({ isWorkflowSaved: false, unsavedWorkflowTemplate: workflowTemplate });
-      }
-
-      const workflowId = dbWorkflow ? dbWorkflow.id : `temp-${Date.now()}`;
-      const createdAt = dbWorkflow ? dbWorkflow.createdAt : new Date().toISOString();
-
-      if (dbWorkflow) {
-        const nodeMapping = dbWorkflow.nodeMapping || {};
-        const uuidNodeTitles: Record<string, string> = {};
-        const uuidAgentReasons: Record<string, string> = {};
-        
-        Object.entries(nodeTitles).forEach(([key, val]) => {
-          const mappedKey = nodeMapping[key] || key;
-          uuidNodeTitles[mappedKey] = val;
-        });
-
-        Object.entries(agentSelectionReasons).forEach(([key, val]) => {
-          const mappedKey = nodeMapping[key] || key;
-          uuidAgentReasons[mappedKey] = val;
-        });
-
-        localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
-          query,
-          routingMode,
-          budget,
-          promptTokens,
-          completionTokens,
-          totalTokens,
-          estimatedCost: estCost,
-          nodeTitles: uuidNodeTitles,
-          agentSelectionReasons: uuidAgentReasons
-        }));
-        localStorage.setItem('orbit_last_workflow_id', workflowId);
-        
-        if (typeof window !== 'undefined') {
-          const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
-          window.history.pushState({ path: newUrl }, '', newUrl);
-        }
-      }
-
-      const workflow: Workflow = {
-        id: workflowId,
-        name: dbWorkflow ? dbWorkflow.title : workflowTemplate.title,
-        query,
-        nodes: dbWorkflow && dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
-          const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
-          const taskName = nodeTitles[n.id] || nodeTitles[String(idx)] || nodeTitles[idx] || `Stage: ${n.capability.toUpperCase()}`;
-          return {
-            id: n.id,
-            name: taskName,
-            task: taskName,
-            description: `Execute capability: ${n.capability}. Selected because: ${agentSelectionReasons[n.id] || agentSelectionReasons[String(idx)] || agentSelectionReasons[idx] || 'Optimal selection'}`,
-            capability: n.capability,
-            costEstimate: agent.price,
-            timeEstimate: agent.latency,
-            status: n.status,
-            assignedAgentId: n.agentId,
-            assignedAgent: n.agentId
-          };
-        }) : nodes.map(n => ({
-          ...n,
-          task: n.name,
-          assignedAgent: n.assignedAgentId
-        })),
-        edges: dbWorkflow && dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-          id: e.id,
-          source: e.sourceNode,
-          target: e.targetNode
-        })) : edges,
-        budget,
-        routingMode,
-        retryCount: 0,
-        status: 'pending' as const,
-        createdAt
-      };
-
-      set({ activeWorkflow: workflow, userQuery: query, appState: 'draft' });
-      console.log('[STRUCTURED_LOG] RENDER_WORKFLOW_SUCCESS', { workflowId });
-
-      if (persistError) {
-        throw new Error(`Workflow persistence failure: ${persistError}`);
-      }
-    },
-
-    saveWorkflow: async () => {
-      const state = get();
-      const template = state.unsavedWorkflowTemplate;
-      if (!template) return;
-
-      try {
-        const wfCreate = await apiClient.post<any>('/api/v1/workflows', template);
-        if (!wfCreate.success || !wfCreate.data) {
-          throw new Error(wfCreate.message || 'Failed to create workflow template in database');
-        }
-
-        const dbWorkflow = wfCreate.data;
-        const workflowId = dbWorkflow.id;
-        const active = state.activeWorkflow;
-        const nodeMapping = dbWorkflow.nodeMapping || {};
-
-        console.log('[STRUCTURED_LOG] SAVE_WORKFLOW_SUCCESS', { workflowId });
-
-        if (active) {
-          const updatedNodes = active.nodes.map((n: any, idx: number) => {
-            const dn = dbWorkflow.nodes ? dbWorkflow.nodes[idx] : null;
-            return {
-              ...n,
-              id: dn?.id || nodeMapping[n.id] || n.id
-            };
-          });
-
-          const updatedEdges = active.edges.map((e: any) => ({
-            ...e,
-            source: nodeMapping[e.source] || e.source,
-            target: nodeMapping[e.target] || e.target
-          }));
-
-          localStorage.setItem(`orbit_workflow_metadata_${workflowId}`, JSON.stringify({
-            query: active?.query || template.title,
-            routingMode: active?.routingMode || 'balanced',
-            budget: active?.budget || 2.0,
-            promptTokens: state.promptTokens,
-            completionTokens: state.completionTokens,
-            totalTokens: state.totalTokens,
-            estimatedCost: state.estimatedCost,
-            nodeTitles: updatedNodes.reduce((acc: Record<string, string>, n: any) => ({ ...acc, [n.id]: n.name }), {}) || {},
-            agentSelectionReasons: updatedNodes.reduce((acc: Record<string, string>, n: any) => ({ ...acc, [n.id]: n.description }), {}) || {}
-          }));
-          localStorage.setItem('orbit_last_workflow_id', workflowId);
-
-          if (typeof window !== 'undefined') {
-            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${workflowId}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-          }
-
-          const updated: Workflow = {
-            ...active,
-            id: workflowId,
-            nodes: updatedNodes,
-            edges: updatedEdges,
-            createdAt: dbWorkflow.createdAt
-          };
-          set({ activeWorkflow: updated, isWorkflowSaved: true, unsavedWorkflowTemplate: null, appState: 'draft' });
-        }
-      } catch (err: any) {
-        console.error('[STRUCTURED_LOG] SAVE_WORKFLOW_FAILED', { error: err.message });
-        throw new Error(`Workflow persistence failure: ${err.message}`);
-      }
-    },
-
-    generateLocalDemoWorkflow: (query, routingMode, budget) => {
-      const template = demoTemplates[Math.floor(Math.random() * demoTemplates.length)];
-      const shuffledRoles = [...demoRoles].sort(() => 0.5 - Math.random());
-      
-      const promptTokens = Math.floor(400 + Math.random() * 600);
-      const completionTokens = Math.floor(300 + Math.random() * 500);
-      const totalTokens = promptTokens + completionTokens;
-      const estimatedCost = Math.round((0.15 + Math.random() * 0.45) * 100) / 100;
-      
-      set({
-        promptTokens,
-        completionTokens,
-        totalTokens,
-        estimatedCost
-      });
-
-      const scaleX = 0.95 + Math.random() * 0.25;
-      const scaleY = 0.95 + Math.random() * 0.25;
-
-      const nodes: TaskNode[] = template.nodes.map((n, idx) => {
-        const role = shuffledRoles[idx % shuffledRoles.length];
-        const costEstimate = Math.round((0.02 + Math.random() * 0.88) * 100) / 100;
-        const timeEstimate = Math.floor(150 + Math.random() * 1650);
-        const trustScore = Math.floor(82 + Math.random() * 18);
-        
-        const jitterX = Math.floor(Math.random() * 60 - 30);
-        const jitterY = Math.floor(Math.random() * 50 - 25);
-
-        return {
-          id: n.id,
-          name: n.label,
-          task: n.label,
-          description: `Simulated execution of ${role.category} operations. Target capability: ${n.capability.toLowerCase()}. Selected because: ${trustScore}% trust success.`,
-          capability: role.skill,
-          costEstimate,
-          timeEstimate,
-          trustScore,
-          status: 'pending' as const,
-          assignedAgentId: `agent-${role.skill}-${Math.floor(Math.random() * 1000)}`,
-          assignedAgent: role.name,
-          positionX: Math.round(n.posX * scaleX) + jitterX,
-          positionY: Math.round(n.posY * scaleY) + jitterY
-        } as any;
-      });
-
-      const edges = template.edges.map((e, idx) => ({
-        id: `e-${idx}-${Date.now()}`,
-        source: e.source,
-        target: e.target
-      }));
-
-      let name = 'Agent Swarm Pipeline';
-      const q = query.toLowerCase();
-      if (q.includes('risk') || q.includes('finance') || q.includes('market')) {
-        name = 'Market Risk Analysis';
-      } else if (q.includes('audit') || q.includes('contract') || q.includes('vuln')) {
-        name = 'Smart Contract Audit';
-      } else if (q.includes('customer') || q.includes('segment') || q.includes('user')) {
-        name = 'Customer Segmentation';
-      } else if (q.includes('forecast') || q.includes('predict') || q.includes('sale')) {
-        name = 'Financial Forecast';
-      } else if (q.includes('medical') || q.includes('health') || q.includes('report')) {
-        name = 'Medical Report Review';
-      } else if (q.includes('product') || q.includes('launch') || q.includes('marketing')) {
-        name = 'Product Launch Plan';
-      } else if (q.includes('cyber') || q.includes('security') || q.includes('scan') || q.includes('sast')) {
-        name = 'Cybersecurity Assessment';
-      } else if (q.includes('hire') || q.includes('hiring') || q.includes('job') || q.includes('resume')) {
-        name = 'Hiring Workflow';
-      } else if (q.includes('invest') || q.includes('due diligence') || q.includes('deal')) {
-        name = 'Investment Due Diligence';
-      } else if (q.includes('document') || q.includes('verify') || q.includes('id') || q.includes('kyc')) {
-        name = 'Document Verification';
-      } else {
-        const capitalized = query.split(' ').slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-        name = capitalized ? `${capitalized} Workflow` : 'Agent Swarm Pipeline';
-      }
-
-      const workflow: Workflow = {
-        id: `demo-${Date.now()}`,
-        name,
-        query,
-        nodes: nodes.map(n => ({
-          ...n,
-          task: n.name,
-          assignedAgent: n.assignedAgentId
-        })),
-        edges,
-        budget,
-        routingMode: routingMode as any,
-        retryCount: 0,
-        status: 'pending' as const,
-        createdAt: new Date().toISOString()
-      };
-
-      localStorage.setItem(`orbit_workflow_data_${workflow.id}`, JSON.stringify(workflow));
-      return workflow;
-    },
-
-    runLocalDemoSimulation: async (workflow) => {
-      const runNode = async (nodeId: string) => {
-        set(state => {
-          if (!state.activeWorkflow) return {};
-          const updatedNodes = state.activeWorkflow.nodes.map(n => 
-            n.id === nodeId ? { ...n, status: 'running' as const } : n
-          );
-          const updatedWf = { ...state.activeWorkflow, nodes: updatedNodes };
-          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
-          return { activeWorkflow: updatedWf };
-        });
-
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('nexus_store_update'));
-        }
-
-        const currentWf = get().activeWorkflow;
-        const node = currentWf?.nodes.find(n => n.id === nodeId);
-        const agentName = node?.assignedAgent || 'Swarm Agent';
-        get().logExecution('execution', `Agent [${agentName}] started executing task: "${node?.name || nodeId}"...`);
-
-        const delay = Math.floor(300 + Math.random() * 900);
-        await new Promise(r => setTimeout(r, delay));
-
-        set(state => {
-          if (!state.activeWorkflow) return {};
-          const updatedNodes = state.activeWorkflow.nodes.map(n => 
-            n.id === nodeId ? { ...n, status: 'completed' as const } : n
-          );
-          const updatedWf = { ...state.activeWorkflow, nodes: updatedNodes };
-          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
-          return { activeWorkflow: updatedWf };
-        });
-
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('nexus_store_update'));
-        }
-
-        const updatedWf = get().activeWorkflow;
-        const compNode = updatedWf?.nodes.find(n => n.id === nodeId);
-        get().logExecution('execution', `Agent [${agentName}] completed task: "${node?.name || nodeId}" (Time: ${((compNode?.timeEstimate || 500) / 1000).toFixed(2)}s). Output generated.`, 'success');
-      };
-
-      try {
-        set(state => {
-          if (!state.activeWorkflow) return {};
-          const updatedWf = { ...state.activeWorkflow, status: 'running' as const };
-          localStorage.setItem(`orbit_workflow_data_${updatedWf.id}`, JSON.stringify(updatedWf));
-          return { activeWorkflow: updatedWf };
-        });
-
-        while (get().isRunning && get().activeWorkflow && get().activeWorkflow?.status === 'running') {
-          const wf = get().activeWorkflow!;
-          const pendingNodes = wf.nodes.filter(n => n.status === 'pending');
-          if (pendingNodes.length === 0) {
-            const runningNodes = wf.nodes.filter(n => n.status === 'running');
-            if (runningNodes.length === 0) {
-              break;
-            }
-            await new Promise(r => setTimeout(r, 100));
-            continue;
-          }
-
-          const readyNodeIds: string[] = [];
-          for (const node of pendingNodes) {
-            const incomingEdges = wf.edges.filter(e => e.target === node.id);
-            const allPredecessorsCompleted = incomingEdges.every(edge => {
-              const predNode = wf.nodes.find(n => n.id === edge.source);
-              return predNode && predNode.status === 'completed';
-            });
-            if (allPredecessorsCompleted) {
-              readyNodeIds.push(node.id);
-            }
-          }
-
-          if (readyNodeIds.length > 0) {
-            await Promise.all(readyNodeIds.map(nodeId => runNode(nodeId)));
-          } else {
-            await new Promise(r => setTimeout(r, 100));
-          }
-        }
-
-        const finalWf = get().activeWorkflow;
-        if (finalWf && finalWf.nodes.every(n => n.status === 'completed')) {
-          const totalCost = finalWf.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
-
-          set(state => {
-            const escrowReleaseTx: Transaction = {
-              id: `tx-settle-${Date.now()}`,
-              senderAddress: 'ESCROW_VAULT',
-              receiverAddress: state.demoWalletAddress || '0xDemoWalletAddress789c',
-              amount: totalCost,
-              type: 'escrow_release',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              txHash: '0x' + Math.random().toString(16).substring(2, 42)
-            };
-
-            const newDemoEscrow = Math.max(0, state.demoEscrow - totalCost);
-            const newDemoHistory = [escrowReleaseTx, ...state.demoHistory];
-            
-            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
-            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-            const updatedDemoWallet = {
-              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-              balance: state.demoBalance,
-              escrowBalance: newDemoEscrow,
-              history: newDemoHistory
-            };
-
-            const updatedAgentWallets = { ...state.agentWallets };
-            finalWf.nodes.forEach(node => {
-              if (node.assignedAgentId) {
-                const currentWallet = updatedAgentWallets[node.assignedAgentId] || {
-                  address: '0x' + Math.random().toString(16).substring(2, 42),
-                  balance: 0,
-                  escrowBalance: 0,
-                  history: []
-                };
-                const agentTx: Transaction = {
-                  id: `tx-agent-payout-${Date.now()}-${node.id}`,
-                  senderAddress: 'ESCROW_VAULT',
-                  receiverAddress: currentWallet.address,
-                  amount: node.costEstimate,
-                  type: 'deposit',
-                  timestamp: new Date().toISOString(),
-                  status: 'completed',
-                  txHash: '0x' + Math.random().toString(16).substring(2, 42)
-                };
-                updatedAgentWallets[node.assignedAgentId] = {
-                  ...currentWallet,
-                  balance: currentWallet.balance + node.costEstimate,
-                  history: [agentTx, ...currentWallet.history]
-                };
-              }
-            });
-
-            const completedWf: Workflow = {
-              ...finalWf,
-              status: 'completed' as const
-            };
-            localStorage.setItem(`orbit_workflow_data_${completedWf.id}`, JSON.stringify(completedWf));
-
-            return {
-              demoEscrow: newDemoEscrow,
-              demoHistory: newDemoHistory,
-              demoTransactions: newDemoHistory,
-              demoWallet: updatedDemoWallet,
-              userWallet: updatedDemoWallet,
-              agentWallets: updatedAgentWallets,
-              activeWorkflow: completedWf,
-              isRunning: false,
-              currentPhaseIndex: 9,
-              appState: 'completed'
-            };
-          });
-
-          get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
-          
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('nexus_store_update'));
-            window.dispatchEvent(new CustomEvent('nexus_demo_workflow_completed', { detail: { workflowId: finalWf.id } }));
-          }
-        }
-      } catch (err: any) {
-        console.error('Error during demo local execution simulation:', err);
-        set({ isRunning: false });
+      } catch (err) {
+        const friendly = errorHandler.getFriendlyMessage(err);
+        logger.error('Failed to generate workflow template:', friendly);
+        throw new Error(friendly);
+      } finally {
+        set({ isLoading: false });
       }
     },
 
     startExecution: async (query, routingMode, budget) => {
-      const state = get();
-      if (state.isRunning) return;
-
-      set({ isRunning: true, userQuery: query, currentPhaseIndex: 1, executionLogs: [], appState: 'running' });
-
-      const log = (phase: ExecutionLog['phase'], message: string, type: ExecutionLog['type'] = 'info', metadata?: any) => {
-        get().logExecution(phase, message, type, metadata);
-      };
-
+      logger.info('Starting workflow execution...');
+      set({ isLoading: true });
       try {
-        if (state.isDemoMode) {
-          log('intent', `LLM processing intent for: "${query}"`);
-          set({ currentPhaseIndex: 1 });
-          await new Promise(r => setTimeout(r, 450));
-          log('intent', `Detected intent capabilities.`, 'success');
-
-          set({ currentPhaseIndex: 2 });
-          log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
-          await new Promise(r => setTimeout(r, 450));
-
-          let workflow = state.activeWorkflow;
-          if (!workflow || workflow.query !== query) {
-            workflow = get().generateLocalDemoWorkflow(query, routingMode, budget);
-          }
-
-          workflow = {
-            ...workflow,
-            status: 'running' as const,
-            nodes: workflow.nodes.map(n => ({ ...n, status: 'pending' as const }))
-          };
-
-          localStorage.setItem(`orbit_workflow_data_${workflow.id}`, JSON.stringify(workflow));
-          localStorage.setItem(`orbit_workflow_metadata_${workflow.id}`, JSON.stringify({
-            query,
-            routingMode,
-            budget,
-            promptTokens: get().promptTokens,
-            completionTokens: get().completionTokens,
-            totalTokens: get().totalTokens,
-            estimatedCost: get().estimatedCost,
-            nodeTitles: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
-            agentSelectionReasons: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
-          }));
-          localStorage.setItem('orbit_last_workflow_id', workflow.id);
-
-          set({ activeWorkflow: workflow, appState: 'running' });
-          log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
-
-          set({ currentPhaseIndex: 3 });
-          log('discovery', 'Querying live agent registry database for skill set matching...');
-          await new Promise(r => setTimeout(r, 500));
-          log('discovery', `Identified matching capabilities.`, 'success');
-
-          set({ currentPhaseIndex: 4 });
-          log('evaluation', 'Evaluating agent endpoints, reliability SLA metrics, and bids...');
-          await new Promise(r => setTimeout(r, 500));
-          log('evaluation', 'Agent evaluation complete.', 'success');
-
-          set({ currentPhaseIndex: 5 });
-          log('negotiation', 'Negotiating execution fees and SLA guarantees...');
-          await new Promise(r => setTimeout(r, 500));
-          const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
-          log('negotiation', `Agreements finalized. Cumulative fee locked: ${totalCost.toFixed(2)} USDC`, 'success');
-
-          set({ currentPhaseIndex: 6 });
-          log('payment', 'Demo Mode - Escrow hold bypassed (No funds required)', 'success');
-          await new Promise(r => setTimeout(r, 450));
-
-          set(state => {
-            const escrowTx: Transaction = {
-              id: `tx-escrow-${Date.now()}`,
-              senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
-              receiverAddress: 'ESCROW_VAULT',
-              amount: totalCost,
-              type: 'escrow_hold',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              txHash: '0x' + Math.random().toString(16).substring(2, 42)
-            };
-            const newDemoBalance = Math.max(0, state.demoBalance - totalCost);
-            const newDemoEscrow = state.demoEscrow + totalCost;
-            const newDemoHistory = [escrowTx, ...state.demoHistory];
-            
-            localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
-            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
-            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-            const updatedDemoWallet = {
-              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-              balance: newDemoBalance,
-              escrowBalance: newDemoEscrow,
-              history: newDemoHistory
-            };
-
-            return {
-              demoBalance: newDemoBalance,
-              demoEscrow: newDemoEscrow,
-              demoHistory: newDemoHistory,
-              demoTransactions: newDemoHistory,
-              demoWallet: updatedDemoWallet,
-              userWallet: updatedDemoWallet
-            };
-          });
-
-          set({ currentPhaseIndex: 7 });
-          log('execution', 'Running simulated workflow...');
-          
-          get().runLocalDemoSimulation(workflow);
-          return;
-        }
-
-        let workflow = state.activeWorkflow;
-        const dbAgents = state.agents.length > 0 ? state.agents : seedAgents;
+        const repos = getRepos(get().isDemoMode);
         
-        if (!workflow || workflow.query !== query) {
-          // --- PHASE 1: Intent Detection (LLM Call via API Gateway) ---
-          log('intent', `LLM processing intent for: "${query}"`);
-          set({ currentPhaseIndex: 1 });
-          
-          const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
-            query,
-            routingMode,
-            budget
-          });
-          
-          if (!planRes.success || !planRes.data) {
-            throw new Error(planRes.message || 'AI Planner failed to generate DAG');
-          }
-          
-          const promptTokens = planRes.data.prompt_tokens || 0;
-          const completionTokens = planRes.data.completion_tokens || 0;
-          const totalTokens = promptTokens + completionTokens;
-          const estCost = planRes.data.estimated_cost || 0;
-          
-          set({
-            promptTokens,
-            completionTokens,
-            totalTokens,
-            estimatedCost: estCost
-          });
-          
-          const intentList = planRes.data.nodes.map((n: any) => n.capability).join(', ');
-          log('intent', `Detected intent capabilities: [${intentList}]`, 'success');
-
-          // --- PHASE 2: Workflow Planner (DAG Compilation & DB Save) ---
-          set({ currentPhaseIndex: 2 });
-          log('dag', 'Generating Directed Acyclic Graph (DAG) task plan...');
-          
-          const nodes: TaskNode[] = planRes.data.nodes.map((n: any) => {
-            const cap = n.capability.toLowerCase();
-            const matchedAgent = dbAgents.find(a => a.skills.some(s => s.toLowerCase().includes(cap)) || a.category.toLowerCase().includes(cap)) || dbAgents[0];
-
-            console.log("Matched Agent", matchedAgent);
-            console.log("Available Agents", dbAgents);
-            console.log("Planner Node", n);
-            console.log("Capability", n.capability);
-
-            const agentId = matchedAgent ? matchedAgent.id : 'no-agent';
-            const agentName = matchedAgent ? matchedAgent.name : 'No compatible agent found';
-            const agentPrice = matchedAgent ? matchedAgent.price : 0;
-            const agentLatency = matchedAgent ? matchedAgent.latency : 0;
-
-            const nodeTitle = n.label || n.id.toUpperCase();
-            return {
-              id: n.id,
-              name: nodeTitle,
-              task: nodeTitle,
-              description: `Execute capability: ${cap}`,
-              capability: cap,
-              costEstimate: agentPrice,
-              timeEstimate: agentLatency,
-              status: 'pending',
-              assignedAgentId: agentId,
-              assignedAgent: agentName
-            };
-          });
-
-          const edges = planRes.data.edges.map((e: any) => ({
-            id: e.id,
-            source: e.source,
-            target: e.target
-          }));
-
-          const workflowTemplate = {
-            title: query.slice(0, 40) + '...',
-            userId: 'user-1',
-            estimatedCost: nodes.reduce((sum, n) => sum + n.costEstimate, 0),
-            nodes: nodes.map((n, idx) => ({
-              id: n.id,
-              agentId: n.assignedAgentId,
-              capability: n.capability,
-              status: 'pending',
-              positionX: 100 + idx * 180,
-              positionY: 200
-            })),
-            edges: edges.map((e: any) => ({
-              sourceNode: e.source,
-              targetNode: e.target
-            }))
-          };
-
-          log('dag', 'Persisting structural workflow DAG template in PostgreSQL database...', 'info');
-          const wfCreate = await apiClient.post<any>('/api/v1/workflows', workflowTemplate);
-          if (!wfCreate.success || !wfCreate.data) {
-            throw new Error('Failed to create workflow template in database');
-          }
-
-          const dbWorkflow = wfCreate.data;
-          const nodeMapping = dbWorkflow.nodeMapping || {};
-
-          workflow = {
-            id: dbWorkflow.id,
-            name: dbWorkflow.title,
-            query,
-            nodes: nodes.map((n: any) => ({
-              ...n,
-              id: nodeMapping[n.id] || n.id
-            })),
-            edges: edges.map((e: any) => ({
-              ...e,
-              source: nodeMapping[e.source] || e.source,
-              target: nodeMapping[e.target] || e.target
-            })),
-            budget,
-            routingMode,
-            retryCount: 0,
-            status: dbWorkflow.status,
-            createdAt: dbWorkflow.createdAt
-          };
-
-          localStorage.setItem(`orbit_workflow_metadata_${dbWorkflow.id}`, JSON.stringify({
-            query,
-            routingMode,
-            budget,
-            promptTokens: state.promptTokens,
-            completionTokens: state.completionTokens,
-            totalTokens: state.totalTokens,
-            estimatedCost: state.estimatedCost,
-            nodeTitles: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.name }), {}) || {},
-            agentSelectionReasons: workflow.nodes.reduce((acc, n) => ({ ...acc, [n.id]: n.description }), {}) || {}
-          }));
-          localStorage.setItem('orbit_last_workflow_id', dbWorkflow.id);
-
-          logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
-          set({ activeWorkflow: workflow, appState: 'running' });
-          log('dag', `DAG layout registered in PostgreSQL. Template ID: ${workflow.id}`, 'success');
-        } else {
-          // Pre-generated workflow is active in builder: transition it to running
-          workflow = {
-            ...workflow,
-            status: computeWorkflowStatus(workflow.nodes)
-          };
-          logWorkflowStatusChange(workflow.id, workflow.status, workflow.nodes);
-          set({ activeWorkflow: workflow, appState: 'running' });
-          log('intent', `Executing pre-generated workflow: "${workflow.name}"`, 'success');
+        let wf = get().activeWorkflow;
+        if (!wf) {
+          wf = await repos.workflow.generateWorkflow(query, routingMode, budget);
+          set({ activeWorkflow: wf, userQuery: query });
         }
 
-        const intentList = workflow.nodes.map((n: any) => n.capability).join(', ');
-
-        // --- PHASE 3: Discovery & Evaluation ---
-        set({ currentPhaseIndex: 3 });
-        log('discovery', 'Querying live agent registry database for skill set matching...');
-        await new Promise(r => setTimeout(r, 600));
-        log('discovery', `Identified matching capabilities for [${intentList}].`, 'success');
-
-        set({ currentPhaseIndex: 4 });
-        log('evaluation', 'Evaluating agent endpoints, reliability SLA metrics, and bids...');
-        await new Promise(r => setTimeout(r, 600));
-        log('evaluation', 'Agent evaluation complete.', 'success');
-
-        // --- PHASE 5: Negotiation ---
-        set({ currentPhaseIndex: 5 });
-        log('negotiation', 'Negotiating execution fees and SLA guarantees...');
-        await new Promise(r => setTimeout(r, 600));
-        const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
-        log('negotiation', `Agreements finalized. Cumulative fee locked: ${totalCost.toFixed(2)} USDC`, 'success');
-
-        // --- PHASE 6: Payment (SLA Escrow Hold) ---
-        set({ currentPhaseIndex: 6 });
-        if (!state.isDemoMode) {
-          log('payment', `Locking SLA execution budget escrow of ${totalCost.toFixed(2)} USDC...`);
-          await new Promise(r => setTimeout(r, 600));
-          
-          if (get().userWallet.balance < totalCost) {
-            log('payment', 'SLA Escrow holding failed: Insufficient funds in User Wallet! Aborting run.', 'error');
-            set({ isRunning: false, currentPhaseIndex: 0 });
-            return;
-          }
-
-          set(state => {
-            const escrowTx: Transaction = {
-              id: `tx-escrow-${Date.now()}`,
-              senderAddress: state.userWallet.address,
-              receiverAddress: 'ESCROW_VAULT',
-              amount: totalCost,
-              type: 'escrow_hold',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              txHash: '0x' + Math.random().toString(16).substring(2, 42)
-            };
-            const updatedLiveWallet = {
-              ...state.liveWallet,
-              balance: state.liveWallet.balance - totalCost,
-              escrowBalance: state.liveWallet.escrowBalance + totalCost,
-              history: [escrowTx, ...state.liveWallet.history]
-            };
-            return {
-              liveBalance: updatedLiveWallet.balance,
-              liveEscrow: updatedLiveWallet.escrowBalance,
-              liveHistory: updatedLiveWallet.history,
-              liveTransactions: updatedLiveWallet.history,
-              liveWallet: updatedLiveWallet,
-              userWallet: updatedLiveWallet
-            };
-          });
-          log('payment', 'Budget reserved in database escrow vault record.', 'success');
-        } else {
-          log('payment', 'Demo Mode - Escrow hold bypassed (No funds required)', 'success');
-          await new Promise(r => setTimeout(r, 400));
-
-          set(state => {
-            const escrowTx: Transaction = {
-              id: `tx-escrow-${Date.now()}`,
-              senderAddress: state.userWallet.address || '0xDemoWalletAddress789c',
-              receiverAddress: 'ESCROW_VAULT',
-              amount: totalCost,
-              type: 'escrow_hold',
-              timestamp: new Date().toISOString(),
-              status: 'completed',
-              txHash: '0x' + Math.random().toString(16).substring(2, 42)
-            };
-            const newDemoBalance = Math.max(0, state.demoBalance - totalCost);
-            const newDemoEscrow = state.demoEscrow + totalCost;
-            const newDemoHistory = [escrowTx, ...state.demoHistory];
-            
-            localStorage.setItem('orbit_demo_balance', String(newDemoBalance));
-            localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
-            localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-            const updatedDemoWallet = {
-              address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-              balance: newDemoBalance,
-              escrowBalance: newDemoEscrow,
-              history: newDemoHistory
-            };
-
-            return {
-              demoBalance: newDemoBalance,
-              demoEscrow: newDemoEscrow,
-              demoHistory: newDemoHistory,
-              demoTransactions: newDemoHistory,
-              demoWallet: updatedDemoWallet,
-              userWallet: updatedDemoWallet
-            };
-          });
-        }
-
-        // --- PHASE 7: Run Swarm & Poll logs ---
-        set({ currentPhaseIndex: 7 });
-        if (state.isDemoMode) {
-          log('execution', 'Running simulated workflow...');
-        } else {
-          log('execution', 'Triggering backend execution pipeline...');
-        }
-        
-        const runRes = await apiClient.post<any>(`/api/v1/workflows/${workflow.id}/run`, {});
+        const runRes = await repos.workflow.runWorkflow(wf.id);
         if (!runRes.success) {
-          throw new Error('Backend workflow engine failed to start execution run');
+          throw new Error(runRes.message || 'Execution failed to launch');
         }
 
-        await get().pollActiveWorkflowStatus(workflow);
-      } catch (err: any) {
-        log('execution', `Workflow run failed: ${err.message || err}`, 'error');
-        const latestNodes = get().activeWorkflow?.nodes || [];
-        const hasFailedNode = latestNodes.some(n => n.status === 'failed');
-        const computedStatus = hasFailedNode ? 'failed' : computeWorkflowStatus(latestNodes);
-        
-        if (get().activeWorkflow) {
-          logWorkflowStatusChange(get().activeWorkflow!.id, computedStatus, latestNodes);
-          set(state => ({
-            activeWorkflow: state.activeWorkflow ? { 
-              ...state.activeWorkflow, 
-              status: computedStatus 
-            } : null,
-            isRunning: false,
-            currentPhaseIndex: 0
-          }));
-        } else {
-          set({ isRunning: false, currentPhaseIndex: 0 });
+        set({ isRunning: true, appState: 'running' });
+
+        if (!get().isDemoMode) {
+          get().pollActiveWorkflowStatus(wf);
         }
+      } catch (err) {
+        const friendly = errorHandler.getFriendlyMessage(err);
+        logger.error('Execution failure:', friendly);
+        throw new Error(friendly);
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    cancelWorkflow: async () => {
+      const wf = get().activeWorkflow;
+      if (!wf) return;
+      try {
+        const repos = getRepos(get().isDemoMode);
+        await repos.workflow.cancelWorkflow(wf.id);
+        set({ isRunning: false });
+      } catch (err) {
+        logger.error('Cancel workflow failed:', err);
+      }
+    },
+
+    registerAgent: async (agent) => {
+      set({ isLoading: true });
+      try {
+        const repos = getRepos(get().isDemoMode);
+        await repos.agents.registerAgentCap('new-agent', agent);
+        await get().initialize();
+      } catch (err) {
+        logger.error('Register agent failed:', err);
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    depositUserWallet: async (amount) => {
+      try {
+        const repos = getRepos(get().isDemoMode);
+        const res = await repos.wallet.deposit(amount);
+        await get().initialize();
+        return res;
+      } catch (err) {
+        logger.error('Wallet deposit error:', err);
+        return { success: false, message: 'Deposit failed' };
+      }
+    },
+
+    withdrawUserWallet: async (amount) => {
+      try {
+        const repos = getRepos(get().isDemoMode);
+        await repos.wallet.withdraw(amount);
+        await get().initialize();
+      } catch (err) {
+        logger.error('Wallet withdrawal error:', err);
+      }
+    },
+
+    settleUserWallet: async () => {
+      try {
+        const res = await apiClient.post<any>('/api/v1/wallet/settlement', {});
+        await get().initialize();
+        return res;
+      } catch (err) {
+        logger.error('Wallet settlement error:', err);
+        return { success: false, message: 'Settlement failed' };
       }
     },
 
     initialize: async () => {
-      // Rehydrate auth from useAuthStore
+      logger.info('Initializing application data state...');
+      
       if (typeof window !== 'undefined') {
         if (!(window as any)._hasSessionExpiredListener) {
           (window as any)._hasSessionExpiredListener = true;
@@ -2030,166 +474,37 @@ export const useNexusStore = create<NexusState>((set, get) => {
         useAuthStore.getState().initializeAuth();
       }
 
+      const isDemo = get().isDemoMode;
+      const repos = getRepos(isDemo);
+
       try {
-        // 1. Fetch agents list first (needed in both modes)
-        try {
-          const data = await apiService.getAgentsList() as any;
-          if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-            set({ agents: data.data });
-          }
-        } catch (e) {
-          console.error('Failed to load agents list:', e);
-        }
+        // Load agents registry
+        const list = await repos.agents.getAgents();
+        set({ agents: list });
 
-      // 2. Mode-Aware Wallet Loading
-      if (get().isDemoMode) {
-        // Load demo wallet state from localStorage or memory
-        const savedDemoBalance = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_balance') : null;
-        const savedDemoEscrow = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_escrow') : null;
-        const savedDemoHistory = typeof window !== 'undefined' ? localStorage.getItem('orbit_demo_history') : null;
-
-        const demoBalance = savedDemoBalance !== null ? Number(savedDemoBalance) : 100.0;
-        const demoEscrow = savedDemoEscrow !== null ? Number(savedDemoEscrow) : 0.0;
-        const demoHistory = savedDemoHistory ? JSON.parse(savedDemoHistory) : [];
-        const demoWalletAddress = '0xDemoWalletAddress789c';
-
-        const demoWalletObj = {
-          address: demoWalletAddress,
-          balance: demoBalance,
-          escrowBalance: demoEscrow,
-          history: demoHistory
-        };
-
-        set({
-          demoBalance,
-          demoEscrow,
-          demoHistory,
-          demoTransactions: demoHistory,
-          demoWalletAddress,
-          demoWallet: demoWalletObj,
-          userWallet: demoWalletObj,
-          // Clear live state in store memory to ensure complete isolation
-          liveBalance: 0.0,
-          liveEscrow: 0.0,
-          liveHistory: [],
-          liveTransactions: [],
-          liveWalletAddress: '0x0000000000000000000000000000000000000000',
-          liveWallet: {
-            address: '0x0000000000000000000000000000000000000000',
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
-          }
-        });
-      } else {
-        // Live Mode
-        // Clear demo state in store memory to ensure complete isolation
-        set({
-          demoBalance: 0.0,
-          demoEscrow: 0.0,
-          demoHistory: [],
-          demoTransactions: [],
-          demoWalletAddress: '0xDemoWalletAddress789c',
-          demoWallet: {
-            address: '0xDemoWalletAddress789c',
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
-          }
-        });
-
-        if (!get().token) {
-          const emptyLiveWallet = {
-            address: '0x0000000000000000000000000000000000000000',
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
-          };
+        // Load mode-specific wallet metrics
+        const wallet = await repos.wallet.getBalance();
+        if (isDemo) {
           set({
-            liveBalance: 0.0,
-            liveEscrow: 0.0,
-            liveHistory: [],
-            liveTransactions: [],
-            liveWalletAddress: '0x0000000000000000000000000000000000000000',
-            liveWallet: emptyLiveWallet,
-            userWallet: emptyLiveWallet
+            demoBalance: wallet.balance,
+            demoEscrow: wallet.escrowBalance,
+            demoHistory: wallet.history || [],
+            demoTransactions: wallet.history || [],
+            demoWallet: wallet,
+            userWallet: wallet
           });
         } else {
-          try {
-            const walletRes = await apiClient.get<any>('/api/v1/wallet');
-            const balanceRes = await apiClient.get<any>('/api/v1/wallet/balance');
-            const txsRes = await apiClient.get<any>('/api/v1/wallet/transactions');
-
-            if (walletRes?.success && walletRes.data) {
-              const balanceData = balanceRes?.success && balanceRes.data ? balanceRes.data : { available: 0.0, reserved: 0.0 };
-              const txsList = txsRes?.success && Array.isArray(txsRes.data) ? txsRes.data.map((tx: any) => ({
-                id: tx.id,
-                senderAddress: tx.senderAddress || walletRes.data.address,
-                receiverAddress: tx.receiverAddress || tx.reference || 'EXTERNAL',
-                amount: Number(tx.amount),
-                type: tx.type === 'deposit' ? 'deposit' : tx.type === 'withdraw' ? 'withdrawal' : tx.type === 'escrow_hold' ? 'escrow_hold' : 'escrow_release',
-                timestamp: tx.createdAt,
-                status: tx.status === 'completed' ? 'completed' : 'pending',
-                txHash: tx.txHash || '0x' + Math.random().toString(16).substring(2, 42)
-              })) : [];
-
-              const liveBal = Number(balanceData.available);
-              const liveEsc = Number(balanceData.reserved);
-              const liveAddr = walletRes.data.address;
-
-              const liveWalletObj = {
-                address: liveAddr,
-                balance: liveBal,
-                escrowBalance: liveEsc,
-                history: txsList
-              };
-
-              set({
-                liveBalance: liveBal,
-                liveEscrow: liveEsc,
-                liveHistory: txsList,
-                liveTransactions: txsList,
-                liveWalletAddress: liveAddr,
-                liveWallet: liveWalletObj,
-                userWallet: liveWalletObj
-              });
-            }
-          } catch (e) {
-            console.error('Failed to load live wallet from backend:', e);
-          }
-        }
-      }
-
-        console.log('[APP_BOOT] Booting Orbit Autonomous Agent OS...');
-        console.log('[BOOT] Initializing Workflow Builder startup lifecycle...');
-
-        const clearWorkflowSession = (id?: string) => {
-          console.log('[CLEAR_WORKFLOW] Clearing active workflow and resetting URL search params.');
           set({
-            activeWorkflow: null,
-            isRunning: false,
-            currentPhaseIndex: 0,
-            executionLogs: [],
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0,
-            estimatedCost: 0,
-            appState: 'planning'
+            liveBalance: wallet.balance,
+            liveEscrow: wallet.escrowBalance,
+            liveHistory: wallet.history || [],
+            liveTransactions: wallet.history || [],
+            liveWallet: wallet,
+            userWallet: wallet
           });
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('orbit_last_workflow_id');
-            if (id) {
-              localStorage.removeItem(`orbit_workflow_metadata_${id}`);
-            }
-            const params = new URLSearchParams(window.location.search);
-            params.delete('workflowId');
-            const searchStr = params.toString();
-            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-          }
-        };
+        }
 
-        // Reconstruct workflow if ID is in URL
+        // Restore active workflow session if URL parameter present
         let workflowId = '';
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
@@ -2197,225 +512,43 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
 
         if (workflowId) {
-          console.log('[WORKFLOW_RESTORE] Attempting to restore workflow ID: ' + workflowId);
-          try {
-            if (workflowId.startsWith('demo-')) {
-              const storedWf = localStorage.getItem(`orbit_workflow_data_${workflowId}`);
-              const storedMeta = localStorage.getItem(`orbit_workflow_metadata_${workflowId}`);
-              if (storedWf) {
-                const workflow = JSON.parse(storedWf);
-                const isRunning = workflow.status === 'running';
-                const isTerminal = workflow.status === 'completed' || workflow.status === 'failed' || (workflow.status as any) === 'cancelled';
-                
-                let meta = {
-                  query: workflow.name,
-                  routingMode: 'balanced',
-                  budget: workflow.budget || 2.0,
-                  promptTokens: 0,
-                  completionTokens: 0,
-                  totalTokens: 0,
-                  estimatedCost: workflow.estimatedCost || 0
-                };
-                if (storedMeta) {
-                  meta = { ...meta, ...JSON.parse(storedMeta) };
-                }
+          const activeWf = await repos.workflow.getWorkflow(workflowId);
+          if (activeWf) {
+            const isRunning = activeWf.status === 'running';
+            const isTerminal = activeWf.status === 'completed' || activeWf.status === 'failed';
+            
+            set({
+              activeWorkflow: activeWf,
+              isRunning,
+              appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft'),
+              currentPhaseIndex: isRunning ? 7 : (activeWf.status === 'completed' ? 9 : 0)
+            });
 
-                set({
-                  activeWorkflow: workflow,
-                  isRunning,
-                  currentPhaseIndex: isRunning ? 7 : (workflow.status === 'completed' ? 9 : 0),
-                  userQuery: meta.query,
-                  promptTokens: meta.promptTokens,
-                  completionTokens: meta.completionTokens,
-                  totalTokens: meta.totalTokens,
-                  estimatedCost: meta.estimatedCost,
-                  appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft')
-                });
-
-                if (isRunning) {
-                  get().runLocalDemoSimulation(workflow);
-                }
-                return;
-              }
+            if (isDemo && isRunning) {
+              repos.workflow.runWorkflow(activeWf.id);
+            } else if (!isDemo && (isRunning || activeWf.status === 'pending')) {
+              get().pollActiveWorkflowStatus(activeWf);
             }
-
-            const wfRes = await apiClient.get<any>(`/api/v1/workflows/${workflowId}`);
-            if (wfRes?.success && wfRes.data) {
-              const dbWorkflow = wfRes.data;
-              const dbAgents = get().agents.length > 0 ? get().agents : seedAgents;
-
-              let meta = {
-                query: dbWorkflow.title,
-                routingMode: 'balanced',
-                budget: Number(dbWorkflow.estimatedCost),
-                promptTokens: 0,
-                completionTokens: 0,
-                totalTokens: 0,
-                estimatedCost: Number(dbWorkflow.estimatedCost),
-                nodeTitles: {} as Record<string, string>,
-                agentSelectionReasons: {} as Record<string, string>
-              };
-              const storedMeta = localStorage.getItem(`orbit_workflow_metadata_${workflowId}`);
-              if (storedMeta) {
-                meta = { ...meta, ...JSON.parse(storedMeta) };
-              }
-
-              const workflow: Workflow = {
-                id: dbWorkflow.id,
-                name: dbWorkflow.title,
-                query: meta.query,
-                nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any, idx: number) => {
-                  const agent = dbAgents.find(a => a.id === n.agentId) || dbAgents[0];
-
-                  console.log("Matched Agent", agent);
-                  console.log("Available Agents", dbAgents);
-                  console.log("Planner Node", n);
-                  console.log("Capability", n.capability);
-
-                  const agentPrice = agent ? agent.price : 0;
-                  const agentLatency = agent ? agent.latency : 0;
-                  const agentName = agent ? agent.name : (n.agentId || 'No compatible agent found');
-
-                  const taskName = meta.nodeTitles?.[n.id] || meta.nodeTitles?.[String(idx)] || meta.nodeTitles?.[idx] || `Stage: ${n.capability.toUpperCase()}`;
-                  return {
-                    id: n.id,
-                    name: taskName,
-                    task: taskName,
-                    description: `Execute capability: ${n.capability}. Selected because: ${meta.agentSelectionReasons?.[n.id] || meta.agentSelectionReasons?.[String(idx)] || meta.agentSelectionReasons?.[idx] || 'Optimal selection'}`,
-                    capability: n.capability,
-                    costEstimate: agentPrice,
-                    timeEstimate: agentLatency,
-                    status: n.status,
-                    assignedAgentId: n.agentId,
-                    assignedAgent: agentName
-                  };
-                }) : [],
-                edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-                  id: e.id,
-                  source: e.sourceNode,
-                  target: e.targetNode
-                })) : [],
-                budget: Number(meta.budget),
-                routingMode: meta.routingMode as any,
-                retryCount: 0,
-                status: dbWorkflow.status,
-                createdAt: dbWorkflow.createdAt
-              };
-
-              console.log('[RESTORE] Successfully restored active workflow ID: ' + workflow.id + ' (Status: ' + workflow.status + ')');
-              console.log('[WORKFLOW_STATUS] Workflow ID: ' + workflow.id + ' | Status: ' + workflow.status.toUpperCase());
-
-              const isRunning = workflow.status === 'running';
-              const isPending = workflow.status === 'pending';
-              const isTerminal = workflow.status === 'completed' || workflow.status === 'failed' || (workflow.status as any) === 'cancelled';
-              if (isRunning) {
-                console.log('[WORKFLOW_RUNNING] Workflow ID: ' + workflow.id + ' is active/running.');
-              }
-              set({
-                activeWorkflow: workflow,
-                isRunning,
-                currentPhaseIndex: isRunning ? 7 : (workflow.status === 'completed' ? 9 : 0),
-                userQuery: meta.query,
-                promptTokens: meta.promptTokens,
-                completionTokens: meta.completionTokens,
-                totalTokens: meta.totalTokens,
-                estimatedCost: meta.estimatedCost,
-                appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft')
-              });
-
-              if (isRunning || isPending) {
-                console.log('[POLL] Starting status polling for workflow ID: ' + workflow.id);
-                get().pollActiveWorkflowStatus(workflow);
-              }
-            } else {
-              console.log('[CLEAR_WORKFLOW] Invalid or stale workflowId: ' + workflowId + '.');
-              console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + workflowId + ' (Reason: Invalid/stale workflow ID)');
-              clearWorkflowSession(workflowId);
-            }
-          } catch (wfErr) {
-            console.warn('Failed to restore active workflow session', wfErr);
-            console.log('[CLEAR_WORKFLOW] Exception occurred while fetching workflow: ' + workflowId + '. Clearing session.');
-            console.log('[STOP_POLLING] Stopped polling for workflow ID: ' + workflowId + ' (Reason: Exception during restore)');
-            clearWorkflowSession(workflowId);
           }
         }
       } catch (err) {
-        console.warn('API Gateway offline or unauthenticated.', err);
-        if (get().isDemoMode) {
-          const initialAgentWallets: Record<string, WalletState> = {};
-          seedAgents.forEach(agent => {
-            initialAgentWallets[agent.id] = {
-              address: agent.walletAddress,
-              balance: 15.0,
-              escrowBalance: 0.0,
-              history: []
-            };
-          });
-          set({
-            agents: seedAgents,
-            userWallet: {
-              address: '0xUserWalletAddress789c',
-              balance: 100.0,
-              escrowBalance: 0.0,
-              history: []
-            },
-            agentWallets: initialAgentWallets
-          });
-        } else {
-          set({
-            userWallet: {
-              address: '0x0000000000000000000000000000000000000000',
-              balance: 0.0,
-              escrowBalance: 0.0,
-              history: []
-            }
-          });
-        }
+        logger.warn('Failed initialization sequence:', err);
       }
     },
 
     resetDemoMode: () => {
-      const initialAgentWallets: Record<string, WalletState> = {};
-      seedAgents.forEach(agent => {
-        initialAgentWallets[agent.id] = {
-          address: agent.walletAddress,
-          balance: 15.0,
-          escrowBalance: 0.0,
-          history: []
-        };
-      });
-
-      localStorage.setItem('orbit_demo_balance', '100.0');
-      localStorage.setItem('orbit_demo_escrow', '0.0');
-      localStorage.setItem('orbit_demo_history', JSON.stringify([]));
-
-      const updatedDemoWallet = {
-        address: '0xDemoWalletAddress789c',
-        balance: 100.0,
-        escrowBalance: 0.0,
-        history: []
-      };
-
-      set({
-        agents: seedAgents,
-        activeWorkflow: null,
-        executionLogs: [],
-        demoBalance: 100.0,
-        demoEscrow: 0.0,
-        demoHistory: [],
-        demoTransactions: [],
-        demoWalletAddress: '0xDemoWalletAddress789c',
-        demoWallet: updatedDemoWallet,
-        userWallet: updatedDemoWallet,
-        agentWallets: initialAgentWallets,
-        isRunning: false,
-        currentPhaseIndex: 0,
-        userQuery: '',
-      });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('orbit_demo_balance');
+        localStorage.removeItem('orbit_demo_escrow');
+        localStorage.removeItem('orbit_demo_history');
+        localStorage.removeItem('orbit-demo-workflow');
+      }
+      get().resetExecution();
+      get().initialize();
     },
 
     logExecution: (phase, message, type = 'info', metadata) => {
-      set((prev) => ({
+      set(prev => ({
         executionLogs: [
           ...prev.executionLogs,
           {
@@ -2430,323 +563,42 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }));
     },
 
-    pollActiveWorkflowStatus: async (wf: Workflow) => {
-      let workflow = wf;
-      let isPolling = true;
-      const loggedIds = new Set<string>();
-      const totalCost = workflow.nodes.reduce((acc, curr) => acc + curr.costEstimate, 0);
-      let consecutiveErrors = 0;
-
-      while (isPolling) {
-        await new Promise(r => setTimeout(r, 1200));
-
-        // If the active workflow was reset/cleared or changed in the store by the user, stop polling
-        const active = get().activeWorkflow;
-        if (!active || active.id !== workflow.id) {
-          console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Active workflow cleared or changed)`);
-          isPolling = false;
-          break;
-        }
-
+    pollActiveWorkflowStatus: async (workflow) => {
+      let isPolledRunning = true;
+      const poll = async () => {
+        if (!isPolledRunning || !get().isRunning) return;
         try {
-          console.log(`[POLL] Fetching status for workflow ID: ${workflow.id}...`);
-          const statusRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}`);
-          if (statusRes && statusRes.success && statusRes.data) {
-            consecutiveErrors = 0;
-            const currentWf = statusRes.data;
+          const repos = getRepos(get().isDemoMode);
+          const fresh = await repos.workflow.getWorkflow(workflow.id);
+          
+          if (fresh) {
+            set({ activeWorkflow: fresh });
             
-            const updatedNodes: any[] = workflow.nodes.map((n: any, idx: number) => {
-              let dbNode = currentWf.nodes.find((dn: any) => dn.id === n.id);
-              if (!dbNode && currentWf.nodes[idx]) {
-                dbNode = currentWf.nodes[idx];
-              }
-              if (!dbNode) {
-                dbNode = currentWf.nodes.find((dn: any) => dn.capability.toLowerCase() === n.capability.toLowerCase());
-              }
-              return dbNode ? { 
-                ...n, 
-                status: dbNode.status,
-                assignedAgentId: dbNode.agentId || n.assignedAgentId,
-                assignedAgent: dbNode.agentId || n.assignedAgent || n.assignedAgentId
-              } : n;
-            });
-            
-            const computedStatus = computeWorkflowStatus(updatedNodes) as any;
-            console.log(`[WORKFLOW_STATUS] Workflow ID: ${workflow.id} | Status: ${computedStatus.toUpperCase()}`);
+            // Query logs
+            const logs = await repos.workflow.getWorkflowLogs(workflow.id);
+            set({ executionLogs: logs });
 
-            workflow = {
-              ...workflow,
-              status: computedStatus,
-              nodes: updatedNodes
-            };
-            set({ activeWorkflow: workflow });
-
-            // Fetch live task logs from the database
-            const logsRes = await apiClient.get<any>(`/api/v1/workflows/${workflow.id}/logs`);
-            if (logsRes.success && Array.isArray(logsRes.data)) {
-              logsRes.data.forEach((logItem: any) => {
-                const logKey = `${logItem.id}-${logItem.createdAt}`;
-                if (!loggedIds.has(logKey)) {
-                  loggedIds.add(logKey);
-                  const isVerify = logItem.message.toLowerCase().includes('verify');
-                  get().logExecution(
-                    isVerify ? 'verification' : 'execution',
-                    logItem.message,
-                    logItem.logLevel === 'error' ? 'error' : 'info'
-                  );
-                }
-              });
-            }
-
-            if (computedStatus === 'completed' || computedStatus === 'Demo Completed' || computedStatus === 'failed' || computedStatus === 'cancelled') {
-              console.log(`[WORKFLOW_COMPLETED] Workflow ID: ${workflow.id} execution completed.`);
-              console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: Terminal status ${computedStatus.toUpperCase()} reached)`);
-              isPolling = false;
-              
-              if (computedStatus === 'completed' || computedStatus === 'Demo Completed') {
-                if (get().isDemoMode) {
-                  set(state => {
-                    const releaseTransactions: Transaction[] = [];
-                    updatedNodes.forEach(n => {
-                      const agentId = n.assignedAgentId!;
-                      const agent = state.agents.find(a => a.id === agentId)!;
-                      const fee = n.costEstimate;
-
-                      const agentTx: Transaction = {
-                        id: `tx-agent-release-${Date.now()}-${n.id}`,
-                        senderAddress: 'ESCROW_VAULT',
-                        receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
-                        amount: fee,
-                        type: 'escrow_release',
-                        timestamp: new Date().toISOString(),
-                        status: 'completed',
-                        txHash: '0x' + Math.random().toString(16).substring(2, 42),
-                        taskId: n.id
-                      };
-                      releaseTransactions.push(agentTx);
-                    });
-
-                    const newDemoEscrow = Math.max(0, state.demoEscrow - totalCost);
-                    const newDemoHistory = [...releaseTransactions, ...state.demoHistory];
-
-                    localStorage.setItem('orbit_demo_escrow', String(newDemoEscrow));
-                    localStorage.setItem('orbit_demo_history', JSON.stringify(newDemoHistory));
-
-                    const updatedDemoWallet = {
-                      address: state.demoWalletAddress || '0xDemoWalletAddress789c',
-                      balance: state.demoBalance,
-                      escrowBalance: newDemoEscrow,
-                      history: newDemoHistory
-                    };
-
-                    return {
-                      demoEscrow: newDemoEscrow,
-                      demoHistory: newDemoHistory,
-                      demoTransactions: newDemoHistory,
-                      demoWallet: updatedDemoWallet,
-                      userWallet: updatedDemoWallet,
-                      isRunning: false,
-                      currentPhaseIndex: 9,
-                      appState: 'completed'
-                    };
-                  });
-                  get().logExecution('settlement', 'Demo completed successfully. Simulated workflow finished.', 'success');
-                } else {
-                  // --- PHASE 9: Settlement (Distribute SLA Escrow payouts) ---
-                  set({ currentPhaseIndex: 9 });
-                  get().logExecution('settlement', 'Releasing escrow vault payouts to active agent wallets...');
-                  await new Promise(r => setTimeout(r, 800));
-                  
-                  set(state => {
-                    const updatedAgentWallets = { ...state.agentWallets };
-                    const releaseTransactions: Transaction[] = [];
-
-                    updatedNodes.forEach(n => {
-                      const agentId = n.assignedAgentId!;
-                      const agent = state.agents.find(a => a.id === agentId)!;
-                      const fee = n.costEstimate;
-
-                      const wallet = updatedAgentWallets[agentId] || { balance: 0, escrowBalance: 0, history: [], address: '0xAgent' };
-                      const agentTx: Transaction = {
-                        id: `tx-agent-release-${Date.now()}-${n.id}`,
-                        senderAddress: 'ESCROW_VAULT',
-                        receiverAddress: agent?.walletAddress || '0x0000000000000000000000000000000000000000',
-                        amount: fee,
-                        type: 'escrow_release',
-                        timestamp: new Date().toISOString(),
-                        status: 'completed',
-                        txHash: '0x' + Math.random().toString(16).substring(2, 42),
-                        taskId: n.id
-                      };
-
-                      updatedAgentWallets[agentId] = {
-                        ...wallet,
-                        balance: wallet.balance + fee,
-                        history: [agentTx, ...wallet.history]
-                      };
-                      releaseTransactions.push(agentTx);
-                    });
-
-                    const updatedLiveWallet = {
-                      ...state.liveWallet,
-                      escrowBalance: Math.max(0, state.liveWallet.escrowBalance - totalCost),
-                      history: [...releaseTransactions, ...state.liveWallet.history]
-                    };
-
-                    return {
-                      agentWallets: updatedAgentWallets,
-                      liveBalance: updatedLiveWallet.balance,
-                      liveEscrow: updatedLiveWallet.escrowBalance,
-                      liveHistory: updatedLiveWallet.history,
-                      liveTransactions: updatedLiveWallet.history,
-                      liveWallet: updatedLiveWallet,
-                      userWallet: updatedLiveWallet,
-                      isRunning: false,
-                      currentPhaseIndex: 9,
-                      appState: 'completed'
-                    };
-                  });
-                  
-                  get().logExecution('settlement', 'Escrow payouts distributed successfully. Swarm task completed.', 'success');
-                }
-              } else {
-                set({ isRunning: false, currentPhaseIndex: 0, appState: 'completed' });
-                get().logExecution('execution', 'Swarm execution failed!', 'error');
-              }
-            }
-          } else {
-            consecutiveErrors++;
-            console.warn(`[POLL] Fetch status was not successful (consecutive: ${consecutiveErrors})`);
-            if (consecutiveErrors >= 5) {
-              console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: 5 consecutive failed status requests)`);
-              isPolling = false;
-              
-              // Clear active workflow and return to builder to prevent infinite loading screen
-              console.log(`[CLEAR_WORKFLOW] Invalid/Stale workflow during polling. Clearing session.`);
-              set({
-                activeWorkflow: null,
-                isRunning: false,
-                currentPhaseIndex: 0,
-                executionLogs: [],
-                promptTokens: 0,
-                completionTokens: 0,
-                totalTokens: 0,
-                estimatedCost: 0
-              });
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('orbit_last_workflow_id');
-                localStorage.removeItem(`orbit_workflow_metadata_${workflow.id}`);
-                const params = new URLSearchParams(window.location.search);
-                params.delete('workflowId');
-                const searchStr = params.toString();
-                const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
-                window.history.pushState({ path: newUrl }, '', newUrl);
-              }
+            if (fresh.status === 'completed' || fresh.status === 'failed' || fresh.status === 'cancelled') {
+              isPolledRunning = false;
+              set({ isRunning: false, appState: fresh.status === 'completed' ? 'completed' : 'history' });
+              await get().initialize(); // Refresh wallets
+              return;
             }
           }
-        } catch (err) {
-          consecutiveErrors++;
-          console.warn(`[POLL] Exception in status polling (consecutive: ${consecutiveErrors}):`, err);
-          if (consecutiveErrors >= 5) {
-            console.log(`[STOP_POLLING] Stopped polling for workflow ID: ${workflow.id} (Reason: 5 consecutive status fetch exceptions)`);
-            isPolling = false;
-            
-            // Clear active workflow and return to builder to prevent infinite loading screen
-            console.log(`[CLEAR_WORKFLOW] Exception limit hit during polling. Clearing session.`);
-            set({
-              activeWorkflow: null,
-              isRunning: false,
-              currentPhaseIndex: 0,
-              executionLogs: [],
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0,
-              estimatedCost: 0
-            });
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('orbit_last_workflow_id');
-              localStorage.removeItem(`orbit_workflow_metadata_${workflow.id}`);
-              const params = new URLSearchParams(window.location.search);
-              params.delete('workflowId');
-              const searchStr = params.toString();
-              const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}${searchStr ? '?' + searchStr : ''}`;
-              window.history.pushState({ path: newUrl }, '', newUrl);
-            }
-          }
+        } catch (e) {
+          logger.error('Polling error:', e);
         }
-      }
+        setTimeout(poll, 3000);
+      };
+      
+      poll();
     },
 
-    setAuthModal: (open, tab = 'login') => useAuthStore.getState().setAuthModal(open, tab as any),
-
-    toggleDemoMode: () => {
-      useAuthStore.getState().toggleDemoMode();
-      const mode = useAuthStore.getState().isDemoMode;
-      if (!mode) {
-        // Switching to Live Mode: clear all in-memory demo wallet state
-        set({
-          demoBalance: 0.0,
-          demoTransactions: [],
-          demoEscrow: 0.0,
-          demoHistory: [],
-          demoWalletAddress: '0xDemoWalletAddress789c',
-          demoWallet: {
-            address: '0xDemoWalletAddress789c',
-            balance: 0.0,
-            escrowBalance: 0.0,
-            history: []
-          }
-        });
-      }
-      get().initialize();
-    },
-
-    loginUser: async (usernameOrEmail, password) => {
-      return useAuthStore.getState().loginUser(usernameOrEmail, password);
-    },
-
-    registerUser: async (email, username, password, displayName, role = 'user') => {
-      return useAuthStore.getState().registerUser(email, username, password, displayName, role);
-    },
-
-    logoutUser: async () => {
-      await useAuthStore.getState().logoutUser();
-      set({
-        userWallet: {
-          address: '0x0000000000000000000000000000000000000000',
-          balance: 0.0,
-          escrowBalance: 0.0,
-          history: []
-        }
-      });
-    },
-
-    loginOAuth: async (provider) => {
-      return useAuthStore.getState().loginOAuth(provider);
-    },
-
-    loginWithGoogle: async (idToken) => {
-      return useAuthStore.getState().loginWithGoogle(idToken);
-    },
-
-    verifyEmail: async (code) => {
-      return useAuthStore.getState().verifyEmail(code);
-    },
-
-    forgotPassword: async (email) => {
-      return useAuthStore.getState().forgotPassword(email);
-    },
+    // Auth delegation
+    setAuthModal: (open, tab) => useAuthStore.getState().setAuthModal(open, tab),
+    loginUser: (u, p) => useAuthStore.getState().loginUser(u, p),
+    registerUser: (e, u, p, d, r) => useAuthStore.getState().registerUser(e, u, p, d, r),
+    logoutUser: () => useAuthStore.getState().logoutUser(),
+    logoutEverywhere: () => useAuthStore.getState().logoutEverywhere()
   };
 });
-
-// Synchronize auth state changes from useAuthStore to useNexusStore
-useAuthStore.subscribe((state) => {
-  useNexusStore.setState({
-    user: state.user,
-    token: state.token,
-    isDemoMode: state.isDemoMode,
-    isAuthModalOpen: state.isAuthModalOpen,
-    authModalTab: state.authModalTab as any
-  });
-});
-

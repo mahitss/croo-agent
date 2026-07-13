@@ -56,6 +56,8 @@ model Agent {
   capabilities       AgentCapability[]
   pricingModels      PricingModel[]
   reviews            Review[]
+  installs           Install[]
+  favorites          Favorite[]
 
   @@index([ownerId])
   @@index([slug])
@@ -128,4 +130,28 @@ model Review {
   @@index([agentId])
   @@index([userId])
   @@map("reviews")
+}
+
+model Install {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  agentId     String   @map("agent_id")
+  installedAt DateTime @default(now()) @map("installed_at")
+
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agentId])
+  @@map("agent_installs")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  agentId   String   @map("agent_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agentId])
+  @@map("agent_favorites")
 }

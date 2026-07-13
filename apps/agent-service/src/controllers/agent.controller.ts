@@ -73,61 +73,199 @@ export class AgentController {
   }
 
   @Get('agents')
-  async getAgents() {
-    const cached = await this.redis.get('marketplace:agents');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return {
-            success: true,
-            data: parsed,
-          };
-        }
-      } catch (err) {
-        // Safe fallback
-      }
+  async getAgents(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('verifiedOnly') verifiedOnly?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('userId') userId?: string,
+  ) {
+    const p = Math.max(1, Number(page || 1));
+    const l = Math.max(1, Number(limit || 20));
+    const skip = (p - 1) * l;
+
+    const where: any = { deletedAt: null };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { skills: { has: search } },
+      ];
+    }
+
+    if (category && category !== 'All') {
+      where.category = category;
+    }
+
+    if (verifiedOnly === 'true') {
+      where.verificationStatus = 'verified';
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sortBy === 'price_asc') {
+      orderBy = { price: 'asc' };
+    } else if (sortBy === 'price_desc') {
+      orderBy = { price: 'desc' };
+    } else if (sortBy === 'rating') {
+      orderBy = { averageRating: 'desc' };
+    } else if (sortBy === 'latency') {
+      orderBy = { latency: 'asc' };
+    } else if (sortBy === 'trust') {
+      orderBy = { trustScore: 'desc' };
     }
 
     const agents = await this.prisma.agent.findMany({
-      where: { deletedAt: null },
+      where,
       include: {
-        versions: true,
+        versions: { orderBy: { publishedAt: 'desc' } },
+        reviews: true,
+        installs: true,
+        favorites: true,
       },
+      skip,
+      take: l,
+      orderBy,
     });
+
+    const total = await this.prisma.agent.count({ where });
 
     const mapped = agents.map(a => {
       const latestVersion = a.versions[0];
+      const isFavorite = userId ? a.favorites.some(f => f.userId === userId) : false;
+      const isInstalled = userId ? a.installs.some(i => i.userId === userId) : false;
+
       return {
         id: a.id,
         name: a.name,
         slug: a.slug,
         description: a.description,
-        logoUrl: a.logoUrl,
+        logoUrl: a.logoUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${a.slug}`,
         category: a.category,
         skills: a.skills,
         tags: a.tags,
         price: a.price,
         rating: Number(a.averageRating),
-        reviewsCount: a.verificationCount * 3 + 12,
+        reviewsCount: a.reviews.length,
+        reviews: a.reviews,
         trustScore: Number(a.trustScore),
         latency: a.latency,
         accuracy: a.accuracy,
+        downloads: a.installs.length,
+        verificationStatus: a.verificationStatus,
         verificationCount: a.verificationCount,
         failureRate: a.failureRate,
         status: a.status,
         walletAddress: a.walletAddress,
         version: latestVersion ? latestVersion.version : '1.0.0',
         endpoint: latestVersion ? latestVersion.endpoint : '',
+        isFavorite,
+        isInstalled,
+        ownerId: a.ownerId,
+        createdAt: a.createdAt,
       };
     });
-
-    await this.redis.set('marketplace:agents', JSON.stringify(mapped), 60);
 
     return {
       success: true,
       data: mapped,
+      pagination: {
+        total,
+        page: p,
+        limit: l,
+        pages: Math.ceil(total / l),
+      }
     };
+  }
+
+  @Post('agents/:id/favorite')
+  @HttpCode(HttpStatus.OK)
+  async toggleFavorite(@Param('id') id: string, @Body() body: { userId: string }) {
+    const { userId } = body;
+    if (!userId) {
+      return { success: false, message: 'User ID is required' };
+    }
+    const existing = await this.prisma.favorite.findFirst({
+      where: {
+        userId,
+        agentId: id
+      }
+    });
+
+    if (existing) {
+      await this.prisma.favorite.delete({
+        where: {
+          id: existing.id
+        }
+      });
+      await this.redis.del('marketplace:agents');
+      return { success: true, isFavorite: false, message: 'Removed from favorites' };
+    } else {
+      await this.prisma.favorite.create({
+        data: {
+          userId,
+          agentId: id
+        }
+      });
+      await this.redis.del('marketplace:agents');
+      return { success: true, isFavorite: true, message: 'Added to favorites' };
+    }
+  }
+
+  @Post('agents/:id/install')
+  @HttpCode(HttpStatus.OK)
+  async toggleInstall(@Param('id') id: string, @Body() body: { userId: string }) {
+    const { userId } = body;
+    if (!userId) {
+      return { success: false, message: 'User ID is required' };
+    }
+    const existing = await this.prisma.install.findFirst({
+      where: {
+        userId,
+        agentId: id
+      }
+    });
+
+    if (existing) {
+      await this.prisma.install.delete({
+        where: {
+          id: existing.id
+        }
+      });
+      await this.redis.del('marketplace:agents');
+      return { success: true, isInstalled: false, message: 'Agent uninstalled successfully' };
+    } else {
+      await this.prisma.install.create({
+        data: {
+          userId,
+          agentId: id
+        }
+      });
+      await this.redis.del('marketplace:agents');
+      return { success: true, isInstalled: true, message: 'Agent installed successfully' };
+    }
+  }
+
+  @Post('agents/:id/versions')
+  @HttpCode(HttpStatus.CREATED)
+  async publishVersion(@Param('id') id: string, @Body() body: { version: string; endpoint: string }) {
+    try {
+      const newVersion = await this.prisma.agentVersion.create({
+        data: {
+          agentId: id,
+          version: body.version,
+          endpoint: body.endpoint,
+          inputSchema: {},
+          outputSchema: {}
+        }
+      });
+      await this.redis.del('marketplace:agents');
+      return { success: true, message: 'New agent version published successfully', data: newVersion };
+    } catch (e: any) {
+      return { success: false, message: `Database error publishing version: ${e.message}` };
+    }
   }
 
   @Get('agents/search')

@@ -50,7 +50,7 @@ export class AuthService {
     await this.userRepository.createSession({
       userId: user.id,
       refreshTokenHash,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default to 1 day on register
     });
 
     return {
@@ -83,10 +83,13 @@ export class AuthService {
     const refreshToken = crypto.randomBytes(40).toString('hex');
     const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
+    const rememberMe = dto.rememberMe ?? false;
+    const expiresAt = new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
+
     await this.userRepository.createSession({
       userId: user.id,
       refreshTokenHash,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt,
     });
 
     await this.userRepository.writeAuditLog({
@@ -123,7 +126,16 @@ export class AuthService {
     const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const session = await this.userRepository.findSession(refreshTokenHash);
     
-    if (!session || session.expiresAt.getTime() < Date.now()) {
+    if (!session) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (session.expiresAt.getTime() < Date.now()) {
+      try {
+        await this.prisma.session.delete({ where: { id: session.id } });
+      } catch (err) {
+        // Safe check
+      }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -133,7 +145,24 @@ export class AuthService {
     }
 
     const token = this.cryptoService.signJwt({ sub: user.id, email: user.email, role: user.role });
-    return { token };
+    
+    // Rotate refresh token
+    const newRefreshToken = crypto.randomBytes(40).toString('hex');
+    const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+    
+    // Determine session duration (Remember Me vs standard)
+    const isLongLived = (session.expiresAt.getTime() - session.createdAt.getTime()) > 2 * 24 * 60 * 60 * 1000;
+    const newExpiresAt = new Date(Date.now() + (isLongLived ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
+    
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        refreshTokenHash: newRefreshTokenHash,
+        expiresAt: newExpiresAt,
+      }
+    });
+
+    return { token, refreshToken: newRefreshToken };
   }
 
   async walletLogin(dto: WalletLoginDto) {
@@ -220,7 +249,7 @@ export class AuthService {
     };
   }
 
-  async googleLogin(idToken: string) {
+  async googleLogin(idToken: string, rememberMe: boolean = false) {
     if (!idToken) {
       throw new BadRequestException('Google ID token is required');
     }
@@ -313,7 +342,7 @@ export class AuthService {
       await this.userRepository.createSession({
         userId: user.id,
         refreshTokenHash,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
       });
 
       await this.userRepository.writeAuditLog({

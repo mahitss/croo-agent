@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, HttpStatus, Req, UseGuards } from '@nestjs/common';
+import { GatewayAuthGuard } from '../guards/auth.guard';
 
 @Controller('api/v1')
 export class AgentsController {
@@ -33,17 +34,33 @@ export class AgentsController {
   }
 
   @Get('agents')
-  async getAgents() {
+  async getAgents(@Req() req: any, @Query() query: any) {
     if (!this.agentUrl) {
       return {
         success: false,
         statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        message: 'Agent Service is currently unavailable. AGENT_SERVICE_URL environment variable is not defined.',
+        message: 'Agent Service is currently unavailable.',
         error: 'Service Unavailable'
       };
     }
     try {
-      const res = await fetch(`${this.agentUrl}/agents`);
+      const authHeader = req.headers.authorization;
+      let userId = undefined;
+      if (authHeader) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const payload = token.split('.')[1];
+          const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+          userId = decodedPayload.sub || decodedPayload.id;
+        } catch (e) {}
+      }
+
+      const q = { ...query };
+      if (userId) {
+        q.userId = userId;
+      }
+      const qParams = new URLSearchParams(q).toString();
+      const res = await fetch(`${this.agentUrl}/agents?${qParams}`);
       return await res.json();
     } catch (err: any) {
       return {
@@ -56,26 +73,8 @@ export class AgentsController {
   }
 
   @Get('marketplace')
-  async getMarketplaceAgents() {
-    if (!this.agentUrl) {
-      return {
-        success: false,
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        message: 'Agent Service is currently unavailable. AGENT_SERVICE_URL environment variable is not defined.',
-        error: 'Service Unavailable'
-      };
-    }
-    try {
-      const res = await fetch(`${this.agentUrl}/agents`);
-      return await res.json();
-    } catch (err: any) {
-      return {
-        success: false,
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        message: `Agent Service is unreachable: ${err.message}`,
-        error: 'Service Unavailable'
-      };
-    }
+  async getMarketplaceAgents(@Req() req: any, @Query() query: any) {
+    return this.getAgents(req, query);
   }
 
   @Patch('agents/:id')
@@ -265,5 +264,59 @@ export class AgentsController {
       success: true,
       data: ['Research', 'Finance', 'Legal', 'Coding', 'Security', 'Translation'],
     };
+  }
+
+  @Post('agents/:id/favorite')
+  @UseGuards(GatewayAuthGuard)
+  async toggleFavorite(@Req() req: any, @Param('id') id: string) {
+    if (!this.agentUrl) {
+      return { success: false, message: 'Agent Service is unavailable.' };
+    }
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: req.user.id }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Gateway error favoriting: ${err.message}` };
+    }
+  }
+
+  @Post('agents/:id/install')
+  @UseGuards(GatewayAuthGuard)
+  async toggleInstall(@Req() req: any, @Param('id') id: string) {
+    if (!this.agentUrl) {
+      return { success: false, message: 'Agent Service is unavailable.' };
+    }
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/install`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: req.user.id }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Gateway error installing: ${err.message}` };
+    }
+  }
+
+  @Post('agents/:id/versions')
+  @UseGuards(GatewayAuthGuard)
+  async publishVersion(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    if (!this.agentUrl) {
+      return { success: false, message: 'Agent Service is unavailable.' };
+    }
+    try {
+      const res = await fetch(`${this.agentUrl}/agents/${id}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: `Gateway error publishing version: ${err.message}` };
+    }
   }
 }

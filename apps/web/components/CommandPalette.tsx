@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useNexusStore } from '../store/nexusStore';
+import { useUserWallet } from '../hooks/useUserWallet';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
 import { Search, Sparkles, Navigation, Wallet, Settings, Terminal } from 'lucide-react';
 
 export default function CommandPalette() {
@@ -12,8 +13,8 @@ export default function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const depositUserWallet = useNexusStore((state) => state.depositUserWallet);
-  const agents = useNexusStore((state) => state.agents);
+  const { depositUserWallet } = useUserWallet();
+  const { agents } = useActiveWorkflow();
 
   const navigationCommands = [
     { title: 'Go to Portal', description: 'Run intentions and watch swarms', path: '/', icon: Navigation },

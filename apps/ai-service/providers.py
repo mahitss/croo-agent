@@ -470,13 +470,56 @@ class ModelRouter:
         system_prompt: Optional[str] = None,
         json_mode: bool = False,
         timeout: int = 30,
-        retry_delay: int = 2
+        retry_delay: int = 2,
+        model_override: Optional[str] = None,
+        task_type: Optional[str] = None
     ) -> LLMResult:
         cached = self.get_cached_response(prompt)
         if cached:
             return cached
 
-        ordered_models = self.get_ordered_models()
+        target_model = None
+        if model_override:
+            friendly_map = {
+                "gpt": "openai/gpt-4o-mini",
+                "claude": "anthropic/claude-3-haiku",
+                "gemini": "google/gemini-2.0-flash-exp:free",
+                "deepseek": "deepseek/deepseek-chat",
+                "llama": "meta-llama/llama-3.2-3b-instruct:free",
+                "openrouter": "google/gemini-2.0-flash-exp:free"
+            }
+            target_model = friendly_map.get(model_override.lower(), model_override)
+        elif task_type:
+            task_mapping = {
+                "reasoning": "deepseek/deepseek-chat",
+                "coding": "qwen/qwen3-coder:free",
+                "math": "google/gemini-2.0-flash-exp:free",
+                "finance": "openai/gpt-4o-mini",
+                "legal": "openai/gpt-4o-mini",
+                "translation": "meta-llama/llama-3.2-3b-instruct:free",
+                "creative": "google/gemini-2.0-flash-exp:free"
+            }
+            target_model = task_mapping.get(task_type.lower(), "google/gemini-2.0-flash-exp:free")
+
+        ordered_models = []
+        if target_model:
+            ordered_models.append(target_model)
+        for m in self.get_ordered_models():
+            if m not in ordered_models:
+                ordered_models.append(m)
+
+        for m in ordered_models:
+            if m not in self.stats:
+                self.stats[m] = {
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "consecutive_failures": 0,
+                    "429_count": 0,
+                    "timeout_count": 0,
+                    "total_latency_ms": 0,
+                    "last_successful_response": None
+                }
+
         models_tried = []
 
         for i, model in enumerate(ordered_models):
@@ -598,7 +641,8 @@ class OpenRouterProvider(BaseLLMProvider):
             prompt=prompt,
             system_prompt=system_prompt,
             json_mode=json_mode,
-            timeout=timeout
+            timeout=timeout,
+            model_override=model
         )
 
 class LLMProviderManager:
@@ -742,3 +786,39 @@ class LLMProviderManager:
             success=False,
             error_message=f"All configured LLM providers failed. Last error: {last_error}"
         )
+
+    def route_model(
+        self,
+        prompt: str,
+        task_type: Optional[str] = None,
+        model_override: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        json_mode: bool = False,
+        timeout: int = 30
+    ) -> LLMResult:
+        provider_name = "openrouter" if "openrouter" in self.providers else "openai"
+        if provider_name == "openrouter":
+            provider = self.providers["openrouter"]
+            result = provider.router.route_request(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                json_mode=json_mode,
+                timeout=timeout,
+                model_override=model_override,
+                task_type=task_type
+            )
+            if result.success:
+                self.metrics["openrouter"]["total_latency"] += result.latency_ms
+                self.metrics["openrouter"]["total_tokens"] += (result.prompt_tokens + result.completion_tokens)
+                self.metrics["openrouter"]["total_cost"] += result.cost
+            else:
+                self.metrics["openrouter"]["failures"] += 1
+            return result
+        else:
+            return self.execute_with_retry_and_fallback(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                json_mode=json_mode,
+                model=model_override,
+                timeout=timeout
+            )

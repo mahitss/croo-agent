@@ -158,6 +158,9 @@ importers:
       express:
         specifier: ^4.17.17
         version: 4.22.1
+      ioredis:
+        specifier: ^5.11.1
+        version: 5.11.1
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -428,7 +431,7 @@ importers:
         specifier: ^2.15.0
         version: 2.15.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       socket.io-client:
-        specifier: ^4.8.1
+        specifier: ^4.8.3
         version: 4.8.3
       zod:
         specifier: ^3.24.1
@@ -494,6 +497,9 @@ importers:
       class-validator:
         specifier: ^0.14.1
         version: 0.14.4
+      ioredis:
+        specifier: ^5.11.1
+        version: 5.11.1
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2

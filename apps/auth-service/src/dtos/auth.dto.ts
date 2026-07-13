@@ -29,6 +29,9 @@ export class LoginDto {
 
   @IsString()
   password: string;
+
+  @IsOptional()
+  rememberMe?: boolean;
 }
 
 export class WalletLoginDto {
@@ -70,4 +73,7 @@ export class GoogleLoginDto {
   @IsOptional()
   @IsString()
   credential?: string;
+
+  @IsOptional()
+  rememberMe?: boolean;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useNexusStore } from '../store/nexusStore';
+import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
 import { 
   FileText, 
   Workflow, 
@@ -16,10 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function ExecutionTracker() {
-  const isRunning = useNexusStore((state) => state.isRunning);
-  const currentPhaseIndex = useNexusStore((state) => state.currentPhaseIndex);
-  const executionLogs = useNexusStore((state) => state.executionLogs);
-  const activeWorkflow = useNexusStore((state) => state.activeWorkflow);
+  const { isRunning, currentPhaseIndex, executionLogs, activeWorkflow } = useActiveWorkflow();
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
 

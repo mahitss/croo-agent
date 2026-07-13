@@ -170,7 +170,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   private async validateDatabaseSchema() {
-    const expectedTables = ['agents', 'agent_versions', 'capabilities', 'agent_capabilities', 'pricing_models', 'reviews'];
+    const expectedTables = ['agents', 'agent_versions', 'capabilities', 'agent_capabilities', 'pricing_models', 'reviews', 'agent_installs', 'agent_favorites'];
     try {
       const schemaName = this.targetSchema;
       

@@ -11,10 +11,16 @@ generator client {
 }
 
 enum ExecutionStatus {
-  pending
+  queued
+  planning
+  scheduling
   running
   completed
   failed
+  retrying
+  cancelled
+  paused
+  pending
 }
 
 enum TaskStatus {

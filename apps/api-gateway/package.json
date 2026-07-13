@@ -20,6 +20,7 @@
     "class-validator": "^0.14.1",
     "dotenv": "^17.4.2",
     "express": "^4.17.17",
+    "ioredis": "^5.11.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",

@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast';
 import { Wallet, ArrowDownLeft, ArrowUpRight, ShieldCheck, History, ExternalLink, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function WalletPage() {
-  const { isDemoMode, walletService, wallet: userWallet, refreshData } = useMode();
+  const { isDemoMode, walletService, wallet: userWallet, refreshData, settleUserWallet } = useMode();
   const user = useAuthStore((state) => state.user);
 
   const { toast } = useToast();
@@ -172,7 +172,7 @@ export default function WalletPage() {
         {[
           { label: 'Available Balance', val: `${userWallet.balance.toFixed(2)} USDC`, color: 'text-primary-neon' },
           { label: 'Reserved (Escrow Lock)', val: `${userWallet.escrowBalance.toFixed(2)} USDC`, color: 'text-yellow-400' },
-          { label: 'Pending Settlement', val: '0.00 USDC', color: 'text-gray-500' },
+          { label: 'Pending Settlement', val: `${(userWallet.pendingBalance || 0).toFixed(2)} USDC`, color: 'text-gray-500' },
           { label: 'Lifetime Revenue Earned', val: `${lifetimeRevenue.toFixed(2)} USDC`, color: 'text-accent-blue' }
         ].map((bal, idx) => (
           <div key={idx} className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
@@ -300,10 +300,32 @@ export default function WalletPage() {
         {/* Ledger History List */}
         <div className="lg:col-span-2 glass-card p-6 rounded-2xl border border-border-dark flex-1 flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5 uppercase font-mono tracking-wider mb-4">
-              <History className="w-4 h-4 text-accent-blue" />
-              Decentralized Transaction Ledger (USDC)
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-2 border-b border-border-dark/60">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5 uppercase font-mono tracking-wider">
+                <History className="w-4 h-4 text-accent-blue" />
+                Decentralized Transaction Ledger (USDC)
+              </h3>
+              {!isDemoMode && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await settleUserWallet();
+                      if (res && res.success) {
+                        toast(res.message || 'Settlement run processed successfully', 'success');
+                        loadWalletDetails();
+                      } else {
+                        toast(res?.message || 'Settlement failed', 'error');
+                      }
+                    } catch (e: any) {
+                      toast(e.message || 'Error running settlement', 'error');
+                    }
+                  }}
+                  className="bg-primary-neon/20 border border-primary-neon text-primary-neon hover:bg-primary-neon/30 text-[9px] font-bold uppercase px-3 py-1.5 rounded-md tracking-wider transition-all duration-300 self-start sm:self-auto"
+                >
+                  Settle Pending Withdrawals
+                </button>
+              )}
+            </div>
 
             {userWallet.history.length === 0 ? (
               <div className="text-center py-12 text-gray-500 italic text-xs">
