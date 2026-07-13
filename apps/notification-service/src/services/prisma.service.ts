@@ -125,18 +125,28 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    await this.connectWithRetry();
-    await this.validateDatabaseSchema();
+    this.logger.log('Database connection initialization started in the background...');
+    this.initializePrismaBackground();
+  }
 
-    const pingInterval = setInterval(async () => {
-      try {
-        await this.$queryRawUnsafe('SELECT 1');
-      } catch (err) {
-        this.logger.warn(`Database heartbeat ping failed: ${err.message}`);
-      }
-    }, 15000);
+  private async initializePrismaBackground() {
+    try {
+      await this.connectWithRetry();
+      await this.validateDatabaseSchema();
 
-    (this as any)._pingInterval = pingInterval;
+      // Start a periodic heartbeat to keep PgBouncer/Neon connections warm and prevent "Error { kind: Closed }"
+      const pingInterval = setInterval(async () => {
+        try {
+          await this.$queryRawUnsafe('SELECT 1');
+        } catch (err) {
+          this.logger.warn(`Database heartbeat ping failed: ${err.message}`);
+        }
+      }, 15000);
+
+      (this as any)._pingInterval = pingInterval;
+    } catch (err) {
+      this.logger.error(`Database startup background initialization failed: ${err.message}`);
+    }
   }
 
   private async validateDatabaseSchema() {

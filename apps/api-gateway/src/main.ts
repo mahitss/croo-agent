@@ -12,190 +12,189 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 async function bootstrap() {
-  // Load environment configurations only if in development or if critical variables are missing
+  console.log('[STARTUP] Loading env');
   const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
   let localEnv: any = { parsed: {} };
   let parentEnv: any = { parsed: {} };
-  if (!isProduction || !process.env.DATABASE_URL) {
-    localEnv = dotenv.config();
-    parentEnv = dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
-  }
   
-  console.log('[SENTRY_DEBUG] process.cwd() is:', process.cwd());
-  console.log('[SENTRY_DEBUG] localEnv parsed:', localEnv.parsed ? 'yes' : 'no');
-  console.log('[SENTRY_DEBUG] parentEnv parsed:', parentEnv.parsed ? 'yes' : 'no');
-  console.log('[SENTRY_DEBUG] process.env.SENTRY_DSN:', process.env.SENTRY_DSN);
-
-  // Initialize Sentry if DSN is configured
-  const sentryDsn = process.env.SENTRY_DSN;
-  if (sentryDsn) {
-    Sentry.init({
-      dsn: sentryDsn,
-      environment: process.env.NODE_ENV || 'development',
-      tracesSampleRate: 1.0,
-    });
-    console.log('[SENTRY] Sentry initialized successfully.');
-  } else {
-    console.log('[SENTRY] No SENTRY_DSN found, Sentry tracking is disabled.');
+  try {
+    if (!isProduction || !process.env.DATABASE_URL) {
+      localEnv = dotenv.config();
+      parentEnv = dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+    }
+  } catch (e) {
+    console.error('[STARTUP_WARNING] Failed to load .env files, relying on environment:', e);
   }
 
-  const app = await NestFactory.create(AppModule);
-
-  // Enable trust proxy for correct IP rate-limiting behind Render/Vercel load balancers
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.set('trust proxy', 1);
-
-  // Resolve allowed CORS origins dynamically
-  const defaultOrigins = [
-    "http://localhost:3000",
-    "https://croo-agent-web.vercel.app",
-    "https://orbitai.dev",
+  // Check critical variables and log missing ones
+  const requiredEnv = [
+    'DATABASE_URL',
+    'UPSTASH_REDIS_REST_URL',
+    'UPSTASH_REDIS_REST_TOKEN',
+    'JWT_SECRET',
+    'OPENROUTER_API_KEY'
   ];
-
-  const envOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-    : [];
-
-  const allowedOrigins = [...defaultOrigins, ...envOrigins];
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Allow server-to-server requests
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // Exact matches
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow ALL Vercel preview deployments
-      if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
-    },
-
-    credentials: true,
-
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Accept",
-      "Origin",
-      "X-Requested-With",
-      "x-execution-mode",
-    ],
-
-    optionsSuccessStatus: 200,
-  });
-
-  // Enable global validation pipeline for secure requests
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
-
-
-  // Limit request payload sizes to 10MB to avoid buffer overflows (P13 Security)
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-  // In-memory sliding-window rate-limiting middleware (Phase 8 Security Compliance)
-  const ipRequests = new Map<string, { count: number; resetTime: number }>();
-  app.use((req: any, res: any, next: any) => {
-    const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
-    const now = Date.now();
-    const limit = 150; // max 150 requests per minute
-    const windowMs = 60000;
-
-    let tracker = ipRequests.get(ip);
-    if (!tracker || now > tracker.resetTime) {
-      tracker = { count: 0, resetTime: now + windowMs };
+  requiredEnv.forEach((key) => {
+    if (!process.env[key]) {
+      console.warn(`[STARTUP_WARNING] Missing critical environment variable: ${key}`);
     }
-
-    tracker.count++;
-    ipRequests.set(ip, tracker);
-
-    if (tracker.count > limit) {
-      res.status(429).json({
-        statusCode: 429,
-        message: 'Too many requests. Please slow down and try again later.',
-        error: 'Too Many Requests',
-      });
-      return;
-    }
-    next();
   });
 
-  // Set production security headers manually (Part 3.7 Security Headers)
-  app.use((req: any, res: any, next: any) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none';");
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-    next();
-  });
-
-  // Global XSS Input Sanitization Middleware
-  app.use((req: any, res: any, next: any) => {
-    const sanitize = (data: any): any => {
-      if (typeof data === 'string') {
-        return data
-          .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
-          .replace(/on\w+="[^"]*"/gi, '')
-          .replace(/href="javascript:[^"]*"/gi, '');
-      }
-      if (Array.isArray(data)) {
-        return data.map(sanitize);
-      }
-      if (data !== null && typeof data === 'object') {
-        const cleaned: any = {};
-        for (const key in data) {
-          cleaned[key] = sanitize(data[key]);
-        }
-        return cleaned;
-      }
-      return data;
-    };
-
-    req.body = sanitize(req.body);
-    req.query = sanitize(req.query);
-    next();
-  });
-
-  // Security Audit Logging Middleware
-  app.use((req: any, res: any, next: any) => {
-    const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
-    res.on('finish', () => {
-      if (res.statusCode >= 400) {
-        console.warn(`[AUDIT_ALERT] ${new Date().toISOString()} - IP: ${ip} - Method: ${req.method} - URL: ${req.originalUrl} - Status: ${res.statusCode}`);
-      }
-    });
-    next();
-  });
-
-  // Secrets Complexity and Validation Check
-  const jwtSecret = process.env.JWT_SECRET || 'nexus_secure_secret_hash_key_1012';
-  if (jwtSecret.length < 16) {
-    console.warn(`[SECURITY_WARNING] JWT_SECRET is weak or too short (${jwtSecret.length} chars). Require secure key of at least 32 characters in production.`);
+  console.log('[STARTUP] Database');
+  if (process.env.DATABASE_URL) {
+    const redacted = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
+    console.log(`[STARTUP] Database configured to use: ${redacted}`);
+  } else {
+    console.warn('[STARTUP_WARNING] DATABASE_URL is not set.');
   }
 
-  const port = process.env.PORT || 5000;
-  await app.listen(port, '0.0.0.0');
-  console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
+  console.log('[STARTUP] Redis');
+  if (process.env.UPSTASH_REDIS_REST_URL) {
+    console.log(`[STARTUP] Upstash Redis configured at: ${process.env.UPSTASH_REDIS_REST_URL}`);
+  } else {
+    console.warn('[STARTUP_WARNING] UPSTASH_REDIS_REST_URL is not set.');
+  }
+
+  console.log('[STARTUP] Authentication');
+  if (process.env.JWT_SECRET) {
+    console.log('[STARTUP] JWT secrets validated successfully.');
+  } else {
+    console.warn('[STARTUP_WARNING] JWT_SECRET is missing. Falling back to default secret.');
+  }
+
+  console.log('[STARTUP] AI providers');
+  if (process.env.OPENROUTER_API_KEY) {
+    console.log('[STARTUP] OpenRouter client credentials ready.');
+  } else {
+    console.warn('[STARTUP_WARNING] OPENROUTER_API_KEY is not configured.');
+  }
+
+  console.log('[STARTUP] Routes');
+  
+  try {
+    // Sentry init
+    const sentryDsn = process.env.SENTRY_DSN;
+    if (sentryDsn) {
+      Sentry.init({
+        dsn: sentryDsn,
+        environment: process.env.NODE_ENV || 'development',
+        tracesSampleRate: 1.0,
+      });
+      console.log('[SENTRY] Sentry initialized successfully.');
+    }
+
+    const app = await NestFactory.create(AppModule);
+
+    // Express trust proxy
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.set('trust proxy', 1);
+
+    // CORS
+    const defaultOrigins = [
+      "http://localhost:3000",
+      "https://croo-agent-web.vercel.app",
+      "https://orbitai.dev",
+    ];
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+      : [];
+    const allowedOrigins = [...defaultOrigins, ...envOrigins];
+
+    app.enableCors({
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || /^https:\/\/.*\.vercel\.app$/.test(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With", "x-execution-mode"],
+      optionsSuccessStatus: 200,
+    });
+
+    app.useGlobalPipes(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }));
+
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+    // Rate limiter
+    const ipRequests = new Map<string, { count: number; resetTime: number }>();
+    app.use((req: any, res: any, next: any) => {
+      const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
+      const now = Date.now();
+      const limit = 150;
+      const windowMs = 60000;
+      let tracker = ipRequests.get(ip);
+      if (!tracker || now > tracker.resetTime) {
+        tracker = { count: 0, resetTime: now + windowMs };
+      }
+      tracker.count++;
+      ipRequests.set(ip, tracker);
+      if (tracker.count > limit) {
+        res.status(429).json({ statusCode: 429, message: 'Too many requests.', error: 'Too Many Requests' });
+        return;
+      }
+      next();
+    });
+
+    // Custom headers
+    app.use((req: any, res: any, next: any) => {
+      res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none';");
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+      next();
+    });
+
+    // Sanitizer
+    app.use((req: any, res: any, next: any) => {
+      const sanitize = (data: any): any => {
+        if (typeof data === 'string') {
+          return data
+            .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+            .replace(/on\w+="[^"]*"/gi, '')
+            .replace(/href="javascript:[^"]*"/gi, '');
+        }
+        if (Array.isArray(data)) return data.map(sanitize);
+        if (data !== null && typeof data === 'object') {
+          const cleaned: any = {};
+          for (const key in data) cleaned[key] = sanitize(data[key]);
+          return cleaned;
+        }
+        return data;
+      };
+      req.body = sanitize(req.body);
+      req.query = sanitize(req.query);
+      next();
+    });
+
+    // Audit log
+    app.use((req: any, res: any, next: any) => {
+      const ip = req.ip || req.connection.remoteAddress || '127.0.0.1';
+      res.on('finish', () => {
+        if (res.statusCode >= 400) {
+          console.warn(`[AUDIT_ALERT] ${new Date().toISOString()} - IP: ${ip} - Method: ${req.method} - URL: ${req.originalUrl} - Status: ${res.statusCode}`);
+        }
+      });
+      next();
+    });
+
+    console.log('[STARTUP] Server listening');
+    const port = process.env.PORT || 10000;
+    await app.listen(port, '0.0.0.0');
+    console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
+  } catch (error) {
+    console.error('[FATAL_STARTUP_ERROR] Crash during NestJS API Gateway bootstrap:', error);
+    // Keep process alive so log can be examined on Render dashboard
+    setInterval(() => {
+      console.log('[MANAGER_HEARTBEAT] Still alive after startup crash. Check logs above.');
+    }, 10000);
+  }
 }
 bootstrap();
