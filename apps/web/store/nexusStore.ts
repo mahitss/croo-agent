@@ -474,13 +474,34 @@ export const useNexusStore = create<NexusState>((set, get) => {
         useAuthStore.getState().initializeAuth();
       }
 
+      // Guard: wait if auth state is checking or uninitialized
+      let authState = useAuthStore.getState();
+      if (authState.initializationState === 'UNINITIALIZED' || authState.initializationState === 'CHECKING_SESSION') {
+        logger.info('[NEXUS_STORE] Waiting for auth initialization to complete before loading metrics...');
+        await new Promise<void>((resolve) => {
+          const unsubscribe = useAuthStore.subscribe((state) => {
+            if (state.initializationState === 'AUTHENTICATED' || state.initializationState === 'UNAUTHENTICATED') {
+              unsubscribe();
+              resolve();
+            }
+          });
+        });
+        authState = useAuthStore.getState();
+      }
+
       const isDemo = get().isDemoMode;
       const repos = getRepos(isDemo);
 
       try {
-        // Load agents registry
+        // Load agents registry (public)
         const list = await repos.agents.getAgents();
         set({ agents: list });
+
+        // Guard: skip protected calls in Live mode if guest
+        if (!isDemo && authState.initializationState !== 'AUTHENTICATED') {
+          logger.info('[NEXUS_STORE] User is unauthenticated in Live Mode. Bypassing wallet & active workflow queries.');
+          return;
+        }
 
         // Load mode-specific wallet metrics
         const wallet = await repos.wallet.getBalance();

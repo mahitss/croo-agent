@@ -14,7 +14,15 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [walletError, setWalletError] = useState<string | null>(null);
 
+  const initializationState = useAuthStore((state) => state.initializationState);
+
   const loadWalletDetails = async () => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[WALLET_PAGE] Bypassing protected balance query for guest user.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setWalletError(null);
     try {
@@ -31,7 +39,7 @@ export default function WalletPage() {
 
   useEffect(() => {
     loadWalletDetails();
-  }, [isDemoMode]);
+  }, [isDemoMode, initializationState]);
 
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');

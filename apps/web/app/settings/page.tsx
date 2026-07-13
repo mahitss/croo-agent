@@ -52,9 +52,13 @@ export default function SettingsPage() {
   }, [user]);
 
   const loadPreferences = async () => {
-    if (!user) return;
+    if (!user || !token) return;
     try {
-      const res = await fetch(`/api/v1/memory/preferences?userId=${user.id}`);
+      const res = await fetch(`/api/v1/memory/preferences?userId=${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         const body = await res.json();
         if (body.success && body.data) {
@@ -129,7 +133,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/v1/memory/store', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           id: mId,
           user_id: user.id,
@@ -159,7 +166,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/v1/memory/query', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           user_id: user.id,
           query: searchQuery,
@@ -187,7 +197,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/v1/memory/preferences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           user_id: user.id,
           pref_key: prefKey,
@@ -214,7 +227,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/v1/memory/compress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           session_id: sessionId,
           user_id: user.id

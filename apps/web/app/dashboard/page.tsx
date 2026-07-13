@@ -47,7 +47,15 @@ export default function DashboardPage() {
   const [agentMetrics, setAgentMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const initializationState = useAuthStore((state) => state.initializationState);
+
   useEffect(() => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[DASHBOARD_PAGE] Guest user in Live Mode. Bypassing data fetch.');
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     dashboardService.getDashboardData()
@@ -82,7 +90,7 @@ export default function DashboardPage() {
         }
       })
       .catch(err => console.warn('Failed to load agent metrics:', err));
-  }, [isDemoMode]);
+  }, [isDemoMode, initializationState]);
 
   // Leaderboard data calculation using database analytics values
   const leaderboard = ([...agents] as any[])

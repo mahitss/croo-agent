@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNexusStore } from '../../store/nexusStore';
 import { apiService } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import Link from 'next/link';
 import { io } from 'socket.io-client';
 import { 
@@ -52,6 +53,7 @@ export default function AnalyticsPage() {
   const { isDemoMode, analyticsService, wallet: userWallet } = useMode();
   const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
   const { toast } = useToast();
+  const initializationState = useAuthStore((state) => state.initializationState);
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'swarm' | 'terminal'>('overview');
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
@@ -74,6 +76,10 @@ export default function AnalyticsPage() {
   
   // Real-time WebSocket connection
   useEffect(() => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      return;
+    }
     // Standard Socket.io connection to proxy namespace
     const socket = io('http://localhost:10000', {
       path: '/socket.io',
@@ -127,9 +133,13 @@ export default function AnalyticsPage() {
       socket.disconnect();
       clearInterval(interval);
     };
-  }, []);
+  }, [isDemoMode, initializationState]);
 
   const fetchExecutions = async () => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      return;
+    }
     try {
       // Find history of executions
       const res = await fetch('/api/v1/workflows');
@@ -191,6 +201,12 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
+    const authState = useAuthStore.getState();
+    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+      console.log('[ANALYTICS_PAGE] Guest user in Live Mode. Bypassing data fetch.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     const fetchAllData = async () => {
@@ -230,7 +246,7 @@ export default function AnalyticsPage() {
 
     fetchAllData();
     fetchExecutions();
-  }, [isDemoMode]);
+  }, [isDemoMode, initializationState]);
 
   // Scroll to bottom of terminal logs
   useEffect(() => {
