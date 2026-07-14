@@ -8,13 +8,24 @@ declare var process: any;
 export class WorkflowController {
   private redisPub: Redis;
 
+  private hasWarnedRedis = false;
+
   constructor(private readonly prisma: PrismaService) {
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
     console.log(`[WORKFLOW_ORCHESTRATOR] Connecting Redis publisher to: ${redisUrl}`);
     
     this.redisPub = new Redis(redisUrl, {
       maxRetriesPerRequest: null,
-      retryStrategy: (times) => Math.min(times * 100, 3000),
+      retryStrategy: (times) => {
+        if (times > 3) {
+          if (!this.hasWarnedRedis) {
+            this.hasWarnedRedis = true;
+            console.warn('[WORKFLOW_ORCHESTRATOR] Local Redis connection failed repeatedly. Event publishing fallbacks active.');
+          }
+          return null; // Stop reconnecting to prevent log spam
+        }
+        return Math.min(times * 100, 1000);
+      },
     });
 
     this.redisPub.on('error', (err) => {

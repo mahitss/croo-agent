@@ -15,13 +15,24 @@ export class NexusGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private redisSub: Redis;
 
+  private hasWarnedRedis = false;
+
   constructor() {
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
     console.log(`[WEBSOCKET_GATEWAY] Connecting to Redis subscription on URL: ${redisUrl}`);
     
     this.redisSub = new Redis(redisUrl, {
       maxRetriesPerRequest: null,
-      retryStrategy: (times) => Math.min(times * 100, 3000),
+      retryStrategy: (times) => {
+        if (times > 3) {
+          if (!this.hasWarnedRedis) {
+            this.hasWarnedRedis = true;
+            console.warn('[WEBSOCKET_GATEWAY] Local Redis connection failed repeatedly. Running with event streaming disabled.');
+          }
+          return null; // Stop reconnecting to prevent log spam
+        }
+        return Math.min(times * 100, 1000);
+      },
     });
 
     this.redisSub.on('connect', () => {
@@ -30,7 +41,9 @@ export class NexusGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     this.redisSub.on('error', (err) => {
-      console.error('[WEBSOCKET_GATEWAY] Redis connection error:', err);
+      if (!this.hasWarnedRedis) {
+        console.warn(`[WEBSOCKET_GATEWAY] Redis broker unavailable: ${err.message}`);
+      }
     });
   }
 
