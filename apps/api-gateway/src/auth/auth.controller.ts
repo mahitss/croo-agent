@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, HttpCode, HttpStatus, Req, Res, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as crypto from 'crypto';
 import { GatewayAuthGuard } from '../guards/auth.guard';
@@ -8,31 +8,35 @@ export class AuthController {
   private readonly authUrl = process.env.AUTH_SERVICE_URL || 'http://127.0.0.1:5001/api/v1';
 
   @Post('auth/register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(@Body() body: any) {
+  async register(@Body() body: any, @Res({ passthrough: true }) response: any) {
     try {
       const res = await fetch(`${this.authUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      response.status(res.status);
+      return data;
     } catch (err: any) {
+      response.status(HttpStatus.INTERNAL_SERVER_ERROR);
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
   }
 
   @Post('auth/login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() body: any) {
+  async login(@Body() body: any, @Res({ passthrough: true }) response: any) {
     try {
       const res = await fetch(`${this.authUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      response.status(res.status);
+      return data;
     } catch (err: any) {
+      response.status(HttpStatus.INTERNAL_SERVER_ERROR);
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
   }

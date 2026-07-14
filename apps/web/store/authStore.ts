@@ -323,10 +323,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         const rememberMe = get().rememberMe;
         const res = await apiClient.post<any>('/api/v1/auth/login', { usernameOrEmail, password, rememberMe });
-        if (res.success && res.data) {
-          const profile = res.data.profile;
-          const token = res.data.token;
-          const refreshToken = res.data.refreshToken;
+        
+        const success = res.success !== undefined ? res.success : true;
+        const data = res.data !== undefined ? res.data : res;
+
+        if (success && data && data.token) {
+          const profile = data.profile;
+          const token = data.token;
+          const refreshToken = data.refreshToken;
           
           const rememberMe = get().rememberMe;
           const storage = rememberMe ? localStorage : sessionStorage;
@@ -378,25 +382,32 @@ export const useAuthStore = create<AuthState>((set, get) => {
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
         
+        get().scheduleAutoRefresh();
         return true;
       }
     },
 
     registerUser: async (email, username, password, displayName, role = 'user') => {
-      console.log('[AUTH_STORE] registerUser initiated for:', username, email);
+      console.log('[REGISTER] Sending request', { email, username, password: '••••••••', displayName, role });
       try {
         const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role });
-        if (res.success && res.data) {
-          const profile = res.data.profile;
-          const token = res.data.token;
-          const refreshToken = res.data.refreshToken;
+        console.log('[REGISTER] Response received', res);
+
+        const success = res.success !== undefined ? res.success : true;
+        const data = res.data !== undefined ? res.data : res;
+
+        if (success && data && data.token) {
+          const profile = data.profile;
+          const token = data.token;
+          const refreshToken = data.refreshToken;
           
           const rememberMe = get().rememberMe;
           const storage = rememberMe ? localStorage : sessionStorage;
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
-          console.log('[AUTH_STORE] Register success: auto-logging in user');
+          console.log('[REGISTER] User created');
           set({ user: profile, token, initializationState: 'AUTHENTICATED' });
+          console.log('[REGISTER] Auth state updated');
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -436,7 +447,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
+        console.log('[REGISTER] User created');
         set({ user: localProfile, token: 'local-mock-token', initializationState: 'AUTHENTICATED' });
+        console.log('[REGISTER] Auth state updated');
+        
         storage.setItem('orbit_token', 'local-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');

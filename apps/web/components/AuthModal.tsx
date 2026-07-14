@@ -194,10 +194,18 @@ export default function AuthModal() {
           }
         }
       } else if (tab === 'register') {
+        console.log('[REGISTER] Form submitted');
+        if (!email || !username || !password || !displayName) {
+          throw new Error('Please fill in all required fields');
+        }
+        console.log('[REGISTER] Validation passed');
         const ok = await registerUser(email, username, password, displayName, role);
         if (ok) {
-          toast('Registration successful! Please verify your email.', 'success');
-          setTab('verify');
+          toast('Successfully registered to Orbit!', 'success');
+          setAuthModal(false);
+          if (typeof window !== 'undefined') {
+            window.location.href = '/dashboard';
+          }
         }
       } else if (tab === 'forgot') {
         await forgotPassword(email);
@@ -209,7 +217,17 @@ export default function AuthModal() {
         setAuthModal(false);
       }
     } catch (err: any) {
-      toast(err.message || 'Authentication error occurred', 'error');
+      let friendlyMsg = err.message || 'Authentication error occurred';
+      if (friendlyMsg.includes('400') || friendlyMsg.includes('BadRequest') || friendlyMsg.includes('validation')) {
+        friendlyMsg = `Invalid input details: ${friendlyMsg}`;
+      } else if (friendlyMsg.includes('401') || friendlyMsg.includes('Unauthorized') || friendlyMsg.includes('Invalid credentials')) {
+        friendlyMsg = 'Unauthorized request. Incorrect credentials.';
+      } else if (friendlyMsg.includes('409') || friendlyMsg.includes('Conflict') || friendlyMsg.includes('already registered') || friendlyMsg.includes('already taken')) {
+        friendlyMsg = 'This email address or username is already in use.';
+      } else if (friendlyMsg.includes('500') || friendlyMsg.includes('InternalServerError')) {
+        friendlyMsg = 'Internal server or database error. Please try again later.';
+      }
+      toast(friendlyMsg, 'error');
     } finally {
       setIsLoading(false);
     }

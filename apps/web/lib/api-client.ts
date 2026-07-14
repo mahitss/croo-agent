@@ -273,7 +273,7 @@ export const apiClient = {
       try {
         const errBody = await res.json();
         if (errBody && errBody.message) {
-          msg = errBody.message;
+          msg = Array.isArray(errBody.message) ? errBody.message.join(', ') : errBody.message;
         }
       } catch (e) {}
       throw new Error(msg);
