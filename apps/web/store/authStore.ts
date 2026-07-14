@@ -426,8 +426,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           get().scheduleAutoRefresh();
           return true;
         }
-        console.warn('[AUTH_STORE] Registration failed: Invalid response structure');
-        return false;
+        throw new Error(res.message || 'Registration failed: Invalid response structure');
       } catch (err) {
         if (!get().isDemoMode) {
           console.error('[AUTH_STORE] Registration error in Live mode:', err);

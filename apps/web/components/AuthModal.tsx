@@ -194,18 +194,34 @@ export default function AuthModal() {
           }
         }
       } else if (tab === 'register') {
-        console.log('[REGISTER] Form submitted');
+        console.log('[REGISTER] Submit clicked');
         if (!email || !username || !password || !displayName) {
           throw new Error('Please fill in all required fields');
         }
         console.log('[REGISTER] Validation passed');
-        const ok = await registerUser(email, username, password, displayName, role);
+        console.log('[REGISTER] Request started');
+        console.log('[REGISTER] Request payload', { email, username, password: '••••••••', displayName, role });
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Registration timed out.')), 30000)
+        );
+
+        const ok = await Promise.race([
+          registerUser(email, username, password, displayName, role),
+          timeoutPromise
+        ]);
+
+        console.log('[REGISTER] Response received');
+
         if (ok) {
+          console.log('[REGISTER] Success');
           toast('Successfully registered to Orbit!', 'success');
           setAuthModal(false);
           if (typeof window !== 'undefined') {
             window.location.href = '/dashboard';
           }
+        } else {
+          throw new Error('Registration failed: Invalid response structure');
         }
       } else if (tab === 'forgot') {
         await forgotPassword(email);
@@ -217,6 +233,7 @@ export default function AuthModal() {
         setAuthModal(false);
       }
     } catch (err: any) {
+      console.error('[REGISTER] Error', err);
       let friendlyMsg = err.message || 'Authentication error occurred';
       if (friendlyMsg.includes('400') || friendlyMsg.includes('BadRequest') || friendlyMsg.includes('validation')) {
         friendlyMsg = `Invalid input details: ${friendlyMsg}`;
@@ -230,6 +247,7 @@ export default function AuthModal() {
       toast(friendlyMsg, 'error');
     } finally {
       setIsLoading(false);
+      console.log('[REGISTER] Loading cleared');
     }
   };
 
