@@ -317,21 +317,27 @@ export class WorkflowsController {
     const start = Date.now();
     const mode = this.getMode(req, body);
 
-    if (mode === 'LIVE') {
-      // 1. Fetch user wallet balance
-      let balance = 0;
-      try {
-        const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
-        if (balanceRes.ok) {
-          const balanceData = await balanceRes.json();
-          const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
-          balance = Number(rawAvail);
-        }
-      } catch (e) {
-        console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for planning:', e);
+    // Fetch user wallet balance first
+    let balance = 0;
+    try {
+      const balanceRes = await fetch(`${this.walletUrl}/wallet/balance?userId=${userId}`);
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json();
+        const rawAvail = balanceData.available !== undefined ? balanceData.available : (balanceData.data?.available || 0);
+        balance = Number(rawAvail);
       }
+    } catch (e) {
+      console.error('[WALLET_CHECK_ERROR] Failed to fetch balance for planning:', e);
+    }
 
-      // 2. Reject immediately if balance <= 0
+    // Add requested execution telemetry logging
+    console.log(`Current mode: ${mode}`);
+    console.log(`Wallet mode: ${mode}`);
+    console.log(`Wallet balance: ${balance}`);
+    console.log(`Payment validation enabled? ${mode === 'LIVE'}`);
+
+    if (mode === 'LIVE') {
+      // Reject immediately if balance <= 0
       if (balance <= 0) {
         throw new HttpException({
           success: false,

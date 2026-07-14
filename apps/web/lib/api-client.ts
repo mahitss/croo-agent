@@ -192,10 +192,11 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     }
   }
 
+  const isDemo = useAuthStore.getState().isDemoMode;
   const headers = {
     ...options.headers,
     'Content-Type': 'application/json',
-    'x-execution-mode': 'LIVE'
+    'x-execution-mode': isDemo ? 'DEMO' : 'LIVE'
   } as Record<string, string>;
 
   if (token) {
