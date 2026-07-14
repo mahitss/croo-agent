@@ -224,35 +224,66 @@ export default function MarketplacePage() {
 
   // Matchmaker Engine
   const handleMatchmaker = async () => {
-    if (!matchmakerPrompt.trim()) return;
+    console.log('[MATCHMAKER] Button clicked');
+    console.log('[MATCHMAKER] Prompt text:', matchmakerPrompt);
+
+    if (!matchmakerPrompt || !matchmakerPrompt.trim()) {
+      console.warn('[MATCHMAKER] Validation failed: Prompt is empty');
+      toast('Validation failed: Please enter a valid task prompt for matchmaking.', 'error');
+      return;
+    }
+
+    console.log('[MATCHMAKER] Validation passed');
     setIsMatching(true);
+    setMatchedStack(null);
+
     try {
+      console.log('[MATCHMAKER] Planner request started');
       const planRes = await apiClient.post<any>('/api/v1/ai/plan', {
         query: matchmakerPrompt,
         routingMode: 'balanced',
         budget: 2.0
       });
+      console.log('[MATCHMAKER] Planner response received', planRes);
 
-      if (planRes.success && planRes.workflow) {
-        const chainItems = planRes.workflow.map((node: any) => ({
+      if (!planRes) {
+        throw new Error('Planner API returned an empty response.');
+      }
+
+      if (!planRes.success) {
+        throw new Error(planRes.message || 'Planner API returned failure.');
+      }
+
+      const resData = planRes.data;
+      if (resData && Array.isArray(resData.nodes) && resData.nodes.length > 0) {
+        const chainItems = resData.nodes.map((node: any) => ({
           nodeId: node.id,
-          stageName: node.task || node.id.toUpperCase(),
+          stageName: node.label || node.task || node.id.toUpperCase(),
           capability: node.capability,
-          agentId: node.agentId,
-          agentName: node.id.toUpperCase(),
+          agentId: node.agentId || `agent-${node.capability}-1`,
+          agentName: node.label || node.id.toUpperCase(),
           reason: 'Best match capability',
           cost: node.cost || 0.10,
-          time: `${node.duration || 1}s`,
+          time: '1s',
           trustScore: 95
         }));
 
         setMatchedStack({
           chain: chainItems,
-          cost: planRes.estimated_cost || 0.30,
-          time: `${planRes.estimated_duration_seconds || 5}s`
+          cost: resData.estimated_cost || 0.30,
+          time: '5s'
         });
+        console.log('[MATCHMAKER] Workflow rendered');
+      } else {
+        console.log('[MATCHMAKER] Planner API succeeded but no workflow appeared:');
+        console.log('- response data:', planRes);
+        console.log('- parsed agents:', resData?.nodes?.map((n: any) => n.agentId || n.id) || []);
+        console.log('- parsed edges:', resData?.edges || []);
+        console.log('- workflow nodes count:', resData?.nodes?.length || 0);
+        throw new Error('No workflow nodes returned in the planner response data.');
       }
     } catch (err: any) {
+      console.error('[MATCHMAKER] Error:', err);
       toast(`Matchmaker calculation failed: ${err.message}`, 'error');
     } finally {
       setIsMatching(false);
