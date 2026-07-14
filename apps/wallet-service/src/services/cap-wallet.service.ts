@@ -56,7 +56,7 @@ export class CAPWalletService {
         await this.prisma.balance.create({
           data: {
             walletId: wallet.id,
-            available: 200.0,
+            available: 0.0,
             reserved: 0.0,
             pending: 0.0,
           },

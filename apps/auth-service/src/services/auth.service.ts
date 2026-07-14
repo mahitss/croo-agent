@@ -43,6 +43,26 @@ export class AuthService {
       resourceId: user.id,
     });
 
+    // Pre-create user wallet and balance with 0.00 balance via raw SQL query (as the tables reside in the same DB schema)
+    try {
+      const walletId = crypto.randomUUID();
+      const randomHex = crypto.randomBytes(4).toString('hex');
+      const walletAddress = `0xUserWallet${randomHex}`;
+      
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
+        walletId, user.id, walletAddress, 'CAP', true
+      );
+
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
+        walletId, 0.0000, 0.0000, 0.0000
+      );
+      console.log(`[AUTH_SERVICE] Pre-created live wallet ${walletAddress} for user ${user.id} with balance 0.00`);
+    } catch (dbErr) {
+      console.error('[AUTH_SERVICE] Failed to pre-create wallet via raw SQL:', dbErr);
+    }
+
     const token = this.cryptoService.signJwt({ sub: user.id, email: user.email, role: user.role });
     const refreshToken = crypto.randomBytes(40).toString('hex');
     const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
@@ -308,6 +328,26 @@ export class AuthService {
           avatarUrl: picture,
           role: 'user' as any,
         });
+
+        // Pre-create user wallet and balance with 0.00 balance via raw SQL query
+        try {
+          const walletId = crypto.randomUUID();
+          const randomHex = crypto.randomBytes(4).toString('hex');
+          const walletAddress = `0xUserWallet${randomHex}`;
+          
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO "wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
+            walletId, user.id, walletAddress, 'CAP', true
+          );
+
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO "balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
+            walletId, 0.0000, 0.0000, 0.0000
+          );
+          console.log(`[AUTH_SERVICE] Pre-created live wallet ${walletAddress} for Google OAuth user ${user.id} with balance 0.00`);
+        } catch (dbErr) {
+          console.error('[AUTH_SERVICE] Failed to pre-create Google user wallet via raw SQL:', dbErr);
+        }
 
         await this.prisma.oauthAccount.create({
           data: {

@@ -182,12 +182,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
         }
       });
     } else {
+      const nextUserWallet = authState.isDemoMode ? get().demoWallet : get().liveWallet;
       set({
         user: authState.user,
         token: authState.token,
         isDemoMode: authState.isDemoMode,
         isAuthModalOpen: authState.isAuthModalOpen,
-        authModalTab: authState.authModalTab
+        authModalTab: authState.authModalTab,
+        userWallet: nextUserWallet
       });
     }
   });

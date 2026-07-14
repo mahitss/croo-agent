@@ -210,7 +210,7 @@ export default function Navbar() {
             >
               <Wallet className="w-4 h-4 text-primary-neon" />
               <span className="text-sm font-mono font-bold text-white">
-                {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">USDC</span>
+                {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">{isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
               </span>
             </Link>
           )}
@@ -314,7 +314,7 @@ export default function Navbar() {
                         Dashboard
                       </Link>
                       <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                        Wallet ({userWallet.balance.toFixed(2)} USDC)
+                        Wallet ({userWallet.balance.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'})
                       </Link>
                       <button
                         onClick={logoutUser}

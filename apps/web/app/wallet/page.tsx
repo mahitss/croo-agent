@@ -178,10 +178,10 @@ export default function WalletPage() {
       {/* 4 Balance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Available Balance', val: `${userWallet.balance.toFixed(2)} USDC`, color: 'text-primary-neon' },
-          { label: 'Reserved (Escrow Lock)', val: `${userWallet.escrowBalance.toFixed(2)} USDC`, color: 'text-yellow-400' },
-          { label: 'Pending Settlement', val: `${(userWallet.pendingBalance || 0).toFixed(2)} USDC`, color: 'text-gray-500' },
-          { label: 'Lifetime Revenue Earned', val: `${lifetimeRevenue.toFixed(2)} USDC`, color: 'text-accent-blue' }
+          { label: isDemoMode ? 'Available Sandbox Balance' : 'Available Balance', val: `${userWallet.balance.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, color: 'text-primary-neon' },
+          { label: isDemoMode ? 'Reserved Sandbox Escrow' : 'Reserved (Escrow Lock)', val: `${userWallet.escrowBalance.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, color: 'text-yellow-400' },
+          { label: 'Pending Settlement', val: `${(userWallet.pendingBalance || 0).toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, color: 'text-gray-500' },
+          { label: 'Lifetime Revenue Earned', val: `${lifetimeRevenue.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, color: 'text-accent-blue' }
         ].map((bal, idx) => (
           <div key={idx} className="glass-card p-5 rounded-xl border border-border-dark flex flex-col justify-between">
             <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">{bal.label}</span>
@@ -199,7 +199,7 @@ export default function WalletPage() {
 
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">CROO CAP WALLET</span>
+              <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">{isDemoMode ? 'CROO SANDBOX WALLET' : 'CROO CAP WALLET'}</span>
               <h4 className="text-xs text-gray-400 font-mono mt-0.5">{userWallet.address}</h4>
             </div>
             <Wallet className="w-6 h-6 text-primary-neon" />
@@ -208,13 +208,13 @@ export default function WalletPage() {
           <div className="my-4">
             <span className="text-xs text-gray-500 font-medium">Spendable Balance</span>
             <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              {userWallet.balance.toFixed(2)} <span className="text-sm font-mono text-gray-400 font-normal">USDC</span>
+              {userWallet.balance.toFixed(2)} <span className="text-sm font-mono text-gray-400 font-normal">{isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
             </h1>
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t border-border-dark text-xs text-gray-500 font-mono">
             <span>Escrow Locked</span>
-            <span className="text-secondary-neon font-bold">{userWallet.escrowBalance.toFixed(2)} USDC</span>
+            <span className="text-secondary-neon font-bold">{userWallet.escrowBalance.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
           </div>
         </div>
 

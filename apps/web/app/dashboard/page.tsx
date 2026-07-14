@@ -123,8 +123,8 @@ export default function DashboardPage() {
       color: 'text-primary-neon' 
     },
     { 
-      label: 'Wallet Balance', 
-      value: `${userWallet.balance.toFixed(2)} USDC`, 
+      label: isDemoMode ? 'Sandbox Wallet Balance' : 'Wallet Balance', 
+      value: `${userWallet.balance.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, 
       icon: Wallet, 
       color: 'text-accent-blue' 
     },
@@ -139,8 +139,8 @@ export default function DashboardPage() {
     { 
       label: 'Platform Revenue', 
       value: dashboardData?.platformRevenue !== undefined
-        ? `${Number(dashboardData.platformRevenue).toFixed(2)} USDC`
-        : `${totalAgentEarnings.toFixed(2)} USDC`, 
+        ? `${Number(dashboardData.platformRevenue).toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`
+        : `${totalAgentEarnings.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`, 
       icon: DollarSign, 
       color: 'text-yellow-400' 
     },
@@ -156,7 +156,7 @@ export default function DashboardPage() {
             👋 Welcome back, {user?.displayName || user?.username || 'User'}
           </h1>
           <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
-            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : (isDemoMode ? agents.length : 0)} published agents, and ${userWallet.balance.toFixed(2)} USDC available in your wallet.
+            You have {dashboardData?.activeWorkflows !== undefined ? dashboardData.activeWorkflows : (activeWorkflow ? 1 : 0)} active workflows, {dashboardData?.publishedAgents !== undefined ? dashboardData.publishedAgents : (isDemoMode ? agents.length : 0)} published agents, and {userWallet.balance.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'} available in your wallet.
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
@@ -222,7 +222,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-500 font-mono">
                   <span className="uppercase">{activeWorkflow.status}</span>
-                  <span className="text-white">{(activeWorkflow.nodes?.reduce((sum, n) => sum + n.costEstimate, 0) || 1.25).toFixed(2)} USDC</span>
+                  <span className="text-white">{(activeWorkflow.nodes?.reduce((sum, n) => sum + n.costEstimate, 0) || 1.25).toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
                 </div>
               </div>
             ) : (
@@ -243,16 +243,16 @@ export default function DashboardPage() {
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Available Balance</span>
               <span className="text-white font-mono font-bold">
-                {`${userWallet.balance.toFixed(2)} USDC`}
+                {`${userWallet.balance.toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`}
               </span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Reserved (Escrow Lock)</span>
-              <span className="text-yellow-400 font-mono font-bold">{userWallet.escrowBalance.toFixed(2)} USDC</span>
+              <span className="text-yellow-400 font-mono font-bold">{userWallet.escrowBalance.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
             </div>
             <div className="flex justify-between text-xs py-1.5 border-b border-border-dark">
               <span className="text-gray-400">Pending Approvals</span>
-              <span className="text-gray-500 font-mono">0.00 USDC</span>
+              <span className="text-gray-500 font-mono">0.00 {isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -287,8 +287,8 @@ export default function DashboardPage() {
               <span className="text-gray-400">Inference Cost</span>
               <span className="text-secondary-neon font-mono font-bold">
                 {dashboardData?.todayInferenceCost !== undefined 
-                  ? `${Number(dashboardData.todayInferenceCost).toFixed(2)} USDC` 
-                  : '0.00 USDC'}
+                  ? `${Number(dashboardData.todayInferenceCost).toFixed(2)} ${isDemoMode ? 'Sandbox USDC' : 'USDC'}` 
+                  : `0.00 ${isDemoMode ? 'Sandbox USDC' : 'USDC'}`}
               </span>
             </div>
             <div className="flex justify-between">
@@ -490,7 +490,7 @@ export default function DashboardPage() {
                       {agent.rating}⭐ ({agent.reviewsCount})
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
-                      {agent.earnings.toFixed(2)} USDC
+                      {agent.earnings.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'}
                     </td>
                   </tr>
                 ))
