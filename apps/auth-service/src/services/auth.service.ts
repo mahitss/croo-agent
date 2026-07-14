@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { UserRepository } from '../repositories/user.repository';
 import { CryptoService } from './crypto.service';
 import { PrismaService } from './prisma.service';
@@ -19,12 +19,12 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const existingEmail = await this.userRepository.findByEmail(dto.email);
     if (existingEmail) {
-      throw new BadRequestException('Email address already registered');
+      throw new ConflictException('Email address already registered');
     }
 
     const existingUsername = await this.userRepository.findByUsername(dto.username);
     if (existingUsername) {
-      throw new BadRequestException('Username is already taken');
+      throw new ConflictException('Username is already taken');
     }
 
     const passwordHash = this.cryptoService.hashPassword(dto.password);
