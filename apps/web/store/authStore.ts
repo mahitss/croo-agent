@@ -546,10 +546,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         const rememberMe = get().rememberMe;
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken, rememberMe });
-        if (res.success && res.data) {
-          const profile = res.data.user;
-          const token = res.data.accessToken;
-          const refreshToken = res.data.refreshToken;
+        
+        const success = res.success !== undefined ? res.success : true;
+        const data = res.data !== undefined ? res.data : res;
+
+        if (success && data && (data.accessToken || data.token)) {
+          const profile = data.user || data.profile;
+          const token = data.accessToken || data.token;
+          const refreshToken = data.refreshToken;
           
           const rememberMe = get().rememberMe;
           const storage = rememberMe ? localStorage : sessionStorage;
@@ -575,7 +579,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           get().scheduleAutoRefresh();
           return true;
         }
-        return false;
+        throw new Error('Google login failed: Invalid response structure');
       } catch (err) {
         if (!get().isDemoMode) {
           console.error('[AUTH_STORE] Google login error in Live mode:', err);

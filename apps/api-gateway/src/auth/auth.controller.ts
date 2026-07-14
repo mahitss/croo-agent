@@ -47,16 +47,18 @@ export class AuthController {
   }
 
   @Post('auth/google')
-  @HttpCode(HttpStatus.OK)
-  async googleLogin(@Body() body: any) {
+  async googleLogin(@Body() body: any, @Res({ passthrough: true }) response: any) {
     try {
       const res = await fetch(`${this.authUrl}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      response.status(res.status);
+      return data;
     } catch (err: any) {
+      response.status(HttpStatus.INTERNAL_SERVER_ERROR);
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
   }
