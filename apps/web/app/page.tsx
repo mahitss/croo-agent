@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
 import { useNexusStore } from '../store/nexusStore';
 import { useAuthStore } from '../store/authStore';
 import { useUserWallet } from '../hooks/useUserWallet';
@@ -13,64 +12,124 @@ import {
   Sliders, 
   Coins, 
   RotateCcw, 
-  Layers, 
   Sparkles, 
-  Plus, 
   ArrowRight, 
   ShieldCheck, 
   Cpu, 
   Database, 
   Globe, 
   Terminal, 
-  Award,
   Wallet,
-  Menu,
-  X,
-  LogOut,
-  ChevronDown,
-  ArrowUpRight,
   TrendingUp,
-  Clock,
-  Lock,
-  ArrowDownRight,
-  Activity,
-  CheckCircle,
-  HelpCircle
+  Activity
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
-// Live Activity Feed Component showing real-time agent commerce updates
+// Native IntersectionObserver Viewport Entry Component for zero layout shifts
+function ViewportAnimate({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.05 });
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translate3d(0, 0, 0)' : 'translate3d(0, 15px, 0)',
+        transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+        transitionDelay: `${delay}ms`,
+        willChange: 'transform, opacity',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// 3D Perspective Card Tilt (Bypasses React State, modifies style directly on GPU)
+function PerspectiveCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  let isMoving = false;
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMoving) return;
+    isMoving = true;
+    
+    // Throttle tilt style update to match screen refreshes
+    requestAnimationFrame(() => {
+      if (!cardRef.current) return;
+      const box = cardRef.current.getBoundingClientRect();
+      const x = e.clientX - box.left - box.width / 2;
+      const y = e.clientY - box.top - box.height / 2;
+      
+      const rx = -y / 35;
+      const ry = x / 35;
+      
+      cardRef.current.style.transform = `perspective(1000px) translate3d(0,0,0) rotateX(${rx}deg) rotateY(${ry}deg)`;
+      isMoving = false;
+    });
+  };
+
+  const handleMouseLeave = () => {
+    if (!cardRef.current) return;
+    cardRef.current.style.transform = `perspective(1000px) translate3d(0,0,0) rotateX(0deg) rotateY(0deg)`;
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`transition-transform duration-300 ease-out border border-white/6 bg-[#0D0D0D] rounded-[20px] overflow-hidden relative will-change-transform ${className}`}
+      style={{
+        transform: 'perspective(1000px) translate3d(0,0,0) rotateX(0deg) rotateY(0deg)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Live Activity Feed Component showing real-time agent updates
 function LiveActivityFeed() {
   const [feed, setFeed] = useState<any[]>([
     { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
     { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
-    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' },
-    { type: 'Registration', desc: 'New verified node "SentriScan" active on CAP', time: '20s ago' },
-    { type: 'Workflow Run', desc: 'Intention swarm started for "Compliance check"', time: '40s ago' }
+    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' }
   ]);
 
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
+    if (!isAuthenticated) return;
     let active = true;
     const fetchFeed = async () => {
       try {
         const res = await apiService.getActivityFeed();
         if (res && res.success && Array.isArray(res.data) && active) {
-          setFeed(res.data);
+          setFeed(res.data.slice(0, 3));
         }
       } catch (err) {
-        console.warn('Failed to load live activity feed:', err);
+        console.warn('Failed to load activity feed:', err);
       }
     };
-
     fetchFeed();
-    const interval = setInterval(fetchFeed, 3000);
+    const interval = setInterval(fetchFeed, 5000);
     return () => {
       active = false;
       clearInterval(interval);
@@ -80,75 +139,28 @@ function LiveActivityFeed() {
   return (
     <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
       <div>
-        <div className="flex justify-between items-center border-b border-white/8 pb-2 mb-3">
-          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase text-[10px]">
-            <span className="w-1.5 h-1.5 bg-[#6FCBFF] rounded-full animate-ping"></span>
-            Agent Commerce Activity Feed
+        <div className="flex justify-between items-center border-b border-white/6 pb-2 mb-3">
+          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase text-[9px]">
+            <span className="w-1 h-1 bg-[#6FCBFF] rounded-full animate-ping"></span>
+            Agent Activity Feed
           </h4>
-          <span className="text-[9px] text-gray-500">Live Sync</span>
+          <span className="text-[8px] text-gray-500">Live Sync</span>
         </div>
-        <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+        <div className="flex flex-col gap-2">
           {feed.map((evt, idx) => (
-            <div key={idx} className="bg-white/2 border border-white/8 p-2.5 rounded-lg flex flex-col gap-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+            <div key={idx} className="bg-white/1 border border-white/4 p-2 rounded flex flex-col gap-0.5">
               <div className="flex justify-between text-[8px]">
-                <span className="text-[#6FCBFF] font-bold uppercase tracking-wider">{evt.type}</span>
+                <span className="text-[#6FCBFF] font-bold uppercase">{evt.type}</span>
                 <span className="text-gray-500">{evt.time}</span>
               </div>
-              <p className="text-[10px] text-gray-300 leading-normal">{evt.desc}</p>
+              <p className="text-[9px] text-gray-300 leading-normal">{evt.desc}</p>
             </div>
           ))}
         </div>
       </div>
-      <div className="text-[9px] text-gray-500 border-t border-white/8 pt-3 flex justify-between items-center">
-        <span>CAP Protocol V2</span>
+      <div className="text-[8px] text-gray-500 border-t border-white/6 pt-2 flex justify-between items-center">
+        <span>CAP Substrate</span>
         <span>Secure Escrows</span>
-      </div>
-    </div>
-  );
-}
-
-// Premium 3D Perspective Card Wrapper
-function PerspectiveCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const box = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - box.left - box.width / 2;
-    const y = e.clientY - box.top - box.height / 2;
-    
-    // Tilt calculations
-    setRotateX(-y / 20);
-    setRotateY(x / 20);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
-
-  return (
-    <div
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className={`transition-all duration-200 ease-out border border-white/8 bg-[#0D0D0D]/75 backdrop-blur-md rounded-[24px] overflow-hidden relative ${className}`}
-      style={{
-        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-        transformStyle: 'preserve-3d',
-      }}
-    >
-      {/* Gloss Reflection Overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none transition-opacity duration-300 group-hover:opacity-[0.06]"
-        style={{
-          background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
-        }}
-      />
-      <div style={{ transform: 'translateZ(10px)' }}>
-        {children}
       </div>
     </div>
   );
@@ -158,395 +170,196 @@ function PerspectiveCard({ children, className = '' }: { children: React.ReactNo
 // INTERACTIVE MOCKUPS
 // ----------------------------------------------------
 
-// 1. Interactive Workflow Builder Mockup
 function WorkflowBuilderMockup() {
   const [activeStep, setActiveStep] = useState(0);
-  const [logs, setLogs] = useState<string[]>([
-    '[Planner] Analyzing prompt intent...',
-    '[Planner] Sequenced 6 execution nodes.'
-  ]);
-
   const steps = [
-    { id: 'plan', label: 'Swarm Planner', icon: <Sparkles className="w-4 h-4 text-[#6FCBFF]" />, desc: 'Decomposing intent' },
-    { id: 'research', label: 'Market Research', icon: <Globe className="w-4 h-4 text-[#C9F4FF]" />, desc: 'QuickScan active' },
-    { id: 'openai', label: 'LLM Reasoning', icon: <Cpu className="w-4 h-4 text-[#6FCBFF]" />, desc: 'Claude 3.5 Sonnet' },
-    { id: 'escrow', label: 'CAP Wallet', icon: <Wallet className="w-4 h-4 text-[#C9F4FF]" />, desc: 'USDC Escrow audit' },
-    { id: 'db', label: 'Vector Store', icon: <Database className="w-4 h-4 text-gray-500" />, desc: 'Saving memory' },
-    { id: 'output', label: 'Verifier Output', icon: <ShieldCheck className="w-4 h-4 text-[#6FCBFF]" />, desc: 'SLA verification' }
+    { label: 'Swarm Planner', icon: <Sparkles className="w-3.5 h-3.5 text-[#6FCBFF]" /> },
+    { label: 'Market Research', icon: <Globe className="w-3.5 h-3.5 text-[#C9F4FF]" /> },
+    { label: 'Reasoning Engine', icon: <Cpu className="w-3.5 h-3.5 text-[#6FCBFF]" /> },
+    { label: 'SLA Verifier', icon: <ShieldCheck className="w-3.5 h-3.5 text-[#C9F4FF]" /> }
   ];
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveStep((prev) => {
-        const next = (prev + 1) % steps.length;
-        
-        // Append log dynamically
-        const newLog = `[${steps[next].label}] ${steps[next].desc}...`;
-        setLogs(l => [newLog, ...l.slice(0, 3)]);
-        
-        return next;
-      });
-    }, 2800);
+      setActiveStep((prev) => (prev + 1) % steps.length);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="p-6 flex flex-col gap-6 h-full justify-between font-mono text-xs text-left">
-      <div className="flex justify-between items-center border-b border-white/8 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#6FCBFF] animate-pulse"></span>
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Orchestrator Visualizer</span>
-        </div>
-        <span className="text-[9px] bg-white/5 border border-white/8 px-2 py-0.5 rounded text-gray-400">DAG Layout</span>
-      </div>
-
-      {/* Connection Graph map */}
-      <div className="grid grid-cols-2 gap-4 py-2 relative">
-        {/* Animated connection lines overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          <svg className="w-full h-full" fill="none">
-            <path d="M 120 40 L 120 180 M 120 110 L 280 110" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
-            <path d="M 120 40 L 120 180" stroke="url(#line-glow)" strokeWidth="1.5" strokeDasharray="10 40">
-              <animate attributeName="stroke-dashoffset" values="50;0" dur="2s" repeatCount="indefinite" />
-            </path>
-          </svg>
-          <svg className="hidden">
-            <defs>
-              <linearGradient id="line-glow" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#6FCBFF" />
-                <stop offset="100%" stopColor="#C9F4FF" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-
+    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
+      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Swarms Orchestrator</span>
+      <div className="flex flex-col gap-2.5">
         {steps.map((s, idx) => {
           const isActive = idx === activeStep;
-          const isDone = idx < activeStep;
           return (
             <div 
-              key={s.id}
-              className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all duration-300 relative z-10 ${
+              key={idx}
+              className={`p-2.5 rounded-lg border flex items-center justify-between transition-all duration-300 ${
                 isActive 
-                  ? 'border-[#6FCBFF] bg-[#6FCBFF]/5 shadow-[0_0_15px_rgba(111,203,255,0.08)]' 
-                  : isDone
-                    ? 'border-white/10 bg-white/2 opacity-75'
-                    : 'border-white/4 bg-transparent opacity-45'
+                  ? 'border-[#6FCBFF] bg-[#6FCBFF]/5 shadow-[0_0_10px_rgba(111,203,255,0.04)]' 
+                  : 'border-white/4 bg-transparent opacity-50'
               }`}
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
-                isActive ? 'bg-[#6FCBFF]/10 border-[#6FCBFF]/30' : 'bg-white/2 border-white/8'
-              }`}>
+              <div className="flex items-center gap-2">
                 {s.icon}
+                <span className="text-white">{s.label}</span>
               </div>
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-[10px] font-bold text-white truncate">{s.label}</span>
-                <span className="text-[8px] text-gray-500 truncate">{s.desc}</span>
-              </div>
+              <span className={`text-[8px] ${isActive ? 'text-[#6FCBFF] font-bold' : 'text-gray-500'}`}>
+                {isActive ? 'Executing' : 'Pending'}
+              </span>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      {/* Small timeline logs block */}
-      <div className="bg-black/40 border border-white/8 p-3 rounded-lg flex flex-col gap-1 max-h-[85px] overflow-hidden">
-        {logs.map((log, idx) => (
-          <span key={idx} className={`text-[9px] ${idx === 0 ? 'text-[#6FCBFF]' : 'text-gray-500'}`}>
-            {log}
-          </span>
+function MarketplaceMockup() {
+  const list = [
+    { name: 'FinAnalytica Pro', cost: '0.25', latency: '1.2s' },
+    { name: 'InsightFinder', cost: '0.05', latency: '0.4s' },
+    { name: 'ConsensuVerify', cost: '0.10', latency: '0.8s' }
+  ];
+  return (
+    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
+      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Capability Registries</span>
+      <div className="flex flex-col gap-2">
+        {list.map((agent, idx) => (
+          <div key={idx} className="bg-white/1 border border-white/4 p-2.5 rounded-lg flex items-center justify-between">
+            <span className="text-white font-bold">{agent.name}</span>
+            <div className="flex items-center gap-3 text-[9px]">
+              <span className="text-[#6FCBFF]">{agent.cost} USDC</span>
+              <span className="text-gray-500">{agent.latency}</span>
+            </div>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-// 2. Interactive Marketplace Mockup
-function MarketplaceMockup() {
-  const [installedCount, setInstalledCount] = useState(2);
-  const [installingId, setInstallingId] = useState<string | null>(null);
-  const [installedSet, setInstalledSet] = useState<string[]>(['agent-1']);
-
-  const list = [
-    { id: 'agent-1', name: 'FinAnalytica Pro', role: 'Finance', rating: '4.9', cost: '0.25', latency: '1200ms' },
-    { id: 'agent-2', name: 'InsightFinder', role: 'Research', rating: '4.8', cost: '0.05', latency: '450ms' },
-    { id: 'agent-3', name: 'ConsensuVerify', role: 'Security', rating: '4.85', cost: '0.10', latency: '800ms' }
-  ];
-
-  const handleInstall = (id: string) => {
-    if (installedSet.includes(id)) return;
-    setInstallingId(id);
-    setTimeout(() => {
-      setInstalledSet(prev => [...prev, id]);
-      setInstalledCount(prev => prev + 1);
-      setInstallingId(null);
-    }, 1200);
-  };
-
+function ExecutionConsoleMockup() {
+  const [progress, setProgress] = useState(20);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress((p) => (p >= 100 ? 10 : p + 5));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   return (
-    <div className="p-6 flex flex-col gap-5 h-full justify-between font-mono text-xs text-left">
-      <div className="flex justify-between items-center border-b border-white/8 pb-3">
-        <div className="flex flex-col">
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Registry Marketplace</span>
-          <span className="text-[8px] text-gray-500 mt-0.5">Secure CAP capability hashes loaded</span>
+    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
+      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Chain Visualizer</span>
+      <div className="flex flex-col gap-2 bg-black/30 p-2.5 rounded-lg border border-white/4">
+        <div className="flex justify-between text-gray-400">
+          <span>TASK RATE:</span>
+          <span className="text-[#6FCBFF]">2,410 t/s</span>
         </div>
-        <span className="text-[9px] bg-[#6FCBFF]/10 border border-[#6FCBFF]/30 px-2 py-0.5 rounded text-[#6FCBFF]">
-          {installedCount} Agents Connected
-        </span>
+        <div className="flex justify-between text-gray-400 mt-1">
+          <span>PIPELINE PROGRESS:</span>
+          <span className="text-white">{progress}%</span>
+        </div>
       </div>
-
-      <div className="flex flex-col gap-3">
-        {list.map((agent) => {
-          const isInstalled = installedSet.includes(agent.id);
-          const isInstalling = installingId === agent.id;
-          
-          return (
-            <div 
-              key={agent.id}
-              className="bg-white/2 border border-white/8 p-3.5 rounded-xl flex items-center justify-between gap-4 hover:border-white/15 transition-all duration-300"
-            >
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-extrabold text-white truncate">{agent.name}</span>
-                  <span className="text-[8px] bg-white/5 border border-white/8 px-1.5 py-0.2 rounded text-gray-400">{agent.role}</span>
-                </div>
-                <div className="flex items-center gap-3 text-[8px] text-gray-500">
-                  <span>Rating: {agent.rating} ⭐</span>
-                  <span>Latency: {agent.latency}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 shrink-0">
-                <span className="text-[#6FCBFF] font-bold text-[10px]">{agent.cost} USDC</span>
-                <button
-                  onClick={() => handleInstall(agent.id)}
-                  disabled={isInstalled || isInstalling}
-                  className={`text-[9px] font-extrabold px-3 py-1.5 rounded-lg font-mono transition-all ${
-                    isInstalled
-                      ? 'bg-white/5 text-gray-500 border border-white/4 cursor-default'
-                      : isInstalling
-                        ? 'bg-[#6FCBFF]/10 text-[#6FCBFF] border border-[#6FCBFF]/30 animate-pulse'
-                        : 'bg-[#6FCBFF] text-black hover:brightness-110'
-                  }`}
-                >
-                  {isInstalled ? 'Installed' : isInstalling ? 'Auditing...' : 'Install'}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div className="w-full h-1 bg-white/4 rounded-full overflow-hidden">
+        <div className="h-full bg-[#6FCBFF] transition-all duration-300" style={{ width: `${progress}%` }}></div>
       </div>
     </div>
   );
 }
 
-// 3. Interactive Execution Console Mockup
-function ExecutionConsoleMockup() {
-  const [progress, setProgress] = useState(15);
-  const [tokenRate, setTokenRate] = useState(2450);
-  const [logLines, setLogLines] = useState<string[]>([
-    '[14:45:01] SLA channels verified.',
-    '[14:45:03] Subtask mapping complete.',
-    '[14:45:05] Running parallel nodes...'
-  ]);
-
+function EscrowWalletMockup() {
+  const [balance, setBalance] = useState(100.00);
+  const [escrow, setEscrow] = useState(0.00);
+  
   useEffect(() => {
     const timer = setInterval(() => {
-      setProgress((p) => {
-        const next = p + 2;
-        if (next >= 100) {
-          // Add a new log reset
-          setLogLines(prev => [`[${new Date().toLocaleTimeString()}] Restarting execution chain...`, ...prev.slice(0, 2)]);
-          return 15;
-        }
-        return next;
-      });
-      setTokenRate(() => Math.floor(2100 + Math.random() * 800));
-    }, 1500);
+      setBalance((b) => (b === 100.00 ? 99.75 : 100.00));
+      setEscrow((e) => (e === 0.00 ? 0.25 : 0.00));
+    }, 4000);
     return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className="p-6 flex flex-col gap-5 h-full justify-between font-mono text-xs text-left">
-      <div className="flex justify-between items-center border-b border-white/8 pb-3">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-[#6FCBFF]" />
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Real-Time Execution Console</span>
+    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
+      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Agent Wallets Ledger</span>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white/1 border border-white/4 p-2.5 rounded-lg text-center">
+          <span className="text-gray-500 text-[8px]">Wallet Balance</span>
+          <h4 className="text-xs font-bold text-white mt-1">{balance.toFixed(2)} USDC</h4>
         </div>
-        <span className="text-[9px] text-[#6FCBFF] animate-pulse">Running</span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 text-[10px] bg-white/2 border border-white/8 p-3 rounded-xl">
-        <div className="flex flex-col">
-          <span className="text-gray-500 text-[8px] uppercase">Token Throughput</span>
-          <span className="text-white font-bold mt-0.5">{tokenRate.toLocaleString()} t/sec</span>
+        <div className="bg-[#6FCBFF]/5 border border-[#6FCBFF]/20 p-2.5 rounded-lg text-center">
+          <span className="text-[#6FCBFF] text-[8px]">Escrow Lock</span>
+          <h4 className="text-xs font-bold text-white mt-1">{escrow.toFixed(2)} USDC</h4>
         </div>
-        <div className="flex flex-col">
-          <span className="text-gray-500 text-[8px] uppercase">Active Duration</span>
-          <span className="text-white font-bold mt-0.5">14.2s (SLA SLA)</span>
-        </div>
-      </div>
-
-      {/* Progress bar container */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex justify-between items-center text-[9px] text-gray-500">
-          <span>PIPELINE COMPLETION PROGRESS</span>
-          <span className="text-white font-bold">{progress}%</span>
-        </div>
-        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-[#6FCBFF] to-[#C9F4FF] rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
-        </div>
-      </div>
-
-      <div className="bg-black/60 border border-white/8 p-3 rounded-lg flex flex-col gap-1.5 max-h-[100px] overflow-hidden">
-        {logLines.map((l, idx) => (
-          <span key={idx} className={`text-[9px] leading-relaxed truncate ${idx === 0 ? 'text-white' : 'text-gray-500'}`}>
-            {l}
-          </span>
-        ))}
       </div>
     </div>
   );
 }
 
-// 4. Interactive Escrow Wallet Mockup
-function EscrowWalletMockup() {
-  const [balance, setBalance] = useState(100.00);
-  const [escrow, setEscrow] = useState(0.00);
-  const [settled, setSettled] = useState(45.20);
-  const [txLog, setTxLog] = useState<string>('System idle. Escrow accounts loaded.');
-
-  const triggerMockTransfer = () => {
-    // 1. Lock escrow
-    setTxLog('Reserving 0.25 USDC SLA lock...');
-    setBalance(b => Number((b - 0.25).toFixed(2)));
-    setEscrow(e => Number((e + 0.25).toFixed(2)));
-
-    // 2. Release payout after 3 seconds
-    setTimeout(() => {
-      setTxLog('SLA consensus check passed. Disbursing payout.');
-      setEscrow(e => Number((e - 0.25).toFixed(2)));
-      setSettled(s => Number((s + 0.25).toFixed(2)));
-    }, 2500);
-  };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      triggerMockTransfer();
-    }, 7000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="p-6 flex flex-col gap-6 h-full justify-between font-mono text-xs text-left">
-      <div className="flex justify-between items-center border-b border-white/8 pb-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-[#6FCBFF]" />
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">CAP Escrow Substrate</span>
-        </div>
-        <span className="text-[9px] text-gray-500">P2P Payments</span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white/2 border border-white/8 p-3 rounded-xl text-center">
-          <span className="text-gray-500 text-[8px] uppercase">Available</span>
-          <h4 className="text-xs font-bold text-white mt-1">{balance.toFixed(2)}</h4>
-        </div>
-        <div className="bg-[#6FCBFF]/5 border border-[#6FCBFF]/30 p-3 rounded-xl text-center relative overflow-hidden">
-          <span className="text-[#6FCBFF] text-[8px] uppercase">Escrow Locked</span>
-          <h4 className="text-xs font-bold text-white mt-1 animate-pulse">{escrow.toFixed(2)}</h4>
-        </div>
-        <div className="bg-white/2 border border-white/8 p-3 rounded-xl text-center">
-          <span className="text-gray-500 text-[8px] uppercase">Total Settled</span>
-          <h4 className="text-xs font-bold text-[#C9F4FF] mt-1">{settled.toFixed(2)}</h4>
-        </div>
-      </div>
-
-      {/* Transaction status card */}
-      <div className="bg-black/60 border border-white/8 p-3 rounded-lg flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#6FCBFF] shrink-0 animate-ping"></span>
-          <span className="text-[9px] text-gray-400 truncate">{txLog}</span>
-        </div>
-        <span className="text-[8px] text-gray-500 shrink-0 uppercase tracking-widest font-mono">CROO V2</span>
-      </div>
-    </div>
-  );
-}
-
-// 5. Interactive Analytics Mockup
 function AnalyticsMockup() {
-  const [data, setData] = useState([
-    { name: '1', usage: 1200 },
-    { name: '2', usage: 1800 },
-    { name: '3', usage: 1400 },
-    { name: '4', usage: 2200 },
-    { name: '5', usage: 2900 },
-    { name: '6', usage: 2400 },
-    { name: '7', usage: 3100 }
-  ]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setData((prev) => {
-        const next = [...prev.slice(1)];
-        const newVal = Math.floor(1500 + Math.random() * 2000);
-        next.push({ name: String(prev.length + 1), usage: newVal });
-        return next;
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
+  const data = [
+    { usage: 1200 },
+    { usage: 1800 },
+    { usage: 1400 },
+    { usage: 2200 },
+    { usage: 2900 },
+    { usage: 2400 }
+  ];
   return (
-    <div className="p-6 flex flex-col gap-4 h-full justify-between font-mono text-xs text-left">
-      <div className="flex justify-between items-center border-b border-white/8 pb-3">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-[#6FCBFF]" />
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Autonomous SLA Analytics</span>
-        </div>
-        <span className="text-[9px] text-[#C9F4FF]">60 FPS Chart</span>
-      </div>
-
-      <div className="w-full h-[140px] mt-2 select-none relative">
+    <div className="p-5 flex flex-col gap-3 h-full justify-between font-mono text-[10px] text-left">
+      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">SLA Throughput Ratio</span>
+      <div className="w-full h-[90px] select-none pointer-events-none">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
             <defs>
-              <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6FCBFF" stopOpacity={0.25} />
+              <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6FCBFF" stopOpacity={0.15} />
                 <stop offset="95%" stopColor="#6FCBFF" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <Tooltip contentStyle={{ background: '#0C0C0D', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '9px' }} />
-            <Area type="monotone" dataKey="usage" stroke="#6FCBFF" strokeWidth={1.5} fillOpacity={1} fill="url(#colorUsage)" />
+            <Area type="monotone" dataKey="usage" stroke="#6FCBFF" strokeWidth={1} fillOpacity={1} fill="url(#usageGrad)" isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
-
-      <div className="flex justify-between items-center text-[8px] text-gray-500 mt-1 pt-2 border-t border-white/8">
-        <span>METRIC: WORKFLOW REQUEST RATIO</span>
-        <span>LATENCY AVERAGE: 850ms</span>
       </div>
     </div>
   );
 }
 
 // ----------------------------------------------------
-// MAIN LANDING PORTAL PAGE
+// DYNAMIC SVG BACKDROP NODES DATA (40 NODES)
+// ----------------------------------------------------
+const SVG_NODES = Array.from({ length: 40 }, (_, i) => {
+  const col = i % 8;
+  const row = Math.floor(i / 8);
+  return {
+    id: `node-${i}`,
+    x: 80 + col * 120 + (i % 2 === 0 ? 12 : -12),
+    y: 50 + row * 90 + (i % 3 === 0 ? 8 : -8)
+  };
+});
+
+const SVG_FLOWS = [
+  'M 80 50 Q 200 140 320 50 T 560 50',
+  'M 200 230 Q 320 320 440 230 T 680 230',
+  'M 560 320 Q 680 410 800 320 T 920 320'
+];
+
+// ----------------------------------------------------
+// PORTAL PAGE COMPONENT
 // ----------------------------------------------------
 export default function PortalPage() {
   const userQuery = useNexusStore((state) => state.userQuery);
   const setUserQuery = useNexusStore((state) => state.setUserQuery);
   const startExecution = useNexusStore((state) => state.startExecution);
-  const resetExecution = useNexusStore((state) => state.resetExecution);
   const initialize = useNexusStore((state) => state.initialize);
   
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
-  const { isDemoMode, userWallet } = useUserWallet();
+  const { userWallet } = useUserWallet();
 
-  const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [routingMode, setLocalRoutingMode] = useState<'cheapest' | 'fastest' | 'accuracy' | 'balanced'>('balanced');
   const [budget, setLocalBudget] = useState<number>(2.0);
@@ -581,123 +394,125 @@ export default function PortalPage() {
   return (
     <div className="flex-1 flex flex-col bg-[#030303] text-white overflow-x-hidden selection:bg-[#6FCBFF]/30 relative font-inter min-h-screen">
       
-      {/* Dynamic Fonts Import Style Block */}
+      {/* Dynamic Optimized CSS style declarations */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,400italic;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
         .font-instrument {
           font-family: 'Instrument Serif', serif;
         }
-        .font-inter {
-          font-family: 'Inter', sans-serif;
-        }
         
-        /* Grid background layer */
+        /* Grid background layout */
         .bg-grid-overlay {
           background-size: 60px 60px;
           background-image: 
-            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        }
-        
-        /* Noise Overlay */
-        .bg-noise-overlay {
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
+            linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+          will-change: background-position;
+          animation: gridSlowMove 35s linear infinite;
         }
 
-        /* Subtle animated translation of gradient grid */
-        @keyframes slow-move {
+        /* Subtle procedural noise overlay */
+        .noise-overlay {
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+          pointer-events: none;
+        }
+
+        /* GPU accelerated grid translation keyframe */
+        @keyframes gridSlowMove {
           0% { background-position: 0 0; }
           100% { background-position: 60px 60px; }
         }
-        .animate-grid-move {
-          animation: slow-move 20s linear infinite;
+
+        /* Slowly floating radial gradients */
+        @keyframes floatGradient1 {
+          0% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(40px, 20px, 0); }
+          100% { transform: translate3d(0, 0, 0); }
+        }
+        @keyframes floatGradient2 {
+          0% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(-30px, -15px, 0); }
+          100% { transform: translate3d(0, 0, 0); }
+        }
+
+        .animate-radial-1 {
+          animation: floatGradient1 45s ease-in-out infinite;
+          will-change: transform;
+        }
+        .animate-radial-2 {
+          animation: floatGradient2 55s ease-in-out infinite;
+          will-change: transform;
+        }
+
+        /* GPU Composited static fade up reveal for hero elements */
+        @keyframes heroFadeUp {
+          0% { opacity: 0; transform: translate3d(0, 15px, 0); }
+          100% { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+
+        .hero-reveal {
+          animation: heroFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: transform, opacity;
         }
       `}} />
 
-      {/* BACKGROUND DEPTH LAYERS */}
+      {/* BACKGROUND MATTE DECORATIONS */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        {/* Layer 1: Matte black layout gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#030303] via-[#050505] to-[#080808]"></div>
+        {/* Layer 1: Matte coal-black background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#030303] via-[#050505] to-[#090909]"></div>
 
-        {/* Layer 2: Subtle Grid */}
-        <div className="absolute inset-0 bg-grid-overlay opacity-80 animate-grid-move"></div>
+        {/* Layer 2: Moving Grid */}
+        <div className="absolute inset-0 bg-grid-overlay opacity-90"></div>
 
-        {/* Layer 3: Noise overlay */}
-        <div className="absolute inset-0 bg-noise-overlay"></div>
+        {/* Layer 3: Noise Overlay */}
+        <div className="absolute inset-0 noise-overlay"></div>
 
-        {/* Layer 4: Floating blurred lights */}
-        <div className="absolute top-[10%] left-1/4 w-[600px] h-[600px] rounded-full bg-[#6FCBFF]/3 blur-[130px]"></div>
-        <div className="absolute top-[40%] right-1/4 w-[700px] h-[700px] rounded-full bg-white/2 blur-[150px]"></div>
-        <div className="absolute bottom-[20%] left-1/3 w-[500px] h-[500px] rounded-full bg-[#C9F4FF]/3 blur-[120px]"></div>
+        {/* Layer 4: Two floating radial gradients (white and soft blue) */}
+        <div className="absolute top-[8%] left-[20%] w-[550px] h-[550px] rounded-full bg-[#6FCBFF]/3 blur-[120px] animate-radial-1"></div>
+        <div className="absolute top-[35%] right-[20%] w-[600px] h-[600px] rounded-full bg-white/[0.015] blur-[140px] animate-radial-2"></div>
       </div>
 
-      {/* Floating Header Navbar */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-2xl bg-[#0D0D0D]/70 border border-white/8 px-6 py-2.5 rounded-full flex items-center justify-between shadow-2xl">
-        <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#53B6FF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-base transition-transform group-hover:rotate-12 duration-300">
+      {/* Centered Floating Header Navigation (Backdrop blur simplified) */}
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-4xl bg-[#0D0D0D]/90 border border-white/6 px-5 py-2 rounded-full flex items-center justify-between shadow-lg">
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-6.5 h-6.5 rounded-lg bg-gradient-to-tr from-[#53B6FF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-sm">
             O
           </div>
-          <span className="font-extrabold text-sm tracking-wider font-inter">
-            ORBIT <span className="text-[#6FCBFF] font-normal text-xs tracking-widest ml-0.5">AI</span>
+          <span className="font-extrabold text-xs tracking-wider">
+            ORBIT <span className="text-[#6FCBFF] font-normal text-[10px] tracking-widest ml-0.5">AI</span>
           </span>
         </Link>
 
-        {/* Menu Links */}
-        <div className="hidden lg:flex items-center gap-6 font-mono text-[10px] text-gray-400">
-          <Link href="/" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Portal
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </Link>
-          <Link href="/marketplace" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Marketplace
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </Link>
-          <Link href="/workflow" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Workflow Builder
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </Link>
-          <Link href="/analytics" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Analytics
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </Link>
-          <a href="#pricing-tiers" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Pricing
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </a>
-          <Link href="/docs" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
-            Developers
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
-          </Link>
+        {/* Navigation Links */}
+        <div className="hidden md:flex items-center gap-5 font-mono text-[9px] text-gray-400">
+          <Link href="/" className="hover:text-[#6FCBFF] transition-colors relative py-1">Portal</Link>
+          <Link href="/marketplace" className="hover:text-[#6FCBFF] transition-colors relative py-1">Marketplace</Link>
+          <Link href="/workflow" className="hover:text-[#6FCBFF] transition-colors relative py-1">Workflow Builder</Link>
+          <Link href="/analytics" className="hover:text-[#6FCBFF] transition-colors relative py-1">Analytics</Link>
+          <a href="#pricing-tiers" className="hover:text-[#6FCBFF] transition-colors relative py-1">Pricing</a >
+          <Link href="/docs" className="hover:text-[#6FCBFF] transition-colors relative py-1">Developers</Link>
         </div>
 
-        {/* Right Buttons */}
+        {/* Header Right Workspace actions */}
         <div className="flex items-center gap-3">
           {mounted && token && user ? (
             <div className="relative group">
-              <button className="flex items-center gap-2 py-1 focus:outline-none">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#6FCBFF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-xs font-mono">
+              <button className="flex items-center gap-1.5 focus:outline-none py-1">
+                <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-tr from-[#6FCBFF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-[10px] font-mono">
                   {user.displayName?.substring(0, 2).toUpperCase() || 'US'}
                 </div>
-                <span className="text-[10px] text-gray-300 font-mono hidden sm:inline max-w-[80px] truncate">
-                  {user.displayName || user.username || 'User'}
-                </span>
               </button>
-              <div className="absolute w-40 hidden group-hover:block bg-black/90 border border-white/8 rounded-xl shadow-xl p-1.5 right-0 top-full mt-2 font-mono text-[9px]">
-                <Link href="/dashboard" className="block px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
-                  Dashboard
-                </Link>
-                <Link href="/wallet" className="block px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
-                  Wallet ({userWallet.balance.toFixed(2)} USDC)
-                </Link>
-                <button onClick={logoutUser} className="w-full text-left block px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
-                  Logout
-                </button>
+              <div className="absolute w-36 hidden group-hover:block bg-black border border-white/6 rounded-lg p-1 right-0 top-full mt-1.5 font-mono text-[8px]">
+                <Link href="/dashboard" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Dashboard</Link>
+                <Link href="/wallet" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Wallet</Link>
+                <button onClick={logoutUser} className="w-full text-left block px-2 py-1.5 text-red-400 hover:text-red-300 hover:bg-white/5 rounded">Logout</button>
               </div>
             </div>
           ) : (
             <button
               onClick={() => setAuthModal(true, 'login')}
-              className="text-[10px] font-mono text-gray-400 hover:text-white transition-colors"
+              className="text-[9px] font-mono text-gray-400 hover:text-white transition-colors"
             >
               Sign In
             </button>
@@ -705,372 +520,323 @@ export default function PortalPage() {
 
           <button
             onClick={scrollToIntentionWorkspace}
-            className="bg-white text-black hover:bg-white/90 text-[10px] font-extrabold px-4 py-2 rounded-full transition-all flex items-center gap-1 font-mono hover:scale-[1.02]"
+            className="bg-white text-black hover:bg-white/90 text-[9px] font-extrabold px-3.5 py-1.5 rounded-full transition-transform hover:scale-[1.02] font-mono"
           >
-            Launch Workspace
-            <ArrowRight className="w-3 h-3" />
+            Launch App
           </button>
         </div>
       </nav>
 
-      {/* HERO SECTION VIEWPORT */}
-      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-5xl mx-auto pt-20">
-        <div className="flex flex-col items-center gap-6 max-w-4xl">
-          {/* Tagline Badge */}
-          <motion.div 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 bg-[#0D0D0D]/95 border border-white/8 rounded-full px-4.5 py-1.5 text-[9px] tracking-widest font-mono uppercase text-gray-400"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6FCBFF] animate-pulse"></span>
-            Agent Swarm Substrate
-          </motion.div>
+      {/* HERO HERO SECTION VIEWPORT */}
+      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto pt-16">
+        
+        {/* SVG Network Background Visual (Approx 40 nodes, pure SVG composition) */}
+        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none opacity-40">
+          <svg className="w-full h-full max-h-[600px]" viewBox="0 0 1000 500" fill="none">
+            {/* Draw network edges */}
+            {SVG_NODES.map((node, i) => {
+              // Connect node to adjacent node to form lightweight mesh grid structure
+              if (i >= SVG_NODES.length - 1) return null;
+              const nextNode = SVG_NODES[i + 1];
+              return (
+                <line
+                  key={`edge-${i}`}
+                  x1={node.x}
+                  y1={node.y}
+                  x2={nextNode.x}
+                  y2={nextNode.y}
+                  stroke="rgba(255,255,255,0.015)"
+                  strokeWidth="1"
+                />
+              );
+            })}
 
-          {/* Headline (Line-by-line mask reveal) */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl tracking-tight leading-[1.08] max-w-4xl text-white font-instrument select-none">
-            <motion.span 
-              initial={{ opacity: 0, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="block"
-            >
-              Build AI Workers
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="block italic font-light text-gray-400"
-            >
-              That Hire
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-              className="block text-transparent bg-clip-text bg-gradient-to-r from-[#6FCBFF] via-[#FFFFFF] to-[#C9F4FF]"
-            >
-              Other AI Workers
-            </motion.span>
+            {/* Glowing Flow Paths */}
+            {SVG_FLOWS.map((flowPath, idx) => (
+              <path
+                key={`path-${idx}`}
+                d={flowPath}
+                stroke="rgba(111,203,255,0.12)"
+                strokeWidth="1.2"
+                strokeDasharray="40 180"
+              >
+                <animate attributeName="stroke-dashoffset" values="220;0" dur="5s" repeatCount="indefinite" />
+              </path>
+            ))}
+
+            {/* Tiny flowing data packets */}
+            {SVG_FLOWS.map((flowPath, idx) => (
+              <circle key={`spark-${idx}`} r="1.5" fill="#6FCBFF">
+                <animateMotion dur="5s" repeatCount="indefinite" path={flowPath} />
+              </circle>
+            ))}
+
+            {/* Node dots */}
+            {SVG_NODES.map((node) => (
+              <circle
+                key={node.id}
+                cx={node.x}
+                cy={node.y}
+                r="1.5"
+                fill="rgba(255,255,255,0.15)"
+              />
+            ))}
+          </svg>
+        </div>
+
+        <div className="flex flex-col items-center gap-6 max-w-3xl relative z-10 mt-10">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-1.5 bg-[#0D0D0D] border border-white/6 rounded-full px-3.5 py-1 text-[8px] tracking-widest font-mono uppercase text-gray-400 hero-reveal [animation-delay:100ms] opacity-0">
+            <span className="w-1 h-1 rounded-full bg-[#6FCBFF]"></span>
+            AI Agent Substrate
+          </div>
+
+          {/* Heading (Reveal line by line using fast CSS GPU keyframes) */}
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.1] text-white font-instrument select-none">
+            <span className="block hero-reveal [animation-delay:250ms] opacity-0">Build AI Workers</span>
+            <span className="block italic font-light text-gray-400 hero-reveal [animation-delay:400ms] opacity-0">That Hire</span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#6FCBFF] via-[#FFFFFF] to-[#C9F4FF] hero-reveal [animation-delay:550ms] opacity-0">Other AI Workers</span>
           </h1>
 
           {/* Subtitle */}
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1.2, delay: 0.8 }}
-            className="text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed font-inter mt-2"
-          >
+          <p className="text-gray-400 text-xs md:text-sm max-w-xl leading-relaxed font-inter hero-reveal [animation-delay:700ms] opacity-0">
             Deploy autonomous AI workers capable of planning, executing, collaborating and paying other AI workers securely.
-          </motion.p>
+          </p>
 
-          {/* Action Buttons */}
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.0 }}
-            className="flex flex-wrap gap-4 justify-center items-center mt-3"
-          >
+          {/* CTAs */}
+          <div className="flex gap-4 justify-center items-center mt-2 hero-reveal [animation-delay:850ms] opacity-0">
             <button
               onClick={scrollToIntentionWorkspace}
-              className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black text-xs font-extrabold px-8 py-3.5 rounded-xl transition-all hover:shadow-[0_0_20px_rgba(111,203,255,0.25)] flex items-center gap-2 font-mono group"
+              className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/95 text-black text-xs font-extrabold px-6 py-2.5 rounded-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5 font-mono shadow"
             >
               Launch Workspace
-              <Play className="w-4 h-4 fill-black group-hover:translate-x-0.5 transition-transform" />
+              <Play className="w-3.5 h-3.5 fill-black" />
             </button>
             <a
               href="#keynote-sections"
-              className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/8 text-xs font-bold px-8 py-3.5 rounded-xl transition-all backdrop-blur-md"
+              className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/6 text-xs font-bold px-6 py-2.5 rounded-lg transition-colors"
             >
-              Watch Keynote Details
+              Explore Features
             </a>
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* KEYNOTE SECTIONS SECTION CONTAINER */}
-      <section id="keynote-sections" className="relative z-10 max-w-5xl mx-auto px-6 flex flex-col gap-24 md:gap-36 pb-24">
+      {/* KEYNOTE VIEWPANS (IntersectionObserver viewport loading) */}
+      <section id="keynote-sections" className="relative z-10 max-w-4xl mx-auto px-6 flex flex-col gap-24 pb-24">
         
-        {/* Section 1: Workflow Builder */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="order-2 md:order-1">
-            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
-              <WorkflowBuilderMockup />
-            </PerspectiveCard>
+        {/* Section 1: Workflow */}
+        <ViewportAnimate>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="order-2 md:order-1">
+              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
+                <WorkflowBuilderMockup />
+              </PerspectiveCard>
+            </div>
+            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 01</span>
+              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
+                Orchestrator Swarm Builder
+              </h2>
+              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+                Graphically map out complex Multi-Agent Swarms. Define subtask routing limits, verify thresholds, and sequence execution structures concurrently.
+              </p>
+            </div>
           </div>
-          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 01</span>
-            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-              Visual Agent Workflow Builder
-            </h2>
-            <p className="text-xs text-gray-400 leading-relaxed font-mono">
-              Graphically map out complex Multi-Agent Swarms. Define dependencies, capabilities, retry boundaries, and custom execution limits. Watch connections route tokens concurrently at 60 FPS.
-            </p>
-            <Link href="/workflow" className="text-[10px] font-mono text-[#6FCBFF] hover:underline flex items-center gap-1 mt-2">
-              Launch Workflow Builder &rarr;
-            </Link>
-          </div>
-        </div>
+        </ViewportAnimate>
 
         {/* Section 2: Marketplace */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="text-left flex flex-col gap-4 max-w-md">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9F4FF] font-bold">Keynote Stage 02</span>
-            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-              Decentralized Registry Store
-            </h2>
-            <p className="text-xs text-gray-400 leading-relaxed font-mono">
-              Discover, install, and benchmark autonomous agent nodes published by developers. Lock secure USDC-CAP pricing agreements, audit reputation trustScores, and read success rates before loading.
-            </p>
-            <Link href="/marketplace" className="text-[10px] font-mono text-[#C9F4FF] hover:underline flex items-center gap-1 mt-2">
-              Explore Agent Marketplace &rarr;
-            </Link>
+        <ViewportAnimate>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="text-left flex flex-col gap-3 max-w-sm">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[#C9F4FF]">SLA Stage 02</span>
+              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
+                Registry Capabilities Store
+              </h2>
+              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+                Discover, publish, and load verified agent templates. Benchmark latency logs and review P2P prices dynamically.
+              </p>
+            </div>
+            <div>
+              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
+                <MarketplaceMockup />
+              </PerspectiveCard>
+            </div>
           </div>
-          <div>
-            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
-              <MarketplaceMockup />
-            </PerspectiveCard>
-          </div>
-        </div>
+        </ViewportAnimate>
 
-        {/* Section 3: Live Execution */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="order-2 md:order-1">
-            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
-              <ExecutionConsoleMockup />
-            </PerspectiveCard>
+        {/* Section 3: Execution */}
+        <ViewportAnimate>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="order-2 md:order-1">
+              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
+                <ExecutionConsoleMockup />
+              </PerspectiveCard>
+            </div>
+            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 03</span>
+              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
+                Console Streaming Telemetry
+              </h2>
+              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+                Inspect running jobs dynamically. Real-time logging outputs active subtask states and execution timelines.
+              </p>
+            </div>
           </div>
-          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 03</span>
-            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-              Live Console Telemetry
-            </h2>
-            <p className="text-xs text-gray-400 leading-relaxed font-mono">
-              Monitor running agent chains in real-time. View execution progress, active token rates, fallback errors, and stream terminal status updates. Everything updates continuously on GPU-accelerated layouts.
-            </p>
-          </div>
-        </div>
+        </ViewportAnimate>
 
         {/* Section 4: Wallet */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="text-left flex flex-col gap-4 max-w-md">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9F4FF] font-bold">Keynote Stage 04</span>
-            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-              CAP Escrow & Settlements
-            </h2>
-            <p className="text-xs text-gray-400 leading-relaxed font-mono">
-              USDC deposits are locked in secure smart escrow contracts prior to execution trigger. Funds are disbursed automatically to worker node addresses only after independent verification consensus is reached.
-            </p>
-            <Link href="/wallet" className="text-[10px] font-mono text-[#C9F4FF] hover:underline flex items-center gap-1 mt-2">
-              View Personal Substrate Wallet &rarr;
-            </Link>
+        <ViewportAnimate>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="text-left flex flex-col gap-3 max-w-sm">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[#C9F4FF]">SLA Stage 04</span>
+              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
+                Escrow Settlement Rails
+              </h2>
+              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+                USDC fees are locked inside smart contracts prior to run triggers. Settlements are disbursed autonomously after consensus verification reports.
+              </p>
+            </div>
+            <div>
+              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
+                <EscrowWalletMockup />
+              </PerspectiveCard>
+            </div>
           </div>
-          <div>
-            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
-              <EscrowWalletMockup />
-            </PerspectiveCard>
-          </div>
-        </div>
+        </ViewportAnimate>
 
         {/* Section 5: Analytics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="order-2 md:order-1">
-            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
-              <AnalyticsMockup />
-            </PerspectiveCard>
+        <ViewportAnimate>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="order-2 md:order-1">
+              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
+                <AnalyticsMockup />
+              </PerspectiveCard>
+            </div>
+            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 05</span>
+              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
+                Performance Dashboard
+              </h2>
+              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+                Optimize and analyze request load ratios, cost metrics, and latency averages with lightweight, zero-latency visualizations.
+              </p>
+            </div>
           </div>
-          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 05</span>
-            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-              Autonomous SLA Performance
-            </h2>
-            <p className="text-xs text-gray-400 leading-relaxed font-mono">
-              Analyze request latency ratios, cost breakdowns, and overall active node load. Recharts-rendered graphics let you optimize workflows and compare pricing metrics dynamically.
-            </p>
-            <Link href="/analytics" className="text-[10px] font-mono text-[#6FCBFF] hover:underline flex items-center gap-1 mt-2">
-              Inspect Advanced Analytics &rarr;
-            </Link>
-          </div>
-        </div>
+        </ViewportAnimate>
 
       </section>
 
-      {/* INTERACTIVE WORKSPACE SECTION */}
-      <section id="launchpad" className="max-w-5xl w-full mx-auto px-6 pb-24 relative z-10 scroll-mt-24">
-        <div className="text-left flex flex-col gap-3 mb-8">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">Active Substrate</span>
-          <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
-            Orchestration Launchpad
-          </h2>
-          <p className="text-xs text-gray-400 font-mono max-w-xl">
-            Input a complex agent request below. The router constructs the execution stack, calculates SLA latency, and locks CAP USDC channels.
-          </p>
-        </div>
+      {/* LAUNCHPAD WORKSPACE */}
+      <section id="launchpad" className="max-w-4xl w-full mx-auto px-6 pb-20 relative z-10 scroll-mt-24">
+        <ViewportAnimate>
+          <div className="text-left flex flex-col gap-2 mb-6">
+            <h2 className="text-2xl font-bold uppercase tracking-wider text-white font-instrument">
+              Orchestrator Workspace
+            </h2>
+            <p className="text-xs text-gray-400 font-mono">
+              Input your swarm intention below. Smart routing coordinates nodes and locks secure SLA transaction escrows automatically.
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Intention Workspace */}
-          <div className="lg:col-span-2 bg-[#0D0D0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col gap-4 glow-card">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs uppercase font-bold tracking-wider text-gray-500 font-mono">
-                Execute Natural Language Intention
-              </label>
-              <div className="flex flex-col md:flex-row gap-3">
-                <input
-                  type="text"
-                  className="flex-1 bg-black/40 border border-white/8 focus:border-[#6FCBFF]/50 px-4 py-3 rounded-xl text-white text-xs outline-none transition-colors font-mono"
-                  placeholder="e.g. Create a complete investment report for Tesla..."
-                  value={userQuery}
-                  onChange={(e) => setUserQuery(e.target.value)}
-                />
-                <button
-                  onClick={handleLaunch}
-                  disabled={!userQuery.trim()}
-                  className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black px-6 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all font-mono shrink-0"
-                >
-                  <Play className="w-3.5 h-3.5 fill-black" />
-                  Launch Swarm
-                </button>
-              </div>
-            </div>
-
-            {/* Configurations */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-white/8">
-              {/* Routing Mode */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Left Workspace Panel */}
+            <div className="lg:col-span-2 bg-[#0D0D0D] border border-white/6 p-5 rounded-[20px] flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase">
-                  <Sliders className="w-3.5 h-3.5 text-[#6FCBFF]" />
-                  Smart Routing Metrics
-                </span>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['balanced', 'cheapest', 'fastest', 'accuracy'] as const).map((mode) => (
+                <label className="text-[10px] uppercase font-bold tracking-wider text-gray-500 font-mono">
+                  Natural Language Prompt
+                </label>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input
+                    type="text"
+                    className="flex-1 bg-black/30 border border-white/6 focus:border-[#6FCBFF]/50 px-3.5 py-2.5 rounded-xl text-white text-xs outline-none transition-colors font-mono"
+                    placeholder="Describe intention swarm..."
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                  />
+                  <button
+                    onClick={handleLaunch}
+                    disabled={!userQuery.trim()}
+                    className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/95 text-black px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-transform hover:scale-[1.02] font-mono shrink-0"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-black" />
+                    Launch
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced config layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-white/6">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 font-mono uppercase">Routing mode</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['balanced', 'cheapest', 'fastest', 'accuracy'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setLocalRoutingMode(mode)}
+                        className={`text-[8px] py-1.5 rounded-lg border uppercase transition-colors font-mono ${
+                          routingMode === mode
+                            ? 'border-[#6FCBFF] text-[#6FCBFF] bg-[#6FCBFF]/5'
+                            : 'border-white/6 text-gray-400 bg-white/2 hover:text-white'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 font-mono uppercase">
+                    <span>Budget Limit</span>
+                    <span className="text-[#6FCBFF]">{(budget || 0).toFixed(2)} USDC</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.5"
+                    value={budget}
+                    onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
+                    className="w-full h-1 bg-[#0C0C0D] rounded appearance-none cursor-pointer accent-[#6FCBFF]"
+                  />
+                </div>
+              </div>
+
+              {/* Suggestions */}
+              <div className="flex flex-col gap-1 mt-2">
+                <span className="text-[8px] text-gray-500 uppercase tracking-widest font-mono">Suggested Intention seeds</span>
+                <div className="flex flex-col gap-1.5">
+                  {quickQueries.map((q, idx) => (
                     <button
-                      key={mode}
-                      onClick={() => setLocalRoutingMode(mode)}
-                      className={`text-[9px] py-2 rounded-lg font-bold border uppercase transition-all font-mono ${
-                        routingMode === mode
-                          ? 'border-[#6FCBFF] text-[#6FCBFF] bg-[#6FCBFF]/5'
-                          : 'border-white/8 text-gray-400 bg-white/2 hover:text-white hover:bg-white/5'
-                      }`}
+                      key={idx}
+                      onClick={() => setUserQuery(q)}
+                      className="text-left text-[10px] text-gray-400 hover:text-white hover:bg-white/2 p-2 rounded border border-white/4 transition-colors font-mono"
                     >
-                      {mode}
+                      {q}
                     </button>
                   ))}
                 </div>
               </div>
-
-              {/* Budget Cap */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase justify-between">
-                  <span className="flex items-center gap-1">
-                    <Coins className="w-3.5 h-3.5 text-[#C9F4FF]" />
-                    Budget Optimization Cap
-                  </span>
-                  <span className="text-[#C9F4FF]">{(budget || 0).toFixed(2)} USDC</span>
-                </span>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="5.0"
-                  step="0.5"
-                  value={budget}
-                  onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-[#0C0C0D] rounded-lg appearance-none cursor-pointer accent-[#C9F4FF]"
-                />
-                <div className="flex justify-between text-[10px] text-gray-500 font-mono">
-                  <span>0.50 USDC</span>
-                  <span>5.00 USDC (Max Limit)</span>
-                </div>
-              </div>
             </div>
 
-            {/* Suggested Workflows */}
-            <div className="flex flex-col gap-1.5 mt-2">
-              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">Suggested Workflows</span>
-              <div className="flex flex-col gap-1.5">
-                {quickQueries.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setUserQuery(q)}
-                    className="text-left text-xs text-gray-400 hover:text-white hover:bg-white/5 p-2.5 rounded border border-white/8 transition-all font-mono"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+            {/* Right Activity Panel */}
+            <div className="lg:col-span-1 bg-[#0D0D0D] border border-white/6 p-5 rounded-[20px] flex flex-col justify-between">
+              <LiveActivityFeed />
             </div>
           </div>
+        </ViewportAnimate>
+      </section>
 
-          {/* Right Column: Live Activity Feed */}
-          <div className="lg:col-span-1 bg-[#0D0D0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col justify-between glow-card">
-            <LiveActivityFeed />
+      {/* FOOTER */}
+      <footer className="w-full bg-[#030303] border-t border-white/6 py-8 relative z-10">
+        <div className="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-mono text-gray-500">
+          <span>© 2026 ORBIT AI. The Agentic Substrate Operating System.</span>
+          <div className="flex gap-4">
+            <Link href="/docs" className="hover:text-white">Docs</Link>
+            <Link href="/marketplace" className="hover:text-white">Marketplace</Link>
+            <Link href="/workflow" className="hover:text-white">Builder</Link>
           </div>
-        </div>
-      </section>
-
-      {/* PRICING PLANS SECTION */}
-      <section id="pricing-tiers" className="max-w-5xl mx-auto px-6 pb-24 relative z-10 border-t border-white/8 pt-20">
-        <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold block text-center mb-2">Substrate Access</span>
-        <h3 className="text-3xl md:text-4xl font-normal leading-tight font-instrument text-center mb-12">
-          Simple, Transparent Pricing
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
-          {[
-            { name: "Starter", price: "Free", desc: "Sandbox environment, 10 workflows/day.", highlighted: false },
-            { name: "Professional", price: "$49/mo", desc: "Production access, 1000 workflows/day, SLA checks.", highlighted: true },
-            { name: "Enterprise", price: "Custom", desc: "Dedicated instance, custom SLA rules, priority queues.", highlighted: false }
-          ].map((plan, idx) => (
-            <div key={idx} className={`bg-[#0D0D0D]/80 p-6 rounded-xl border flex flex-col justify-between gap-4 transition-all duration-300 ${plan.highlighted ? 'border-[#6FCBFF] shadow-[0_0_20px_rgba(111,203,255,0.15)] scale-[1.03]' : 'border-white/8'}`}>
-              <div>
-                <h4 className="text-xs font-mono uppercase tracking-widest text-gray-500">{plan.name}</h4>
-                <h2 className="text-2xl font-extrabold text-white mt-2">{plan.price}</h2>
-                <p className="text-[11px] text-gray-400 mt-2 font-mono leading-relaxed">{plan.desc}</p>
-              </div>
-              <button 
-                onClick={scrollToIntentionWorkspace}
-                className={`w-full py-2.5 rounded-lg text-xs font-bold font-mono transition-all ${plan.highlighted ? 'bg-[#6FCBFF] text-black hover:brightness-110' : 'bg-white/5 border border-white/8 text-white hover:bg-white/10'}`}
-              >
-                Choose Plan
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FINAL CONVERGING CTA SECTION */}
-      <section className="relative z-10 max-w-4xl mx-auto px-6 py-28 text-center flex flex-col items-center gap-6 border-t border-white/8">
-        <h2 className="text-4xl md:text-6xl font-normal leading-tight font-instrument max-w-2xl text-white">
-          Ready to Build the Future of Autonomous AI?
-        </h2>
-        <p className="text-gray-400 text-xs font-mono max-w-md leading-relaxed mt-1">
-          Deploy, execute, and monetize multi-agent swarms. Settle transaction fees autonomously on the CAP agent commerce protocol.
-        </p>
-        <div className="flex gap-4 mt-3">
-          <button
-            onClick={scrollToIntentionWorkspace}
-            className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black text-xs font-extrabold px-8 py-3.5 rounded-xl transition-all hover:scale-[1.02] font-mono shadow-[0_0_20px_rgba(111,203,255,0.2)]"
-          >
-            Launch Workspace
-          </button>
-          <Link
-            href="/marketplace"
-            className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/8 text-xs font-bold px-8 py-3.5 rounded-xl transition-all backdrop-blur-md"
-          >
-            Explore Marketplace
-          </Link>
-        </div>
-      </section>
-
-      {/* PREMIUM GLASS FOOTER */}
-      <footer className="w-full bg-[#030303] border-t border-white/8 py-10 relative z-10">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-mono text-gray-500">
-          <span>© 2026 ORBIT AI. The Autonomous Substrate Operating System.</span>
-          <div className="flex gap-6">
-            <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
-            <Link href="/marketplace" className="hover:text-white transition-colors">Marketplace</Link>
-            <Link href="/workflow" className="hover:text-white transition-colors">Builder</Link>
-          </div>
-          <span>v2.5.0 | Status: Production Active</span>
         </div>
       </footer>
     </div>
