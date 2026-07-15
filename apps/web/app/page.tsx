@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { useNexusStore } from '../store/nexusStore';
 import { useAuthStore } from '../store/authStore';
 import { useUserWallet } from '../hooks/useUserWallet';
@@ -25,138 +27,449 @@ import {
   Menu,
   X,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  ArrowUpRight,
+  TrendingUp,
+  Clock,
+  Lock,
+  ArrowDownRight,
+  Activity,
+  CheckCircle,
+  HelpCircle
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
-// Live Activity Feed Component showing real-time agent commerce updates
-function LiveActivityFeed() {
-  const [feed, setFeed] = useState<any[]>([
-    { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
-    { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
-    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' },
-    { type: 'Registration', desc: 'New verified node "SentriScan" active on CAP', time: '20s ago' },
-    { type: 'Workflow Run', desc: 'Intention swarm started for "Compliance check"', time: '40s ago' }
-  ]);
+// Premium 3D Perspective Card Wrapper
+function PerspectiveCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const box = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - box.left - box.width / 2;
+    const y = e.clientY - box.top - box.height / 2;
+    
+    // Tilt calculations
+    setRotateX(-y / 20);
+    setRotateY(x / 20);
+  };
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    let active = true;
-    const fetchFeed = async () => {
-      try {
-        const res = await apiService.getActivityFeed();
-        if (res && res.success && Array.isArray(res.data) && active) {
-          setFeed(res.data);
-        }
-      } catch (err) {
-        console.warn('Failed to load live activity feed:', err);
-      }
-    };
-
-    fetchFeed();
-    const interval = setInterval(fetchFeed, 3000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [isDemoMode, isAuthenticated]);
+  const handleMouseLeave = () => {
+    setRotateX(0);
+    setRotateY(0);
+  };
 
   return (
-    <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
-      <div>
-        <div className="flex justify-between items-center border-b border-border-dark pb-2 mb-3">
-          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase">
-            <span className="w-1.5 h-1.5 bg-primary-neon rounded-full animate-ping"></span>
-            Agent Commerce Activity Feed
-          </h4>
-          <span className="text-[9px] text-gray-500">Live Sync</span>
-        </div>
-        <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
-          {feed.map((evt, idx) => (
-            <div key={idx} className="bg-white/2 border border-border-dark p-2.5 rounded-lg flex flex-col gap-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
-              <div className="flex justify-between text-[8px]">
-                <span className="text-primary-neon font-bold uppercase tracking-wider">{evt.type}</span>
-                <span className="text-gray-500">{evt.time}</span>
-              </div>
-              <p className="text-[10px] text-gray-300 leading-normal">{evt.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="text-[9px] text-gray-500 border-t border-border-dark pt-3 flex justify-between items-center">
-        <span>CAP Protocol V2</span>
-        <span>Secure Escrows</span>
+    <div
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`transition-all duration-200 ease-out border border-white/8 bg-[#0D0D0D]/75 backdrop-blur-md rounded-[24px] overflow-hidden relative ${className}`}
+      style={{
+        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+        transformStyle: 'preserve-3d',
+      }}
+    >
+      {/* Gloss Reflection Overlay */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none transition-opacity duration-300 group-hover:opacity-[0.06]"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%)',
+        }}
+      />
+      <div style={{ transform: 'translateZ(10px)' }}>
+        {children}
       </div>
     </div>
   );
 }
 
-// Counters animation helper component
-function AnimatedCounter({ target, suffix = '', duration = 1500 }: { target: number; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  
+// ----------------------------------------------------
+// INTERACTIVE MOCKUPS
+// ----------------------------------------------------
+
+// 1. Interactive Workflow Builder Mockup
+function WorkflowBuilderMockup() {
+  const [activeStep, setActiveStep] = useState(0);
+  const [logs, setLogs] = useState<string[]>([
+    '[Planner] Analyzing prompt intent...',
+    '[Planner] Sequenced 6 execution nodes.'
+  ]);
+
+  const steps = [
+    { id: 'plan', label: 'Swarm Planner', icon: <Sparkles className="w-4 h-4 text-[#6FCBFF]" />, desc: 'Decomposing intent' },
+    { id: 'research', label: 'Market Research', icon: <Globe className="w-4 h-4 text-[#C9F4FF]" />, desc: 'QuickScan active' },
+    { id: 'openai', label: 'LLM Reasoning', icon: <Cpu className="w-4 h-4 text-[#6FCBFF]" />, desc: 'Claude 3.5 Sonnet' },
+    { id: 'escrow', label: 'CAP Wallet', icon: <Wallet className="w-4 h-4 text-[#C9F4FF]" />, desc: 'USDC Escrow audit' },
+    { id: 'db', label: 'Vector Store', icon: <Database className="w-4 h-4 text-gray-500" />, desc: 'Saving memory' },
+    { id: 'output', label: 'Verifier Output', icon: <ShieldCheck className="w-4 h-4 text-[#6FCBFF]" />, desc: 'SLA verification' }
+  ];
+
   useEffect(() => {
-    let start = 0;
-    const end = target;
-    if (start === end) return;
-    
-    const totalMiliseconds = duration;
-    const incrementTime = Math.max(Math.floor(totalMiliseconds / end), 10);
-    
-    const timer = setInterval(() => {
-      start += Math.ceil(end / (totalMiliseconds / incrementTime));
-      if (start >= end) {
-        clearInterval(timer);
-        setCount(end);
-      } else {
-        setCount(start);
-      }
-    }, incrementTime);
-    
-    return () => clearInterval(timer);
-  }, [target, duration]);
-  
+    const interval = setInterval(() => {
+      setActiveStep((prev) => {
+        const next = (prev + 1) % steps.length;
+        
+        // Append log dynamically
+        const newLog = `[${steps[next].label}] ${steps[next].desc}...`;
+        setLogs(l => [newLog, ...l.slice(0, 3)]);
+        
+        return next;
+      });
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <span>{count.toLocaleString()}{suffix}</span>
+    <div className="p-6 flex flex-col gap-6 h-full justify-between font-mono text-xs text-left">
+      <div className="flex justify-between items-center border-b border-white/8 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#6FCBFF] animate-pulse"></span>
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Orchestrator Visualizer</span>
+        </div>
+        <span className="text-[9px] bg-white/5 border border-white/8 px-2 py-0.5 rounded text-gray-400">DAG Layout</span>
+      </div>
+
+      {/* Connection Graph map */}
+      <div className="grid grid-cols-2 gap-4 py-2 relative">
+        {/* Animated connection lines overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          <svg className="w-full h-full" fill="none">
+            <path d="M 120 40 L 120 180 M 120 110 L 280 110" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+            <path d="M 120 40 L 120 180" stroke="url(#line-glow)" strokeWidth="1.5" strokeDasharray="10 40">
+              <animate attributeName="stroke-dashoffset" values="50;0" dur="2s" repeatCount="indefinite" />
+            </path>
+          </svg>
+          <svg className="hidden">
+            <defs>
+              <linearGradient id="line-glow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#6FCBFF" />
+                <stop offset="100%" stopColor="#C9F4FF" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {steps.map((s, idx) => {
+          const isActive = idx === activeStep;
+          const isDone = idx < activeStep;
+          return (
+            <div 
+              key={s.id}
+              className={`p-3.5 rounded-xl border flex items-center gap-3 transition-all duration-300 relative z-10 ${
+                isActive 
+                  ? 'border-[#6FCBFF] bg-[#6FCBFF]/5 shadow-[0_0_15px_rgba(111,203,255,0.08)]' 
+                  : isDone
+                    ? 'border-white/10 bg-white/2 opacity-75'
+                    : 'border-white/4 bg-transparent opacity-45'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                isActive ? 'bg-[#6FCBFF]/10 border-[#6FCBFF]/30' : 'bg-white/2 border-white/8'
+              }`}>
+                {s.icon}
+              </div>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-[10px] font-bold text-white truncate">{s.label}</span>
+                <span className="text-[8px] text-gray-500 truncate">{s.desc}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Small timeline logs block */}
+      <div className="bg-black/40 border border-white/8 p-3 rounded-lg flex flex-col gap-1 max-h-[85px] overflow-hidden">
+        {logs.map((log, idx) => (
+          <span key={idx} className={`text-[9px] ${idx === 0 ? 'text-[#6FCBFF]' : 'text-gray-500'}`}>
+            {log}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
-const NETWORK_NODES = [
-  { id: 'agent', label: 'AI Worker', icon: '🤖', x: 250, y: 150 },
-  { id: 'wallet', label: 'USDC Wallet', icon: '💼', x: 450, y: 100 },
-  { id: 'openai', label: 'OpenAI GPT-4o', icon: '🧠', x: 680, y: 130 },
-  { id: 'claude', label: 'Claude 3.5', icon: '🔮', x: 820, y: 250 },
-  { id: 'gemini', label: 'Gemini Pro', icon: '♊', x: 680, y: 370 },
-  { id: 'deepseek', label: 'DeepSeek', icon: '⚡', x: 450, y: 400 },
-  { id: 'vector', label: 'Vector DB', icon: '📁', x: 250, y: 350 },
-  { id: 'db', label: 'Main DB', icon: '🗄️', x: 450, y: 250 },
-  { id: 'browser', label: 'Browser Node', icon: '🌐', x: 100, y: 250 },
-];
+// 2. Interactive Marketplace Mockup
+function MarketplaceMockup() {
+  const [installedCount, setInstalledCount] = useState(2);
+  const [installingId, setInstallingId] = useState<string | null>(null);
+  const [installedSet, setInstalledSet] = useState<string[]>(['agent-1']);
 
-const NETWORK_EDGES = [
-  { source: 'agent', target: 'wallet', path: 'M 250 150 L 450 100' },
-  { source: 'agent', target: 'browser', path: 'M 250 150 L 100 250' },
-  { source: 'agent', target: 'vector', path: 'M 250 150 L 250 350' },
-  { source: 'wallet', target: 'openai', path: 'M 450 100 L 680 130' },
-  { source: 'openai', target: 'claude', path: 'M 680 130 L 820 250' },
-  { source: 'claude', target: 'gemini', path: 'M 820 250 L 680 370' },
-  { source: 'gemini', target: 'deepseek', path: 'M 680 370 L 450 400' },
-  { source: 'deepseek', target: 'db', path: 'M 450 400 L 450 250' },
-  { source: 'vector', target: 'db', path: 'M 250 350 L 450 250' },
-];
+  const list = [
+    { id: 'agent-1', name: 'FinAnalytica Pro', role: 'Finance', rating: '4.9', cost: '0.25', latency: '1200ms' },
+    { id: 'agent-2', name: 'InsightFinder', role: 'Research', rating: '4.8', cost: '0.05', latency: '450ms' },
+    { id: 'agent-3', name: 'ConsensuVerify', role: 'Security', rating: '4.85', cost: '0.10', latency: '800ms' }
+  ];
 
+  const handleInstall = (id: string) => {
+    if (installedSet.includes(id)) return;
+    setInstallingId(id);
+    setTimeout(() => {
+      setInstalledSet(prev => [...prev, id]);
+      setInstalledCount(prev => prev + 1);
+      setInstallingId(null);
+    }, 1200);
+  };
+
+  return (
+    <div className="p-6 flex flex-col gap-5 h-full justify-between font-mono text-xs text-left">
+      <div className="flex justify-between items-center border-b border-white/8 pb-3">
+        <div className="flex flex-col">
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Registry Marketplace</span>
+          <span className="text-[8px] text-gray-500 mt-0.5">Secure CAP capability hashes loaded</span>
+        </div>
+        <span className="text-[9px] bg-[#6FCBFF]/10 border border-[#6FCBFF]/30 px-2 py-0.5 rounded text-[#6FCBFF]">
+          {installedCount} Agents Connected
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {list.map((agent) => {
+          const isInstalled = installedSet.includes(agent.id);
+          const isInstalling = installingId === agent.id;
+          
+          return (
+            <div 
+              key={agent.id}
+              className="bg-white/2 border border-white/8 p-3.5 rounded-xl flex items-center justify-between gap-4 hover:border-white/15 transition-all duration-300"
+            >
+              <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold text-white truncate">{agent.name}</span>
+                  <span className="text-[8px] bg-white/5 border border-white/8 px-1.5 py-0.2 rounded text-gray-400">{agent.role}</span>
+                </div>
+                <div className="flex items-center gap-3 text-[8px] text-gray-500">
+                  <span>Rating: {agent.rating} ⭐</span>
+                  <span>Latency: {agent.latency}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="text-[#6FCBFF] font-bold text-[10px]">{agent.cost} USDC</span>
+                <button
+                  onClick={() => handleInstall(agent.id)}
+                  disabled={isInstalled || isInstalling}
+                  className={`text-[9px] font-extrabold px-3 py-1.5 rounded-lg font-mono transition-all ${
+                    isInstalled
+                      ? 'bg-white/5 text-gray-500 border border-white/4 cursor-default'
+                      : isInstalling
+                        ? 'bg-[#6FCBFF]/10 text-[#6FCBFF] border border-[#6FCBFF]/30 animate-pulse'
+                        : 'bg-[#6FCBFF] text-black hover:brightness-110'
+                  }`}
+                >
+                  {isInstalled ? 'Installed' : isInstalling ? 'Auditing...' : 'Install'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 3. Interactive Execution Console Mockup
+function ExecutionConsoleMockup() {
+  const [progress, setProgress] = useState(15);
+  const [tokenRate, setTokenRate] = useState(2450);
+  const [logLines, setLogLines] = useState<string[]>([
+    '[14:45:01] SLA channels verified.',
+    '[14:45:03] Subtask mapping complete.',
+    '[14:45:05] Running parallel nodes...'
+  ]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress((p) => {
+        const next = p + 2;
+        if (next >= 100) {
+          // Add a new log reset
+          setLogLines(prev => [`[${new Date().toLocaleTimeString()}] Restarting execution chain...`, ...prev.slice(0, 2)]);
+          return 15;
+        }
+        return next;
+      });
+      setTokenRate(() => Math.floor(2100 + Math.random() * 800));
+    }, 1500);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="p-6 flex flex-col gap-5 h-full justify-between font-mono text-xs text-left">
+      <div className="flex justify-between items-center border-b border-white/8 pb-3">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-[#6FCBFF]" />
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Real-Time Execution Console</span>
+        </div>
+        <span className="text-[9px] text-[#6FCBFF] animate-pulse">Running</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 text-[10px] bg-white/2 border border-white/8 p-3 rounded-xl">
+        <div className="flex flex-col">
+          <span className="text-gray-500 text-[8px] uppercase">Token Throughput</span>
+          <span className="text-white font-bold mt-0.5">{tokenRate.toLocaleString()} t/sec</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-gray-500 text-[8px] uppercase">Active Duration</span>
+          <span className="text-white font-bold mt-0.5">14.2s (SLA SLA)</span>
+        </div>
+      </div>
+
+      {/* Progress bar container */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between items-center text-[9px] text-gray-500">
+          <span>PIPELINE COMPLETION PROGRESS</span>
+          <span className="text-white font-bold">{progress}%</span>
+        </div>
+        <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-[#6FCBFF] to-[#C9F4FF] rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+        </div>
+      </div>
+
+      <div className="bg-black/60 border border-white/8 p-3 rounded-lg flex flex-col gap-1.5 max-h-[100px] overflow-hidden">
+        {logLines.map((l, idx) => (
+          <span key={idx} className={`text-[9px] leading-relaxed truncate ${idx === 0 ? 'text-white' : 'text-gray-500'}`}>
+            {l}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 4. Interactive Escrow Wallet Mockup
+function EscrowWalletMockup() {
+  const [balance, setBalance] = useState(100.00);
+  const [escrow, setEscrow] = useState(0.00);
+  const [settled, setSettled] = useState(45.20);
+  const [txLog, setTxLog] = useState<string>('System idle. Escrow accounts loaded.');
+
+  const triggerMockTransfer = () => {
+    // 1. Lock escrow
+    setTxLog('Reserving 0.25 USDC SLA lock...');
+    setBalance(b => Number((b - 0.25).toFixed(2)));
+    setEscrow(e => Number((e + 0.25).toFixed(2)));
+
+    // 2. Release payout after 3 seconds
+    setTimeout(() => {
+      setTxLog('SLA consensus check passed. Disbursing payout.');
+      setEscrow(e => Number((e - 0.25).toFixed(2)));
+      setSettled(s => Number((s + 0.25).toFixed(2)));
+    }, 2500);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      triggerMockTransfer();
+    }, 7000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="p-6 flex flex-col gap-6 h-full justify-between font-mono text-xs text-left">
+      <div className="flex justify-between items-center border-b border-white/8 pb-3">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-[#6FCBFF]" />
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">CAP Escrow Substrate</span>
+        </div>
+        <span className="text-[9px] text-gray-500">P2P Payments</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white/2 border border-white/8 p-3 rounded-xl text-center">
+          <span className="text-gray-500 text-[8px] uppercase">Available</span>
+          <h4 className="text-xs font-bold text-white mt-1">{balance.toFixed(2)}</h4>
+        </div>
+        <div className="bg-[#6FCBFF]/5 border border-[#6FCBFF]/30 p-3 rounded-xl text-center relative overflow-hidden">
+          <span className="text-[#6FCBFF] text-[8px] uppercase">Escrow Locked</span>
+          <h4 className="text-xs font-bold text-white mt-1 animate-pulse">{escrow.toFixed(2)}</h4>
+        </div>
+        <div className="bg-white/2 border border-white/8 p-3 rounded-xl text-center">
+          <span className="text-gray-500 text-[8px] uppercase">Total Settled</span>
+          <h4 className="text-xs font-bold text-[#C9F4FF] mt-1">{settled.toFixed(2)}</h4>
+        </div>
+      </div>
+
+      {/* Transaction status card */}
+      <div className="bg-black/60 border border-white/8 p-3 rounded-lg flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#6FCBFF] shrink-0 animate-ping"></span>
+          <span className="text-[9px] text-gray-400 truncate">{txLog}</span>
+        </div>
+        <span className="text-[8px] text-gray-500 shrink-0 uppercase tracking-widest font-mono">CROO V2</span>
+      </div>
+    </div>
+  );
+}
+
+// 5. Interactive Analytics Mockup
+function AnalyticsMockup() {
+  const [data, setData] = useState([
+    { name: '1', usage: 1200 },
+    { name: '2', usage: 1800 },
+    { name: '3', usage: 1400 },
+    { name: '4', usage: 2200 },
+    { name: '5', usage: 2900 },
+    { name: '6', usage: 2400 },
+    { name: '7', usage: 3100 }
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setData((prev) => {
+        const next = [...prev.slice(1)];
+        const newVal = Math.floor(1500 + Math.random() * 2000);
+        next.push({ name: String(prev.length + 1), usage: newVal });
+        return next;
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="p-6 flex flex-col gap-4 h-full justify-between font-mono text-xs text-left">
+      <div className="flex justify-between items-center border-b border-white/8 pb-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-[#6FCBFF]" />
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Autonomous SLA Analytics</span>
+        </div>
+        <span className="text-[9px] text-[#C9F4FF]">60 FPS Chart</span>
+      </div>
+
+      <div className="w-full h-[140px] mt-2 select-none relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data}>
+            <defs>
+              <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6FCBFF" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#6FCBFF" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Tooltip contentStyle={{ background: '#0C0C0D', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '9px' }} />
+            <Area type="monotone" dataKey="usage" stroke="#6FCBFF" strokeWidth={1.5} fillOpacity={1} fill="url(#colorUsage)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="flex justify-between items-center text-[8px] text-gray-500 mt-1 pt-2 border-t border-white/8">
+        <span>METRIC: WORKFLOW REQUEST RATIO</span>
+        <span>LATENCY AVERAGE: 850ms</span>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// MAIN LANDING PORTAL PAGE
+// ----------------------------------------------------
 export default function PortalPage() {
   const userQuery = useNexusStore((state) => state.userQuery);
   const setUserQuery = useNexusStore((state) => state.setUserQuery);
   const startExecution = useNexusStore((state) => state.startExecution);
   const resetExecution = useNexusStore((state) => state.resetExecution);
-  const agents = useNexusStore((state) => state.agents) ?? [];
   const initialize = useNexusStore((state) => state.initialize);
   
   const user = useAuthStore((state) => state.user);
@@ -169,7 +482,6 @@ export default function PortalPage() {
   const [mounted, setMounted] = useState(false);
   const [routingMode, setLocalRoutingMode] = useState<'cheapest' | 'fastest' | 'accuracy' | 'balanced'>('balanced');
   const [budget, setLocalBudget] = useState<number>(2.0);
-  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -199,7 +511,9 @@ export default function PortalPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#050505] text-white overflow-x-hidden selection:bg-primary-neon/30 relative font-inter min-h-screen">
+    <div className="flex-1 flex flex-col bg-[#030303] text-white overflow-x-hidden selection:bg-[#6FCBFF]/30 relative font-inter min-h-screen">
+      
+      {/* Dynamic Fonts Import Style Block */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,400italic;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap');
         .font-instrument {
@@ -208,73 +522,99 @@ export default function PortalPage() {
         .font-inter {
           font-family: 'Inter', sans-serif;
         }
-        .glow-cyan {
-          box-shadow: 0 0 40px rgba(0, 245, 212, 0.15);
+        
+        /* Grid background layer */
+        .bg-grid-overlay {
+          background-size: 60px 60px;
+          background-image: 
+            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
         }
-        .glow-card {
-          box-shadow: 0 0 20px rgba(0, 245, 212, 0.03);
+        
+        /* Noise Overlay */
+        .bg-noise-overlay {
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.015'/%3E%3C/svg%3E");
         }
-        .glow-card:hover {
-          box-shadow: 0 0 30px rgba(0, 245, 212, 0.08);
-          border-color: rgba(0, 245, 212, 0.2) !important;
+
+        /* Subtle animated translation of gradient grid */
+        @keyframes slow-move {
+          0% { background-position: 0 0; }
+          100% { background-position: 60px 60px; }
+        }
+        .animate-grid-move {
+          animation: slow-move 20s linear infinite;
         }
       `}} />
 
-      {/* Floating radial gradient overlay behind hero */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] bg-[radial-gradient(circle_at_center,rgba(0,245,212,0.06),transparent_55%)] pointer-events-none z-0"></div>
-      
-      {/* Centered Floating Glass Navigation Bar */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-xl bg-[#0C0C0D]/75 border border-white/8 px-6 py-3 rounded-full flex items-center justify-between shadow-2xl transition-all duration-300">
+      {/* BACKGROUND DEPTH LAYERS */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        {/* Layer 1: Matte black layout gradients */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#030303] via-[#050505] to-[#080808]"></div>
+
+        {/* Layer 2: Subtle Grid */}
+        <div className="absolute inset-0 bg-grid-overlay opacity-80 animate-grid-move"></div>
+
+        {/* Layer 3: Noise overlay */}
+        <div className="absolute inset-0 bg-noise-overlay"></div>
+
+        {/* Layer 4: Floating blurred lights */}
+        <div className="absolute top-[10%] left-1/4 w-[600px] h-[600px] rounded-full bg-[#6FCBFF]/3 blur-[130px]"></div>
+        <div className="absolute top-[40%] right-1/4 w-[700px] h-[700px] rounded-full bg-white/2 blur-[150px]"></div>
+        <div className="absolute bottom-[20%] left-1/3 w-[500px] h-[500px] rounded-full bg-[#C9F4FF]/3 blur-[120px]"></div>
+      </div>
+
+      {/* Floating Header Navbar */}
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl backdrop-blur-2xl bg-[#0D0D0D]/70 border border-white/8 px-6 py-2.5 rounded-full flex items-center justify-between shadow-2xl">
         <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#53B6FF] to-[#00F5D4] flex items-center justify-center font-bold text-black text-base transition-transform group-hover:rotate-12 duration-300">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#53B6FF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-base transition-transform group-hover:rotate-12 duration-300">
             O
           </div>
           <span className="font-extrabold text-sm tracking-wider font-inter">
-            ORBIT <span className="text-[#00F5D4] font-normal text-xs tracking-widest ml-0.5">AI</span>
+            ORBIT <span className="text-[#6FCBFF] font-normal text-xs tracking-widest ml-0.5">AI</span>
           </span>
         </Link>
 
-        {/* Center menu links */}
-        <div className="hidden md:flex items-center gap-6 font-mono text-[11px] text-gray-400">
-          <Link href="/" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+        {/* Menu Links */}
+        <div className="hidden lg:flex items-center gap-6 font-mono text-[10px] text-gray-400">
+          <Link href="/" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Portal
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </Link>
-          <Link href="/marketplace" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+          <Link href="/marketplace" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Marketplace
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </Link>
-          <Link href="/workflow" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+          <Link href="/workflow" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Workflow Builder
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </Link>
-          <Link href="/analytics" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+          <Link href="/analytics" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Analytics
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </Link>
-          <a href="#pricing" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+          <a href="#pricing-tiers" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Pricing
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </a>
-          <Link href="/docs" className="hover:text-[#00F5D4] transition-colors relative group py-1">
+          <Link href="/docs" className="hover:text-[#6FCBFF] transition-colors relative group py-1">
             Developers
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#00F5D4] transition-all group-hover:w-full"></span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#6FCBFF] transition-all group-hover:w-full"></span>
           </Link>
         </div>
 
-        {/* Right menu buttons */}
+        {/* Right Buttons */}
         <div className="flex items-center gap-3">
           {mounted && token && user ? (
             <div className="relative group">
               <button className="flex items-center gap-2 py-1 focus:outline-none">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#00F5D4] to-[#53B6FF] flex items-center justify-center font-bold text-black text-xs font-mono">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#6FCBFF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-xs font-mono">
                   {user.displayName?.substring(0, 2).toUpperCase() || 'US'}
                 </div>
-                <span className="text-[11px] text-gray-300 font-mono hidden sm:inline max-w-[80px] truncate">
+                <span className="text-[10px] text-gray-300 font-mono hidden sm:inline max-w-[80px] truncate">
                   {user.displayName || user.username || 'User'}
                 </span>
               </button>
-              <div className="absolute w-44 hidden group-hover:block bg-black/90 border border-white/8 rounded-xl shadow-xl p-1 right-0 top-full mt-2 font-mono text-[10px]">
+              <div className="absolute w-40 hidden group-hover:block bg-black/90 border border-white/8 rounded-xl shadow-xl p-1.5 right-0 top-full mt-2 font-mono text-[9px]">
                 <Link href="/dashboard" className="block px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                   Dashboard
                 </Link>
@@ -289,7 +629,7 @@ export default function PortalPage() {
           ) : (
             <button
               onClick={() => setAuthModal(true, 'login')}
-              className="text-[11px] font-mono text-gray-400 hover:text-white transition-colors"
+              className="text-[10px] font-mono text-gray-400 hover:text-white transition-colors"
             >
               Sign In
             </button>
@@ -297,7 +637,7 @@ export default function PortalPage() {
 
           <button
             onClick={scrollToIntentionWorkspace}
-            className="bg-[#00F5D4] hover:bg-[#00F5D4]/90 text-black text-[11px] font-extrabold px-4 py-2 rounded-full transition-all hover:shadow-[0_0_15px_rgba(0,245,212,0.4)] flex items-center gap-1 font-mono"
+            className="bg-white text-black hover:bg-white/90 text-[10px] font-extrabold px-4 py-2 rounded-full transition-all flex items-center gap-1 font-mono hover:scale-[1.02]"
           >
             Launch Workspace
             <ArrowRight className="w-3 h-3" />
@@ -305,184 +645,195 @@ export default function PortalPage() {
         </div>
       </nav>
 
-      {/* Hero Section Container */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-36 md:pt-48 pb-20 flex flex-col items-center text-center gap-8">
-        {/* Operating System Badge */}
-        <div className="inline-flex items-center gap-2 bg-[#0C0C0D]/90 border border-white/8 rounded-full px-4 py-1.5 text-[10px] tracking-wider font-mono uppercase text-[#00F5D4]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00F5D4] animate-pulse"></span>
-          AI Agent Operating System
-        </div>
-
-        {/* Hero Headline */}
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-normal tracking-tight leading-tight max-w-4xl text-white font-instrument">
-          Build AI Workers<br />
-          That Hire <span className="italic text-transparent bg-clip-text bg-gradient-to-r from-[#00F5D4] to-[#53B6FF]">Other AI Workers</span>
-        </h1>
-
-        {/* Subtitle */}
-        <p className="text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed font-inter">
-          Deploy autonomous AI agents capable of planning, executing, collaborating and paying one another through programmable workflows, secure wallets and intelligent orchestration.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-wrap gap-4 justify-center items-center mt-2">
-          <button
-            onClick={scrollToIntentionWorkspace}
-            className="bg-[#00F5D4] hover:bg-[#00F5D4]/90 text-black text-xs font-extrabold px-8 py-4 rounded-xl transition-all glow-cyan hover:scale-[1.02] flex items-center gap-2 font-mono"
+      {/* HERO SECTION VIEWPORT */}
+      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-5xl mx-auto pt-20">
+        <div className="flex flex-col items-center gap-6 max-w-4xl">
+          {/* Tagline Badge */}
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-2 bg-[#0D0D0D]/95 border border-white/8 rounded-full px-4.5 py-1.5 text-[9px] tracking-widest font-mono uppercase text-gray-400"
           >
-            Launch Workspace
-            <Play className="w-4 h-4 fill-black" />
-          </button>
-          <Link
-            href="/marketplace"
-            className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/8 text-xs font-bold px-8 py-4 rounded-xl transition-all backdrop-blur-md"
-          >
-            Explore Marketplace
-          </Link>
-        </div>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#6FCBFF] animate-pulse"></span>
+            Agent Swarm Substrate
+          </motion.div>
 
-        {/* Visual Live Metrics Counter Row */}
-        <div className="w-full grid grid-cols-2 md:grid-cols-5 gap-4 mt-16 max-w-4xl">
-          {[
-            { label: 'Active Agents', value: 1424, suffix: '' },
-            { label: 'Workflows Run', value: 38290, suffix: '' },
-            { label: 'Marketplace Nodes', value: 248, suffix: '' },
-            { label: 'Average SLA', value: 99.8, suffix: '%', isFloat: true },
-            { label: 'USDC Settled', value: 45210, suffix: ' USDC' }
-          ].map((stat, idx) => (
-            <div key={idx} className="bg-[#0C0C0D]/80 border border-white/8 backdrop-blur-sm p-4 rounded-xl flex flex-col justify-center text-center glow-card transition-all duration-300">
-              <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">{stat.label}</span>
-              <h3 className="text-xl font-bold mt-1 text-white font-mono">
-                {stat.isFloat ? (
-                  <span>99.8%</span>
-                ) : (
-                  <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-                )}
-              </h3>
-            </div>
-          ))}
+          {/* Headline (Line-by-line mask reveal) */}
+          <h1 className="text-5xl md:text-7xl lg:text-8xl tracking-tight leading-[1.08] max-w-4xl text-white font-instrument select-none">
+            <motion.span 
+              initial={{ opacity: 0, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="block"
+            >
+              Build AI Workers
+            </motion.span>
+            <motion.span 
+              initial={{ opacity: 0, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="block italic font-light text-gray-400"
+            >
+              That Hire
+            </motion.span>
+            <motion.span 
+              initial={{ opacity: 0, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="block text-transparent bg-clip-text bg-gradient-to-r from-[#6FCBFF] via-[#FFFFFF] to-[#C9F4FF]"
+            >
+              Other AI Workers
+            </motion.span>
+          </h1>
+
+          {/* Subtitle */}
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, delay: 0.8 }}
+            className="text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed font-inter mt-2"
+          >
+            Deploy autonomous AI workers capable of planning, executing, collaborating and paying other AI workers securely.
+          </motion.p>
+
+          {/* Action Buttons */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.0 }}
+            className="flex flex-wrap gap-4 justify-center items-center mt-3"
+          >
+            <button
+              onClick={scrollToIntentionWorkspace}
+              className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black text-xs font-extrabold px-8 py-3.5 rounded-xl transition-all hover:shadow-[0_0_20px_rgba(111,203,255,0.25)] flex items-center gap-2 font-mono group"
+            >
+              Launch Workspace
+              <Play className="w-4 h-4 fill-black group-hover:translate-x-0.5 transition-transform" />
+            </button>
+            <a
+              href="#keynote-sections"
+              className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/8 text-xs font-bold px-8 py-3.5 rounded-xl transition-all backdrop-blur-md"
+            >
+              Watch Keynote Details
+            </a>
+          </motion.div>
         </div>
       </section>
 
-      {/* Loop Animated Flow Graph SVG Background Visual */}
-      <section className="w-full max-w-5xl mx-auto px-6 pb-24 relative z-10 flex justify-center items-center">
-        <div className="relative w-full aspect-[2/1] min-h-[300px] max-h-[500px] border border-white/8 bg-[#0C0C0D]/40 rounded-2xl backdrop-blur-md overflow-hidden glow-cyan">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,245,212,0.02),transparent_70%)]"></div>
-          
-          <svg className="w-full h-full" viewBox="0 0 1000 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#00F5D4" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#53B6FF" stopOpacity="0.25" />
-              </linearGradient>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="6" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-            </defs>
-
-            {/* Drawing connection paths with static color */}
-            {NETWORK_EDGES.map((edge, idx) => (
-              <path
-                key={idx}
-                d={edge.path}
-                stroke="url(#edge-gradient)"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                className="opacity-60"
-              />
-            ))}
-
-            {/* Glowing flowing lines */}
-            {NETWORK_EDGES.map((edge, idx) => (
-              <path
-                key={`flow-${idx}`}
-                d={edge.path}
-                stroke="#00F5D4"
-                strokeWidth="2"
-                strokeDasharray="30 150"
-                className="opacity-80"
-                filter="url(#glow)"
-              >
-                <animate
-                  attributeName="stroke-dashoffset"
-                  values="180;0"
-                  dur="4s"
-                  repeatCount="indefinite"
-                />
-              </path>
-            ))}
-
-            {/* Execution sparks traveling along paths */}
-            {NETWORK_EDGES.map((edge, idx) => (
-              <circle key={`dot-${idx}`} r="3" fill="#00F5D4" filter="url(#glow)">
-                <animateMotion
-                  dur="4s"
-                  repeatCount="indefinite"
-                  path={edge.path}
-                />
-              </circle>
-            ))}
-
-            {/* Draw nodes */}
-            {NETWORK_NODES.map((node) => (
-              <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
-                {/* Node pulsing anchor */}
-                <circle r="22" fill="#0C0C0D" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-                <circle r="22" fill="none" stroke="#00F5D4" strokeWidth="1" className="opacity-40">
-                  <animate attributeName="r" values="22;28;22" dur="3s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite" />
-                </circle>
-                
-                {/* Node Symbol/Icon */}
-                <text
-                  textAnchor="middle"
-                  dy="5"
-                  fill="#ffffff"
-                  fontSize="16"
-                  className="font-inter select-none"
-                >
-                  {node.icon}
-                </text>
-
-                {/* Node Label Card */}
-                <rect x="-55" y="32" width="110" height="20" rx="4" fill="#050505" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-                <text
-                  textAnchor="middle"
-                  y="45"
-                  fill="rgba(255,255,255,0.7)"
-                  fontSize="9"
-                  className="font-mono tracking-wider font-semibold uppercase"
-                >
-                  {node.label}
-                </text>
-              </g>
-            ))}
-          </svg>
-        </div>
-      </section>
-
-      {/* How It Works & Core Details grid section */}
-      <section className="max-w-5xl mx-auto px-6 pb-24 relative z-10 grid grid-cols-1 md:grid-cols-4 gap-6 border-t border-white/8 pt-20">
-        {[
-          { step: "01", title: "Analyze Prompt", desc: "Describe your intention. The planner analyzes dependencies and maps agent layers." },
-          { step: "02", title: "Decompose Subtasks", desc: "Your prompt is split into a robust parallel and sequential DAG execution structure." },
-          { step: "03", title: "Lock Escrow Wallet", desc: "SLA payment channels are locked securely in USDC escrow before agent trigger." },
-          { step: "04", title: "P2P Settlement", desc: "Outputs are verified by a consensus agent and payments are released directly." }
-        ].map((item, idx) => (
-          <div key={idx} className="bg-[#0C0C0D]/80 border border-white/8 p-6 rounded-xl flex flex-col gap-3 glow-card transition-all duration-300">
-            <span className="text-[#00F5D4] font-mono text-xl font-bold">{item.step}</span>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">{item.title}</h4>
-            <p className="text-[11px] text-gray-400 font-mono leading-relaxed">{item.desc}</p>
+      {/* KEYNOTE SECTIONS SECTION CONTAINER */}
+      <section id="keynote-sections" className="relative z-10 max-w-5xl mx-auto px-6 flex flex-col gap-24 md:gap-36 pb-24">
+        
+        {/* Section 1: Workflow Builder */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="order-2 md:order-1">
+            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
+              <WorkflowBuilderMockup />
+            </PerspectiveCard>
           </div>
-        ))}
+          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 01</span>
+            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+              Visual Agent Workflow Builder
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Graphically map out complex Multi-Agent Swarms. Define dependencies, capabilities, retry boundaries, and custom execution limits. Watch connections route tokens concurrently at 60 FPS.
+            </p>
+            <Link href="/workflow" className="text-[10px] font-mono text-[#6FCBFF] hover:underline flex items-center gap-1 mt-2">
+              Launch Workflow Builder &rarr;
+            </Link>
+          </div>
+        </div>
+
+        {/* Section 2: Marketplace */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="text-left flex flex-col gap-4 max-w-md">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9F4FF] font-bold">Keynote Stage 02</span>
+            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+              Decentralized Registry Store
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Discover, install, and benchmark autonomous agent nodes published by developers. Lock secure USDC-CAP pricing agreements, audit reputation trustScores, and read success rates before loading.
+            </p>
+            <Link href="/marketplace" className="text-[10px] font-mono text-[#C9F4FF] hover:underline flex items-center gap-1 mt-2">
+              Explore Agent Marketplace &rarr;
+            </Link>
+          </div>
+          <div>
+            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
+              <MarketplaceMockup />
+            </PerspectiveCard>
+          </div>
+        </div>
+
+        {/* Section 3: Live Execution */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="order-2 md:order-1">
+            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
+              <ExecutionConsoleMockup />
+            </PerspectiveCard>
+          </div>
+          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 03</span>
+            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+              Live Console Telemetry
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Monitor running agent chains in real-time. View execution progress, active token rates, fallback errors, and stream terminal status updates. Everything updates continuously on GPU-accelerated layouts.
+            </p>
+          </div>
+        </div>
+
+        {/* Section 4: Wallet */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="text-left flex flex-col gap-4 max-w-md">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9F4FF] font-bold">Keynote Stage 04</span>
+            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+              CAP Escrow & Settlements
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              USDC deposits are locked in secure smart escrow contracts prior to execution trigger. Funds are disbursed automatically to worker node addresses only after independent verification consensus is reached.
+            </p>
+            <Link href="/wallet" className="text-[10px] font-mono text-[#C9F4FF] hover:underline flex items-center gap-1 mt-2">
+              View Personal Substrate Wallet &rarr;
+            </Link>
+          </div>
+          <div>
+            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
+              <EscrowWalletMockup />
+            </PerspectiveCard>
+          </div>
+        </div>
+
+        {/* Section 5: Analytics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="order-2 md:order-1">
+            <PerspectiveCard className="w-full aspect-[4/3] flex items-center justify-center">
+              <AnalyticsMockup />
+            </PerspectiveCard>
+          </div>
+          <div className="order-1 md:order-2 text-left flex flex-col gap-4 max-w-md">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#6FCBFF] font-bold">Keynote Stage 05</span>
+            <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+              Autonomous SLA Performance
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Analyze request latency ratios, cost breakdowns, and overall active node load. Recharts-rendered graphics let you optimize workflows and compare pricing metrics dynamically.
+            </p>
+            <Link href="/analytics" className="text-[10px] font-mono text-[#6FCBFF] hover:underline flex items-center gap-1 mt-2">
+              Inspect Advanced Analytics &rarr;
+            </Link>
+          </div>
+        </div>
+
       </section>
 
-      {/* Interactive Intention Launchpad Workspace Section */}
+      {/* INTERACTIVE WORKSPACE SECTION */}
       <section id="launchpad" className="max-w-5xl w-full mx-auto px-6 pb-24 relative z-10 scroll-mt-24">
-        <div className="text-left flex flex-col gap-3 mb-6">
-          <h2 className="text-xl font-bold uppercase tracking-wider text-white font-instrument">
-            Intention Launcher Workspace
+        <div className="text-left flex flex-col gap-3 mb-8">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold">Active Substrate</span>
+          <h2 className="text-3xl md:text-4xl font-normal leading-tight font-instrument">
+            Orchestration Launchpad
           </h2>
           <p className="text-xs text-gray-400 font-mono max-w-xl">
             Input a complex agent request below. The router constructs the execution stack, calculates SLA latency, and locks CAP USDC channels.
@@ -491,7 +842,7 @@ export default function PortalPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Intention Workspace */}
-          <div className="lg:col-span-2 bg-[#0C0C0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col gap-4 glow-cyan">
+          <div className="lg:col-span-2 bg-[#0D0D0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col gap-4 glow-card">
             <div className="flex flex-col gap-2">
               <label className="text-xs uppercase font-bold tracking-wider text-gray-500 font-mono">
                 Execute Natural Language Intention
@@ -499,7 +850,7 @@ export default function PortalPage() {
               <div className="flex flex-col md:flex-row gap-3">
                 <input
                   type="text"
-                  className="flex-1 bg-black/40 border border-white/8 focus:border-[#00F5D4]/50 px-4 py-3 rounded-xl text-white text-xs outline-none transition-colors font-mono"
+                  className="flex-1 bg-black/40 border border-white/8 focus:border-[#6FCBFF]/50 px-4 py-3 rounded-xl text-white text-xs outline-none transition-colors font-mono"
                   placeholder="e.g. Create a complete investment report for Tesla..."
                   value={userQuery}
                   onChange={(e) => setUserQuery(e.target.value)}
@@ -507,7 +858,7 @@ export default function PortalPage() {
                 <button
                   onClick={handleLaunch}
                   disabled={!userQuery.trim()}
-                  className="bg-[#00F5D4] hover:bg-[#00F5D4]/90 text-black px-6 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all font-mono shrink-0"
+                  className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black px-6 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 hover:brightness-110 disabled:opacity-50 transition-all font-mono shrink-0"
                 >
                   <Play className="w-3.5 h-3.5 fill-black" />
                   Launch Swarm
@@ -520,7 +871,7 @@ export default function PortalPage() {
               {/* Routing Mode */}
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase">
-                  <Sliders className="w-3.5 h-3.5 text-[#00F5D4]" />
+                  <Sliders className="w-3.5 h-3.5 text-[#6FCBFF]" />
                   Smart Routing Metrics
                 </span>
                 <div className="grid grid-cols-4 gap-2">
@@ -528,9 +879,9 @@ export default function PortalPage() {
                     <button
                       key={mode}
                       onClick={() => setLocalRoutingMode(mode)}
-                      className={`text-[10px] py-2 rounded-lg font-bold border uppercase transition-all font-mono ${
+                      className={`text-[9px] py-2 rounded-lg font-bold border uppercase transition-all font-mono ${
                         routingMode === mode
-                          ? 'border-[#00F5D4] text-[#00F5D4] bg-[#00F5D4]/5'
+                          ? 'border-[#6FCBFF] text-[#6FCBFF] bg-[#6FCBFF]/5'
                           : 'border-white/8 text-gray-400 bg-white/2 hover:text-white hover:bg-white/5'
                       }`}
                     >
@@ -544,10 +895,10 @@ export default function PortalPage() {
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-gray-400 flex items-center gap-1 font-mono uppercase justify-between">
                   <span className="flex items-center gap-1">
-                    <Coins className="w-3.5 h-3.5 text-[#53B6FF]" />
+                    <Coins className="w-3.5 h-3.5 text-[#C9F4FF]" />
                     Budget Optimization Cap
                   </span>
-                  <span className="text-[#53B6FF]">{(budget || 0).toFixed(2)} USDC</span>
+                  <span className="text-[#C9F4FF]">{(budget || 0).toFixed(2)} USDC</span>
                 </span>
                 <input
                   type="range"
@@ -556,7 +907,7 @@ export default function PortalPage() {
                   step="0.5"
                   value={budget}
                   onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-[#0C0C0D] rounded-lg appearance-none cursor-pointer accent-[#53B6FF]"
+                  className="w-full h-1.5 bg-[#0C0C0D] rounded-lg appearance-none cursor-pointer accent-[#C9F4FF]"
                 />
                 <div className="flex justify-between text-[10px] text-gray-500 font-mono">
                   <span>0.50 USDC</span>
@@ -583,15 +934,16 @@ export default function PortalPage() {
           </div>
 
           {/* Right Column: Live Activity Feed */}
-          <div className="lg:col-span-1 bg-[#0C0C0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col justify-between glow-card">
+          <div className="lg:col-span-1 bg-[#0D0D0D]/90 border border-white/8 p-6 rounded-2xl flex flex-col justify-between glow-card">
             <LiveActivityFeed />
           </div>
         </div>
       </section>
 
-      {/* Pricing Tiers Section */}
-      <section id="pricing" className="max-w-5xl mx-auto px-6 pb-24 relative z-10 border-t border-white/8 pt-20">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-center text-gray-400 font-mono mb-12">
+      {/* PRICING PLANS SECTION */}
+      <section id="pricing-tiers" className="max-w-5xl mx-auto px-6 pb-24 relative z-10 border-t border-white/8 pt-20">
+        <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 font-bold block text-center mb-2">Substrate Access</span>
+        <h3 className="text-3xl md:text-4xl font-normal leading-tight font-instrument text-center mb-12">
           Simple, Transparent Pricing
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
@@ -600,7 +952,7 @@ export default function PortalPage() {
             { name: "Professional", price: "$49/mo", desc: "Production access, 1000 workflows/day, SLA checks.", highlighted: true },
             { name: "Enterprise", price: "Custom", desc: "Dedicated instance, custom SLA rules, priority queues.", highlighted: false }
           ].map((plan, idx) => (
-            <div key={idx} className={`bg-[#0C0C0D]/80 p-6 rounded-xl border flex flex-col justify-between gap-4 transition-all duration-300 ${plan.highlighted ? 'border-[#00F5D4] shadow-[0_0_20px_rgba(0,245,212,0.15)] scale-[1.03]' : 'border-white/8'}`}>
+            <div key={idx} className={`bg-[#0D0D0D]/80 p-6 rounded-xl border flex flex-col justify-between gap-4 transition-all duration-300 ${plan.highlighted ? 'border-[#6FCBFF] shadow-[0_0_20px_rgba(111,203,255,0.15)] scale-[1.03]' : 'border-white/8'}`}>
               <div>
                 <h4 className="text-xs font-mono uppercase tracking-widest text-gray-500">{plan.name}</h4>
                 <h2 className="text-2xl font-extrabold text-white mt-2">{plan.price}</h2>
@@ -608,7 +960,7 @@ export default function PortalPage() {
               </div>
               <button 
                 onClick={scrollToIntentionWorkspace}
-                className={`w-full py-2.5 rounded-lg text-xs font-bold font-mono transition-all ${plan.highlighted ? 'bg-[#00F5D4] text-black hover:brightness-110' : 'bg-white/5 border border-white/8 text-white hover:bg-white/10'}`}
+                className={`w-full py-2.5 rounded-lg text-xs font-bold font-mono transition-all ${plan.highlighted ? 'bg-[#6FCBFF] text-black hover:brightness-110' : 'bg-white/5 border border-white/8 text-white hover:bg-white/10'}`}
               >
                 Choose Plan
               </button>
@@ -617,10 +969,34 @@ export default function PortalPage() {
         </div>
       </section>
 
-      {/* Premium Footer */}
-      <footer className="w-full bg-[#050505] border-t border-white/8 py-10 relative z-10">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-500">
-          <span>© 2026 ORBIT AI. The Agent Operating System substrate.</span>
+      {/* FINAL CONVERGING CTA SECTION */}
+      <section className="relative z-10 max-w-4xl mx-auto px-6 py-28 text-center flex flex-col items-center gap-6 border-t border-white/8">
+        <h2 className="text-4xl md:text-6xl font-normal leading-tight font-instrument max-w-2xl text-white">
+          Ready to Build the Future of Autonomous AI?
+        </h2>
+        <p className="text-gray-400 text-xs font-mono max-w-md leading-relaxed mt-1">
+          Deploy, execute, and monetize multi-agent swarms. Settle transaction fees autonomously on the CAP agent commerce protocol.
+        </p>
+        <div className="flex gap-4 mt-3">
+          <button
+            onClick={scrollToIntentionWorkspace}
+            className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/90 text-black text-xs font-extrabold px-8 py-3.5 rounded-xl transition-all hover:scale-[1.02] font-mono shadow-[0_0_20px_rgba(111,203,255,0.2)]"
+          >
+            Launch Workspace
+          </button>
+          <Link
+            href="/marketplace"
+            className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/8 text-xs font-bold px-8 py-3.5 rounded-xl transition-all backdrop-blur-md"
+          >
+            Explore Marketplace
+          </Link>
+        </div>
+      </section>
+
+      {/* PREMIUM GLASS FOOTER */}
+      <footer className="w-full bg-[#030303] border-t border-white/8 py-10 relative z-10">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-mono text-gray-500">
+          <span>© 2026 ORBIT AI. The Autonomous Substrate Operating System.</span>
           <div className="flex gap-6">
             <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
             <Link href="/marketplace" className="hover:text-white transition-colors">Marketplace</Link>
