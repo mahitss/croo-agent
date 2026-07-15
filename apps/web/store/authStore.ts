@@ -393,9 +393,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     registerUser: async (email, username, password, displayName, role = 'user') => {
-      console.log('[REGISTER] Sending request', { email, username, password: '••••••••', displayName, role });
+      let mappedRole = role;
+      if (role === 'creator') {
+        mappedRole = 'developer';
+      }
+      console.log('[REGISTER] Sending request', { email, username, password: '••••••••', displayName, role: mappedRole });
       try {
-        const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role });
+        const res = await apiClient.post<any>('/api/v1/auth/register', { email, username, password, displayName, role: mappedRole });
         console.log('[REGISTER] Response received', res);
 
         const success = res.success !== undefined ? res.success : true;
@@ -442,7 +446,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           id: 'user-mock-1',
           email,
           username,
-          role: role as any,
+          role: mappedRole as any,
           displayName: displayName || username,
           emailVerified: true
         };
@@ -539,7 +543,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const storage = rememberMe ? localStorage : sessionStorage;
       localStorage.setItem('orbit_remember_me', String(rememberMe));
       
-      set({ user: localProfile, token: `oauth-${provider}-token`, initializationState: 'AUTHENTICATED' });
+      set({ user: localProfile, token: `oauth-${provider}-token`, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
       storage.setItem('orbit_token', `oauth-${provider}-token`);
       storage.setItem('orbit_user', JSON.stringify(localProfile));
       localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -564,7 +568,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log('[AUTH_STORE] Google login success: updating state');
-          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
+          set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -604,7 +608,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
-        set({ user: localProfile, token: 'google-mock-token', initializationState: 'AUTHENTICATED' });
+        set({ user: localProfile, token: 'google-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
         storage.setItem('orbit_token', 'google-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -646,6 +650,7 @@ if (typeof window !== 'undefined') {
       rememberMe,
       token: token || null,
       user: parsedUser,
+      isAuthenticated: token && !isJwtExpired(token) ? true : false,
       initializationState: token && !isJwtExpired(token) ? 'AUTHENTICATED' : 'UNINITIALIZED',
       isCheckingAuth: !!storage.getItem('orbit_refreshtoken')
     });
@@ -669,6 +674,7 @@ if (typeof window !== 'undefined') {
         useAuthStore.setState({
           token: event.newValue,
           user: parsedUser,
+          isAuthenticated: true,
           initializationState: 'AUTHENTICATED',
           isCheckingAuth: false
         });
@@ -680,7 +686,7 @@ if (typeof window !== 'undefined') {
   // Listen for refresh events dispatched by API client
   window.addEventListener('orbit_token_refreshed', (e: any) => {
     if (e.detail?.token) {
-      useAuthStore.setState({ token: e.detail.token, initializationState: 'AUTHENTICATED' });
+      useAuthStore.setState({ token: e.detail.token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
     }
   });
 }
