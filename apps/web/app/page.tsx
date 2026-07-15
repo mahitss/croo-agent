@@ -39,6 +39,74 @@ import {
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
+// Live Activity Feed Component showing real-time agent commerce updates
+function LiveActivityFeed() {
+  const [feed, setFeed] = useState<any[]>([
+    { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
+    { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
+    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' },
+    { type: 'Registration', desc: 'New verified node "SentriScan" active on CAP', time: '20s ago' },
+    { type: 'Workflow Run', desc: 'Intention swarm started for "Compliance check"', time: '40s ago' }
+  ]);
+
+  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    let active = true;
+    const fetchFeed = async () => {
+      try {
+        const res = await apiService.getActivityFeed();
+        if (res && res.success && Array.isArray(res.data) && active) {
+          setFeed(res.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load live activity feed:', err);
+      }
+    };
+
+    fetchFeed();
+    const interval = setInterval(fetchFeed, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isDemoMode, isAuthenticated]);
+
+  return (
+    <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
+      <div>
+        <div className="flex justify-between items-center border-b border-white/8 pb-2 mb-3">
+          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase text-[10px]">
+            <span className="w-1.5 h-1.5 bg-[#6FCBFF] rounded-full animate-ping"></span>
+            Agent Commerce Activity Feed
+          </h4>
+          <span className="text-[9px] text-gray-500">Live Sync</span>
+        </div>
+        <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+          {feed.map((evt, idx) => (
+            <div key={idx} className="bg-white/2 border border-white/8 p-2.5 rounded-lg flex flex-col gap-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+              <div className="flex justify-between text-[8px]">
+                <span className="text-[#6FCBFF] font-bold uppercase tracking-wider">{evt.type}</span>
+                <span className="text-gray-500">{evt.time}</span>
+              </div>
+              <p className="text-[10px] text-gray-300 leading-normal">{evt.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="text-[9px] text-gray-500 border-t border-white/8 pt-3 flex justify-between items-center">
+        <span>CAP Protocol V2</span>
+        <span>Secure Escrows</span>
+      </div>
+    </div>
+  );
+}
+
 // Premium 3D Perspective Card Wrapper
 function PerspectiveCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const [rotateX, setRotateX] = useState(0);
