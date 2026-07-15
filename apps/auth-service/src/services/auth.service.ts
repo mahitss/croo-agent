@@ -50,12 +50,12 @@ export class AuthService {
       const walletAddress = `0xUserWallet${randomHex}`;
       
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
+        `INSERT INTO "wallet"."wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
         walletId, user.id, walletAddress, 'CAP', true
       );
 
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
+        `INSERT INTO "wallet"."balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
         walletId, 0.0000, 0.0000, 0.0000
       );
       console.log(`[AUTH_SERVICE] Pre-created live wallet ${walletAddress} for user ${user.id} with balance 0.00`);
@@ -336,12 +336,12 @@ export class AuthService {
           const walletAddress = `0xUserWallet${randomHex}`;
           
           await this.prisma.$executeRawUnsafe(
-            `INSERT INTO "wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
+            `INSERT INTO "wallet"."wallets" ("id", "user_id", "address", "network", "verified", "created_at") VALUES ($1, $2, $3, $4, $5, NOW())`,
             walletId, user.id, walletAddress, 'CAP', true
           );
 
           await this.prisma.$executeRawUnsafe(
-            `INSERT INTO "balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
+            `INSERT INTO "wallet"."balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
             walletId, 0.0000, 0.0000, 0.0000
           );
           console.log(`[AUTH_SERVICE] Pre-created live wallet ${walletAddress} for Google OAuth user ${user.id} with balance 0.00`);
