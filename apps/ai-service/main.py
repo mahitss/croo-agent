@@ -130,6 +130,12 @@ class PlanResponse(BaseModel):
     confidence: float
     prompt_tokens: Optional[int] = 0
     completion_tokens: Optional[int] = 0
+    intent: Optional[str] = "General"
+    complexity: Optional[str] = "Medium"
+    risk_assessment: Optional[str] = "None"
+    parallel_groups: Optional[List[List[str]]] = []
+    execution_order: Optional[List[str]] = []
+    thought: Optional[str] = ""
 
 class EstimateResponse(BaseModel):
     success: bool
@@ -601,13 +607,26 @@ def plan_workflow(req: PlanRequest):
             
             total_duration = max(earliest_completion.values()) if earliest_completion else 0
             
+            intent = parsed.get("intent") or "General task orchestration"
+            complexity = parsed.get("complexity") or "Medium"
+            risk_assessment = parsed.get("riskAssessment") or parsed.get("risk_assessment") or "Minimal risks identified."
+            parallel_groups = parsed.get("parallelGroups") or parsed.get("parallel_groups") or []
+            execution_order = parsed.get("executionOrder") or parsed.get("execution_order") or [n.id for n in workflow_list]
+            thought = parsed.get("thought") or parsed.get("thinking") or "Decomposed prompt into a set of dependent steps."
+
             plan = PlanResponse(
                 workflow=workflow_list,
                 estimated_cost=round(total_cost, 4),
                 estimated_duration_seconds=int(total_duration),
                 confidence=float(parsed.get("confidence") or 0.95),
                 prompt_tokens=result.prompt_tokens,
-                completion_tokens=result.completion_tokens
+                completion_tokens=result.completion_tokens,
+                intent=intent,
+                complexity=complexity,
+                risk_assessment=risk_assessment,
+                parallel_groups=parallel_groups,
+                execution_order=execution_order,
+                thought=thought
             )
             
             # Store in cache

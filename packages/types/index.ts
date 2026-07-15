@@ -52,6 +52,12 @@ export interface Workflow {
   retryCount: number;
   status: 'pending' | 'running' | 'completed' | 'failed';
   createdAt: string;
+  intent?: string;
+  complexity?: string;
+  riskAssessment?: string;
+  parallelGroups?: string[][];
+  executionOrder?: string[];
+  thought?: string;
 }
 
 export interface ExecutionLog {

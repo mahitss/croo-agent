@@ -79,7 +79,13 @@ export class LiveWorkflowRepository implements WorkflowRepository {
       routingMode: routingMode as any,
       retryCount: 0,
       status: 'pending' as const,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      intent: dbWorkflow.intent,
+      complexity: dbWorkflow.complexity,
+      riskAssessment: dbWorkflow.riskAssessment,
+      parallelGroups: dbWorkflow.parallelGroups,
+      executionOrder: dbWorkflow.executionOrder,
+      thought: dbWorkflow.thought
     };
   }
 

@@ -373,15 +373,20 @@ export class WorkflowsController {
           }, HttpStatus.PAYMENT_REQUIRED);
         }
         
-        return {
-          success: true,
-          message: 'Intention plan generated successfully',
-          data: {
+        // 4. Save workflow to database
+        const saveRes = await fetch(`${this.workflowUrl}/workflows`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            title: body.query.slice(0, 50),
+            estimatedCost,
             nodes: data.workflow.map((node: any) => ({
               id: node.id,
               capability: node.capability,
-              label: node.task || node.id.toUpperCase(),
-              task: node.task || node.id.toUpperCase(),
+              agentId: node.agentId || node.assignedAgentId,
+              positionX: node.positionX || 0,
+              positionY: node.positionY || 0,
             })),
             edges: (() => {
               const list: any[] = [];
@@ -391,17 +396,49 @@ export class WorkflowsController {
                   node.dependencies.forEach((dep: string) => {
                     list.push({
                       id: `edge-${edgeIdx++}`,
-                      source: dep,
-                      target: node.id,
+                      sourceNode: dep,
+                      targetNode: node.id,
                     });
                   });
                 }
               });
               return list;
             })(),
+          }),
+        });
+        const savedWf = await saveRes.json();
+        if (!saveRes.ok || !savedWf || !savedWf.success) {
+          throw new Error(savedWf?.message || 'Failed to save workflow template in workflow-service');
+        }
+
+        return {
+          success: true,
+          message: 'Intention plan generated successfully',
+          data: {
+            id: savedWf.data.id,
+            title: savedWf.data.title,
+            nodes: savedWf.data.nodes.map((node: any) => ({
+              id: node.id,
+              capability: node.capability,
+              label: node.id.toUpperCase(),
+              task: node.id.toUpperCase(),
+              agentId: node.agentId
+            })),
+            edges: savedWf.data.edges.map((edge: any) => ({
+              id: edge.id,
+              source: edge.sourceNode,
+              target: edge.targetNode,
+            })),
             prompt_tokens: data.prompt_tokens || 0,
             completion_tokens: data.completion_tokens || 0,
             estimated_cost: data.estimated_cost || 0,
+            estimated_duration_seconds: data.estimated_duration_seconds || 0,
+            intent: data.intent || "General",
+            complexity: data.complexity || "Medium",
+            riskAssessment: data.risk_assessment || "None",
+            parallelGroups: data.parallel_groups || [],
+            executionOrder: data.execution_order || [],
+            thought: data.thought || ""
           },
         };
       } catch (err: any) {
@@ -458,6 +495,13 @@ export class WorkflowsController {
             prompt_tokens: data.prompt_tokens || 0,
             completion_tokens: data.completion_tokens || 0,
             estimated_cost: 0.0, // Demo mode is free
+            estimated_duration_seconds: data.estimated_duration_seconds || 0,
+            intent: data.intent || "General",
+            complexity: data.complexity || "Medium",
+            riskAssessment: data.risk_assessment || "None",
+            parallelGroups: data.parallel_groups || [],
+            executionOrder: data.execution_order || [],
+            thought: data.thought || ""
           },
         };
       } catch (err: any) {

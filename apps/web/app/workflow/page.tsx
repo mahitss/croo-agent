@@ -648,10 +648,54 @@ export default function WorkflowPage() {
                 <div className="glass-card p-5 rounded-xl border border-primary-neon/20 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
                   <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
                     <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
-                    AI Swarm Planner Logic
+                    Autonomous Planner Console
                   </h3>
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded text-[9px] font-bold">
+                      Intent: {activeWorkflow.intent || 'General'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                      activeWorkflow.complexity === 'Enterprise' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                      activeWorkflow.complexity === 'Large' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' :
+                      activeWorkflow.complexity === 'Medium' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                      'bg-green-500/10 border-green-500/30 text-green-400'
+                    }`}>
+                      Complexity: {activeWorkflow.complexity || 'Medium'}
+                    </span>
+                  </div>
+
+                  {activeWorkflow.thought && (
+                    <div className="flex flex-col gap-1 border-t border-border-dark/40 pt-2">
+                      <span className="text-gray-500 uppercase text-[9px]">Planner Reasoning:</span>
+                      <div className="bg-black/40 border border-border-dark p-2 rounded text-[10px] text-gray-300 max-h-[120px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                        {activeWorkflow.thought}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeWorkflow.riskAssessment && activeWorkflow.riskAssessment !== 'None' && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 p-2.5 rounded-lg text-yellow-300 text-[10px]">
+                      <span className="font-bold block mb-0.5">⚠️ Swarm SLA Risk Warn:</span>
+                      {activeWorkflow.riskAssessment}
+                    </div>
+                  )}
+
+                  {activeWorkflow.executionOrder && activeWorkflow.executionOrder.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-gray-500 uppercase text-[9px]">Execution Order Sequence:</span>
+                      <div className="flex flex-wrap gap-1 items-center text-[9px] text-gray-400 bg-black/40 p-2 rounded border border-border-dark">
+                        {activeWorkflow.executionOrder.map((nodeId, idx) => (
+                          <span key={nodeId} className="flex items-center">
+                            {idx > 0 && <span className="mx-1 text-gray-600">&rarr;</span>}
+                            <span className="bg-white/5 border border-border-dark px-1.5 py-0.5 rounded font-bold text-gray-300">{nodeId}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3 pt-2 border-t border-border-dark">
                     {activeWorkflow.nodes.map((node) => {
                       const agent = agents.find(a => a.id === node.assignedAgentId);
                       return (

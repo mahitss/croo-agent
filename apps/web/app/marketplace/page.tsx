@@ -271,7 +271,11 @@ export default function MarketplacePage() {
         setMatchedStack({
           chain: chainItems,
           cost: resData.estimated_cost || 0.30,
-          time: '5s'
+          time: `${resData.estimated_duration_seconds || 5}s`,
+          intent: resData.intent || 'General task execution',
+          complexity: resData.complexity || 'Medium',
+          riskAssessment: resData.riskAssessment || 'None',
+          thought: resData.thought || ''
         });
         console.log('[MATCHMAKER] Workflow rendered');
       } else {
@@ -404,6 +408,33 @@ export default function MarketplacePage() {
                 </Link>
               </div>
             </div>
+            <div className="flex flex-wrap gap-2 text-xs font-mono">
+              <span className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2.5 py-1 rounded-lg">
+                Intent: {matchedStack.intent}
+              </span>
+              <span className={`px-2.5 py-1 rounded-lg border ${
+                matchedStack.complexity === 'Enterprise' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                matchedStack.complexity === 'Large' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' :
+                matchedStack.complexity === 'Medium' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                'bg-green-500/10 border-green-500/30 text-green-400'
+              }`}>
+                Complexity: {matchedStack.complexity}
+              </span>
+            </div>
+
+            {matchedStack.thought && (
+              <div className="bg-white/5 border border-border-dark/50 p-4 rounded-xl flex flex-col gap-2 font-mono text-[11px] leading-relaxed">
+                <span className="text-gray-400 uppercase text-[9px] font-bold tracking-wider">AI Planning Thoughts</span>
+                <p className="text-gray-300 whitespace-pre-wrap">{matchedStack.thought}</p>
+              </div>
+            )}
+
+            {matchedStack.riskAssessment && matchedStack.riskAssessment !== 'None' && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl flex flex-col gap-1 font-mono text-[11px]">
+                <span className="text-yellow-400 uppercase text-[9px] font-bold tracking-wider">Risk & Fallback Assessment</span>
+                <p className="text-yellow-200">{matchedStack.riskAssessment}</p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-3">
               {matchedStack.chain.map((step: any, idx: number) => (

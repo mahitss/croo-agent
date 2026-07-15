@@ -83,6 +83,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <AppSkeleton />;
   }
 
+  if (pathname === '/') {
+    return (
+      <div className="min-h-screen flex flex-col bg-bg-dark">
+        <main className="flex-grow flex flex-col">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col">

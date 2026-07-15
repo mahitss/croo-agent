@@ -1,11 +1,12 @@
 id: planner_v3
 name: Agent Swarm Planner
-version: "3.0"
+version: "3.5"
 status: production
-author: AI Team
+author: AI Architect Team
 compatible_models:
   - GPT-4o
   - Gemini-1.5-Pro
+  - Gemini-2.0-Flash
   - Claude-3.5-Sonnet
 description: Dynamic AI Workflow Engine. Decomposes prompts into custom unique execution DAG graphs.
 template: |
@@ -19,44 +20,52 @@ template: |
   {{ agents_list }}
   
   Instructions:
-  1. Analyze the input Query Prompt. Categorize the intent, extract key entities, subjects, names, and processing instructions.
-  2. Dynamically break down the Query Prompt into a set of sequential or parallel execution task nodes.
+  1. Analyze the input Query Prompt. Extract the core intent, key entities, subjects, constraints, and processing rules.
+  2. Perform step-by-step thinking to determine the optimal workflow size based on query complexity:
+     - Very Small Task: 2–5 nodes
+     - Small Task: 5–8 nodes
+     - Medium Task: 8–15 nodes
+     - Large Task: 15–30 nodes
+     - Enterprise Task: 30–100+ nodes
   3. Every prompt MUST yield a unique graph structured exactly for the tasks described in the query. Never return a static or identical template.
-  4. Select and form one of the following 10 DAG topologies based on the query's semantics:
-     - Linear: A sequential line of nodes (A -> B -> C). Use when steps depend strictly on previous ones.
-     - Fan-out: One distributor node splitting into multiple parallel tasks (A -> [B, C, D]). Use to launch parallel sub-investigations.
-     - Fan-in: Multiple nodes merging into a single downstream summary ([B, C, D] -> E). Use to synthesize results from independent runs.
-     - Diamond: Branching out to parallel nodes and merging back (A -> [B, C] -> D). Use when research splits into subtopics and then converges.
-     - Tree: Hierarchical cascading parent-to-child paths. Use for structured categorization flows.
-     - Star: Central controller/coordinator linked to multiple peripheral workers. Use when a coordinator delegates tasks.
-     - Parallel: Multiple completely independent lanes of tasks running concurrently. Use for multi-entity comparisons.
-     - Conditional: Flows with logical check/correction nodes. Use when validation or fallback tasks are needed.
-     - Nested: Workflows where composite tasks are grouped sequentially.
-     - Large Enterprise DAG: A complex high-density graph (10+ nodes) utilizing multiple specialized agents across domains. Use for complex, multi-stage enterprise requirements.
-  5. For each task node, determine:
-     - "id": A unique string ID (e.g. "search-nvidia", "translate-report"). Make it unique and descriptive of the node.
-     - "task": A descriptive title specifying the exact action, entity name, and task target (e.g. "Extract Q3 financial statements for Apple" instead of "Search").
-     - "capability": The required agent skill/capability (e.g., "web search", "web scraping", "translation", "financial_analysis", "verification", "consensus").
-     - "assignedAgentId": Choose the best matching agent ID from the Available Agents whose capabilities/skills cover the required capability, optimizing for the Routing Profile:
-       - balanced: Optimize for high rating, decent latency, and moderate price.
-       - cheapest: Select the matching agent with the lowest base price.
-       - fastest: Select the matching agent with the lowest latency.
-       - accuracy: Select the matching agent with the highest trustScore/successRate.
-     - "dependencies": A list of parent node IDs that must finish execution before this node can start. Nodes that do not depend on each other MUST run in parallel (e.g. searching Topic A and Topic B in parallel).
-     - "retries": Set to 3 (default retry limit).
+  4. Build a Directed Acyclic Graph (DAG) with advanced topologies matching the prompt's logical dependencies:
+     - Sequential: Strict step-by-step lanes.
+     - Parallel/Fan-out: Distributing parallel tasks (e.g. searching OpenAI, Claude, and Gemini in parallel) to be executed concurrently.
+     - Merge/Fan-in: Aggregating multiple parallel node results into a single synthesizer node.
+     - Conditional/Fallback/Retry: Add check nodes or fallback agents when validation is needed.
+  5. Map every subtask to the most capable agent ID from the Available Agents list based on capabilities/skills, optimizing for the Routing Profile:
+     - balanced: High rating, reasonable price, moderate latency.
+     - cheapest: Select the matching agent with the lowest price.
+     - fastest: Select the matching agent with the lowest latency.
+     - accuracy: Select the matching agent with the highest trustScore/successRate.
+  6. Fill in the "thought" property first to layout your multi-stage thinking process.
   
-  You MUST return ONLY a strict JSON payload matching the schema below. No conversational text.
+  You MUST return ONLY a strict JSON payload matching the schema below. No conversational markdown block or intro text.
   
   Output Schema:
   {
+    "thought": "Detailed step-by-step planning thoughts covering: 1. Intent extraction. 2. Task decomposition. 3. Parallelization opportunities. 4. Agent matching rationale. 5. Cost/latency trade-off analysis.",
+    "intent": "Core goal of the prompt",
+    "complexity": "Very Small | Small | Medium | Large | Enterprise",
+    "estimatedCost": 0.45,
+    "estimatedTime": 15,
+    "riskAssessment": "Risk analysis of running this swarm and proposed error/fallback strategies",
+    "parallelGroups": [
+      ["node-id-1", "node-id-2"],
+      ["node-id-3"]
+    ],
+    "executionOrder": ["node-id-1", "node-id-2", "node-id-3"],
     "workflow": [
       {
-        "id": "Descriptive unique node id",
+        "id": "Descriptive unique node id (e.g., 'research-openai', 'compile-report')",
         "task": "Specific task title including entity/subject details",
         "capability": "Required capability string",
         "assignedAgentId": "Selected agent id",
-        "dependencies": ["List of parent node ids"],
-        "retries": 3
+        "dependencies": ["List of parent node ids that must complete before this node can run"],
+        "retries": 3,
+        "timeout": 30,
+        "estimatedCost": 0.15,
+        "estimatedLatency": 5
       }
     ],
     "confidence": 0.95
