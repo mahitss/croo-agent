@@ -24,6 +24,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
+import InteractiveNetwork from '../components/InteractiveNetwork';
 
 // Native IntersectionObserver Viewport Entry Component for zero layout shifts
 function ViewportAnimate({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
@@ -326,24 +327,7 @@ function AnalyticsMockup() {
   );
 }
 
-// ----------------------------------------------------
-// DYNAMIC SVG BACKDROP NODES DATA (40 NODES)
-// ----------------------------------------------------
-const SVG_NODES = Array.from({ length: 40 }, (_, i) => {
-  const col = i % 8;
-  const row = Math.floor(i / 8);
-  return {
-    id: `node-${i}`,
-    x: 80 + col * 120 + (i % 2 === 0 ? 12 : -12),
-    y: 50 + row * 90 + (i % 3 === 0 ? 8 : -8)
-  };
-});
 
-const SVG_FLOWS = [
-  'M 80 50 Q 200 140 320 50 T 560 50',
-  'M 200 230 Q 320 320 440 230 T 680 230',
-  'M 560 320 Q 680 410 800 320 T 920 320'
-];
 
 // ----------------------------------------------------
 // PORTAL PAGE COMPONENT
@@ -530,59 +514,8 @@ export default function PortalPage() {
       {/* HERO HERO SECTION VIEWPORT */}
       <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto pt-16">
         
-        {/* SVG Network Background Visual (Approx 40 nodes, pure SVG composition) */}
-        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none opacity-40">
-          <svg className="w-full h-full max-h-[600px]" viewBox="0 0 1000 500" fill="none">
-            {/* Draw network edges */}
-            {SVG_NODES.map((node, i) => {
-              // Connect node to adjacent node to form lightweight mesh grid structure
-              if (i >= SVG_NODES.length - 1) return null;
-              const nextNode = SVG_NODES[i + 1];
-              return (
-                <line
-                  key={`edge-${i}`}
-                  x1={node.x}
-                  y1={node.y}
-                  x2={nextNode.x}
-                  y2={nextNode.y}
-                  stroke="rgba(255,255,255,0.015)"
-                  strokeWidth="1"
-                />
-              );
-            })}
-
-            {/* Glowing Flow Paths */}
-            {SVG_FLOWS.map((flowPath, idx) => (
-              <path
-                key={`path-${idx}`}
-                d={flowPath}
-                stroke="rgba(111,203,255,0.12)"
-                strokeWidth="1.2"
-                strokeDasharray="40 180"
-              >
-                <animate attributeName="stroke-dashoffset" values="220;0" dur="5s" repeatCount="indefinite" />
-              </path>
-            ))}
-
-            {/* Tiny flowing data packets */}
-            {SVG_FLOWS.map((flowPath, idx) => (
-              <circle key={`spark-${idx}`} r="1.5" fill="#6FCBFF">
-                <animateMotion dur="5s" repeatCount="indefinite" path={flowPath} />
-              </circle>
-            ))}
-
-            {/* Node dots */}
-            {SVG_NODES.map((node) => (
-              <circle
-                key={node.id}
-                cx={node.x}
-                cy={node.y}
-                r="1.5"
-                fill="rgba(255,255,255,0.15)"
-              />
-            ))}
-          </svg>
-        </div>
+        {/* WebGL React Three Fiber Background Neural Network */}
+        <InteractiveNetwork />
 
         <div className="flex flex-col items-center gap-6 max-w-3xl relative z-10 mt-10">
           {/* Badge */}
