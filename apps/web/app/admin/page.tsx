@@ -65,11 +65,10 @@ export default function AdminPage() {
     { name: 'Sentry', status: 'healthy', msg: 'Checking status...', latency: '4ms' }
   ]);
 
-  const initializationState = useAuthStore((state) => state.initializationState);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+    if (!isAuthenticated) {
       return;
     }
     let active = true;
@@ -91,7 +90,7 @@ export default function AdminPage() {
       active = false;
       clearInterval(interval);
     };
-  }, [isDemoMode, initializationState]);
+  }, [isDemoMode, isAuthenticated]);
 
   useEffect(() => {
     if (timerActive) {

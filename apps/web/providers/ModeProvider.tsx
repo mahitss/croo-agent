@@ -57,10 +57,10 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Unified States mapping
   const transactions = wallet?.history || [];
 
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   const refreshData = async () => {
-    // Only fetch protected data if we are authenticated or in DEMO mode
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+    if (!isAuthenticated) {
       console.log('[MODE_PROVIDER] Session is not authenticated. Bypassing state loading.');
       return;
     }
@@ -77,7 +77,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshData();
-  }, [isDemoMode, initializationState]);
+  }, [isDemoMode, isAuthenticated]);
 
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage

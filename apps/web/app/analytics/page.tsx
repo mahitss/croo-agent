@@ -53,7 +53,7 @@ export default function AnalyticsPage() {
   const { isDemoMode, analyticsService, wallet: userWallet } = useMode();
   const agents = useNexusStore((state) => state.agents.length > 0 ? state.agents : seedAgents) ?? [];
   const { toast } = useToast();
-  const initializationState = useAuthStore((state) => state.initializationState);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'swarm' | 'terminal'>('overview');
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
@@ -76,8 +76,7 @@ export default function AnalyticsPage() {
   
   // Real-time WebSocket connection
   useEffect(() => {
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+    if (!isAuthenticated) {
       return;
     }
     // Standard Socket.io connection to proxy namespace
@@ -133,11 +132,10 @@ export default function AnalyticsPage() {
       socket.disconnect();
       clearInterval(interval);
     };
-  }, [isDemoMode, initializationState]);
+  }, [isDemoMode, isAuthenticated]);
 
   const fetchExecutions = async () => {
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+    if (!isAuthenticated) {
       return;
     }
     try {
@@ -201,9 +199,8 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
-      console.log('[ANALYTICS_PAGE] Guest user in Live Mode. Bypassing data fetch.');
+    if (!isAuthenticated) {
+      console.log('[ANALYTICS_PAGE] Guest user. Bypassing data fetch.');
       setLoading(false);
       return;
     }
@@ -246,7 +243,7 @@ export default function AnalyticsPage() {
 
     fetchAllData();
     fetchExecutions();
-  }, [isDemoMode, initializationState]);
+  }, [isDemoMode, isAuthenticated]);
 
   // Scroll to bottom of terminal logs
   useEffect(() => {

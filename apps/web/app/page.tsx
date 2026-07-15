@@ -500,11 +500,10 @@ function LiveActivityFeed() {
   ]);
 
   const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const initializationState = useAuthStore((state) => state.initializationState);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    const authState = useAuthStore.getState();
-    if (!isDemoMode && authState.initializationState !== 'AUTHENTICATED') {
+    if (!isAuthenticated) {
       console.log('[PORTAL_PAGE] Bypassing activity feed polling for guest session.');
       return;
     }
@@ -527,7 +526,7 @@ function LiveActivityFeed() {
       active = false;
       clearInterval(interval);
     };
-  }, [isDemoMode, initializationState]);
+  }, [isDemoMode, isAuthenticated]);
 
   return (
     <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">

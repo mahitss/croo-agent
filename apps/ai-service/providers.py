@@ -766,7 +766,7 @@ class LLMProviderManager:
 
                 
                 if result.success:
-                    # Update metrics
+                    
                     self.metrics[provider_name]["total_latency"] += result.latency_ms
                     self.metrics[provider_name]["total_tokens"] += (result.prompt_tokens + result.completion_tokens)
                     self.metrics[provider_name]["total_cost"] += result.cost

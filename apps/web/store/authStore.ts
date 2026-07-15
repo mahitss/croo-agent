@@ -42,6 +42,7 @@ export interface AuthState {
   user: UserProfile | null;
   token: string | null;
   isCheckingAuth: boolean;
+  isAuthenticated: boolean;
   initializationState: 'UNINITIALIZED' | 'CHECKING_SESSION' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
   rememberMe: boolean;
   isDemoMode: boolean;
@@ -109,6 +110,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     user: null,
     token: null,
     isCheckingAuth: true,
+    isAuthenticated: false,
     initializationState: 'UNINITIALIZED',
     rememberMe: true,
     isDemoMode: true,
@@ -227,6 +229,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           set({
             token,
             user: parsedUser,
+            isAuthenticated: true,
             initializationState: 'AUTHENTICATED',
             isCheckingAuth: false
           });
@@ -272,6 +275,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 set({
                   token: parsedToken,
                   user: updatedUser,
+                  isAuthenticated: true,
                   initializationState: 'AUTHENTICATED',
                   isCheckingAuth: false
                 });
@@ -292,6 +296,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({
           token: null,
           user: null,
+          isAuthenticated: false,
           initializationState: 'UNAUTHENTICATED',
           isCheckingAuth: false
         });
@@ -337,7 +342,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log(`[AUTH_STORE] Login success: updating state. rememberMe: ${rememberMe}`);
-          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
+          set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
           storage.setItem('orbit_user', JSON.stringify(profile));
@@ -377,7 +382,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storage = rememberMe ? localStorage : sessionStorage;
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
-        set({ user: localProfile, token: 'local-mock-token', initializationState: 'AUTHENTICATED' });
+        set({ user: localProfile, token: 'local-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
         storage.setItem('orbit_token', 'local-mock-token');
         storage.setItem('orbit_user', JSON.stringify(localProfile));
         localStorage.setItem('orbit_login_just_succeeded', 'true');
@@ -406,7 +411,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
           console.log('[REGISTER] User created');
-          set({ user: profile, token, initializationState: 'AUTHENTICATED' });
+          set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
           console.log('[REGISTER] Auth state updated');
           
           storage.setItem('orbit_token', token);
@@ -447,7 +452,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         localStorage.setItem('orbit_remember_me', String(rememberMe));
         
         console.log('[REGISTER] User created');
-        set({ user: localProfile, token: 'local-mock-token', initializationState: 'AUTHENTICATED' });
+        set({ user: localProfile, token: 'local-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
         console.log('[REGISTER] Auth state updated');
         
         storage.setItem('orbit_token', 'local-mock-token');
@@ -472,7 +477,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ refreshTimeoutId: null } as any);
       }
 
-      set({ user: null, token: null, initializationState: 'UNAUTHENTICATED' });
+      set({ user: null, token: null, isAuthenticated: false, initializationState: 'UNAUTHENTICATED' });
       localStorage.removeItem('orbit_token');
       localStorage.removeItem('orbit_user');
       localStorage.removeItem('orbit_refreshtoken');
@@ -501,7 +506,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ refreshTimeoutId: null } as any);
       }
 
-      set({ user: null, token: null, initializationState: 'UNAUTHENTICATED' });
+      set({ user: null, token: null, isAuthenticated: false, initializationState: 'UNAUTHENTICATED' });
       localStorage.removeItem('orbit_token');
       localStorage.removeItem('orbit_user');
       localStorage.removeItem('orbit_refreshtoken');

@@ -93,7 +93,7 @@ function handleSessionExpiration() {
     document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
-    useAuthStore.setState({ token: null, user: null, initializationState: 'UNAUTHENTICATED' });
+    useAuthStore.setState({ token: null, user: null, isAuthenticated: false, initializationState: 'UNAUTHENTICATED' });
     window.dispatchEvent(new Event('nexus_session_expired'));
     
     if (redirectLoopGuard) return;
@@ -148,9 +148,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     }
 
     // Abort if unauthenticated guest session
-    if (authState.initializationState === 'UNAUTHENTICATED') {
-      console.warn(`[API_CLIENT] Bypassing protected fetch: User is unauthenticated for path ${url}`);
-      return new Response(JSON.stringify({ success: false, message: 'Unauthorized' }), { status: 401 });
+    if (!authState.isAuthenticated) {
+      return new Response(JSON.stringify({ success: false, message: 'Unauthorized (AuthGuard Blocked)' }), { status: 401 });
     }
   }
 

@@ -142,7 +142,7 @@ interface NexusState {
 export const useNexusStore = create<NexusState>((set, get) => {
   // Sync state changes from useAuthStore
   useAuthStore.subscribe((authState) => {
-    const isAuth = !!authState.token && !!authState.user;
+    const isAuth = authState.isAuthenticated;
     if (!isAuth) {
       set({
         user: null,
@@ -538,9 +538,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const repos = getRepos(isDemo);
 
       try {
-        // Guard: skip protected calls in Live mode if guest
-        if (!isDemo && authState.initializationState !== 'AUTHENTICATED') {
-          logger.info('[NEXUS_STORE] User is unauthenticated in Live Mode. Bypassing wallet & active workflow queries.');
+        // Guard: skip protected calls if guest
+        if (!authState.isAuthenticated) {
+          logger.info('[NEXUS_STORE] User is unauthenticated. Bypassing wallet & active workflow queries.');
           set({ agents: [] });
           return;
         }
