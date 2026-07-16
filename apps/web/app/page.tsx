@@ -458,56 +458,51 @@ export default function PortalPage() {
       </div>
 
       {/* Centered Floating Header Navigation (Backdrop blur simplified) */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-4xl bg-[#0D0D0D]/90 border border-white/6 px-5 py-2 rounded-full flex items-center justify-between shadow-lg">
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-6.5 h-6.5 rounded-lg bg-gradient-to-tr from-[#53B6FF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-sm">
+      <nav className="fixed top-0 left-0 right-0 z-50 h-[80px] bg-black/55 backdrop-blur-[20px] border-b border-white/6 px-8 flex items-center justify-between shadow-sm">
+        {/* LEFT: Orbit AI Logo & Text */}
+        <Link href="/" className="flex items-center gap-3 select-none">
+          <div className="w-[36px] h-[36px] rounded-xl bg-white flex items-center justify-center font-extrabold text-black text-xl">
             O
           </div>
-          <span className="font-extrabold text-xs tracking-wider">
-            ORBIT <span className="text-[#6FCBFF] font-normal text-[10px] tracking-widest ml-0.5">AI</span>
+          <span className="font-extrabold text-sm tracking-wider text-white/80 font-sans">
+            ORBIT AI
           </span>
         </Link>
 
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-5 font-mono text-[9px] text-gray-400">
-          <Link href="/" className="hover:text-[#6FCBFF] transition-colors relative py-1">Portal</Link>
-          <Link href="/marketplace" className="hover:text-[#6FCBFF] transition-colors relative py-1">Marketplace</Link>
-          <Link href="/workflow" className="hover:text-[#6FCBFF] transition-colors relative py-1">Workflow Builder</Link>
-          <Link href="/analytics" className="hover:text-[#6FCBFF] transition-colors relative py-1">Analytics</Link>
-          <a href="#pricing-tiers" className="hover:text-[#6FCBFF] transition-colors relative py-1">Pricing</a >
-          <Link href="/docs" className="hover:text-[#6FCBFF] transition-colors relative py-1">Developers</Link>
-        </div>
-
-        {/* Header Right Workspace actions */}
-        <div className="flex items-center gap-3">
+        {/* RIGHT: Login & Register */}
+        <div className="flex items-center gap-6">
           {mounted && token && user ? (
             <div className="relative group">
-              <button className="flex items-center gap-1.5 focus:outline-none py-1">
-                <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-tr from-[#6FCBFF] to-[#C9F4FF] flex items-center justify-center font-bold text-black text-[10px] font-mono">
+              <button className="flex items-center gap-2 focus:outline-none py-1">
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-white/80 text-xs font-mono border border-white/10">
                   {user.displayName?.substring(0, 2).toUpperCase() || 'US'}
                 </div>
+                <span className="text-xs text-white/80 font-mono hidden sm:inline max-w-[80px] truncate">
+                  {user.displayName || user.username || 'User'}
+                </span>
               </button>
-              <div className="absolute w-36 hidden group-hover:block bg-black border border-white/6 rounded-lg p-1 right-0 top-full mt-1.5 font-mono text-[8px]">
+              <div className="absolute w-36 hidden group-hover:block bg-black border border-white/6 rounded-lg p-1 right-0 top-full mt-1.5 font-mono text-[8px] z-50 shadow-xl">
                 <Link href="/dashboard" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Dashboard</Link>
                 <Link href="/wallet" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Wallet</Link>
                 <button onClick={logoutUser} className="w-full text-left block px-2 py-1.5 text-red-400 hover:text-red-300 hover:bg-white/5 rounded">Logout</button>
               </div>
             </div>
           ) : (
-            <button
-              onClick={() => setAuthModal(true, 'login')}
-              className="text-[9px] font-mono text-gray-400 hover:text-white transition-colors"
-            >
-              Sign In
-            </button>
+            <>
+              <button
+                onClick={() => setAuthModal(true, 'login')}
+                className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => setAuthModal(true, 'register')}
+                className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans"
+              >
+                Register
+              </button>
+            </>
           )}
-
-          <button
-            onClick={scrollToIntentionWorkspace}
-            className="bg-white text-black hover:bg-white/90 text-[9px] font-extrabold px-3.5 py-1.5 rounded-full transition-transform hover:scale-[1.02] font-mono"
-          >
-            Launch App
-          </button>
         </div>
       </nav>
 
