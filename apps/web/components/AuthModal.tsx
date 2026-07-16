@@ -32,7 +32,6 @@ export default function AuthModal() {
   const setAuthModal = useNexusStore((state) => state.setAuthModal);
   const loginUser = useNexusStore((state) => state.loginUser);
   const registerUser = useNexusStore((state) => state.registerUser);
-  const loginOAuth = useNexusStore((state) => state.loginOAuth);
   const loginWithGoogle = useNexusStore((state) => state.loginWithGoogle);
   const forgotPassword = useNexusStore((state) => state.forgotPassword);
   const verifyEmail = useNexusStore((state) => state.verifyEmail);
@@ -253,18 +252,7 @@ export default function AuthModal() {
     }
   };
 
-  const handleOAuth = async (provider: 'google' | 'github') => {
-    setIsLoading(true);
-    try {
-      await loginOAuth(provider);
-      toast(`Successfully connected via ${provider === 'google' ? 'Google' : 'GitHub'} OAuth!`, 'success');
-      setAuthModal(false);
-    } catch (err: any) {
-      toast(`OAuth connection failed: ${err.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
 
   return createPortal(
     <div 
@@ -467,22 +455,14 @@ export default function AuthModal() {
               <div className="flex-1 h-[1px] bg-border-dark"></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-3">
               <button
                 type="button"
                 onClick={handleGoogleOAuthClick}
                 disabled={isLoading}
-                className="flex items-center justify-center gap-2 bg-white/5 border border-border-dark hover:border-white/10 px-4 py-2.5 rounded-xl text-xs text-white font-mono hover:bg-white/10 transition-all"
+                className="w-full flex items-center justify-center gap-2 bg-white/5 border border-border-dark hover:border-white/10 px-4 py-2.5 rounded-xl text-xs text-white font-mono hover:bg-white/10 transition-all"
               >
-                Google
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOAuth('github')}
-                disabled={isLoading}
-                className="flex items-center justify-center gap-2 bg-white/5 border border-border-dark hover:border-white/10 px-4 py-2.5 rounded-xl text-xs text-white font-mono hover:bg-white/10 transition-all"
-              >
-                GitHub
+                Continue with Google
               </button>
             </div>
           </div>

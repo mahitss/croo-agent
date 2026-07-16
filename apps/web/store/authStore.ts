@@ -62,7 +62,6 @@ export interface AuthState {
   registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
   logoutUser: () => Promise<void>;
   logoutEverywhere: () => Promise<void>;
-  loginOAuth: (provider: 'google' | 'github') => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<boolean>;
   verifyEmail: (code: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -373,31 +372,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
         console.warn('[AUTH_STORE] Login failed: Invalid credentials response structure');
         return false;
       } catch (err) {
-        if (!get().isDemoMode) {
-          console.error('[AUTH_STORE] Login error in Live mode:', err);
-          throw err;
-        }
-        console.log('[AUTH_STORE] Login error in Demo mode. Using mock session fallback.');
-        const localProfile: UserProfile = {
-          id: 'user-mock-1',
-          email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@orbitai.dev`,
-          username: usernameOrEmail.split('@')[0],
-          role: 'user',
-          displayName: usernameOrEmail.split('@')[0],
-          emailVerified: true
-        };
-        
-        const rememberMe = get().rememberMe;
-        const storage = rememberMe ? localStorage : sessionStorage;
-        localStorage.setItem('orbit_remember_me', String(rememberMe));
-        
-        set({ user: localProfile, token: 'local-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
-        storage.setItem('orbit_token', 'local-mock-token');
-        storage.setItem('orbit_user', JSON.stringify(localProfile));
-        localStorage.setItem('orbit_login_just_succeeded', 'true');
-        
-        get().scheduleAutoRefresh();
-        return true;
+        console.error('[AUTH_STORE] Login error:', err);
+        throw err;
       }
     },
 
@@ -534,29 +510,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       initPromise = null;
     },
 
-    loginOAuth: async (provider) => {
-      console.log('[AUTH_STORE] loginOAuth: setting mock OAuth session for', provider);
-      const localProfile: UserProfile = {
-        id: `user-oauth-${provider}-${Date.now()}`,
-        email: `oauth-${provider}@orbitai.dev`,
-        username: `${provider}_user`,
-        role: 'user',
-        displayName: `OAuth ${provider.toUpperCase()} User`,
-        avatarUrl: provider === 'google' 
-          ? 'https://lh3.googleusercontent.com/a/default-user' 
-          : 'https://github.com/identicons/default.png',
-        emailVerified: true
-      };
-      
-      const rememberMe = get().rememberMe;
-      const storage = rememberMe ? localStorage : sessionStorage;
-      localStorage.setItem('orbit_remember_me', String(rememberMe));
-      
-      set({ user: localProfile, token: `oauth-${provider}-token`, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
-      storage.setItem('orbit_token', `oauth-${provider}-token`);
-      storage.setItem('orbit_user', JSON.stringify(localProfile));
-      localStorage.setItem('orbit_login_just_succeeded', 'true');
-    },
+
 
     loginWithGoogle: async (idToken) => {
       console.log('[AUTH_STORE] loginWithGoogle initiated');
@@ -598,31 +552,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
         throw new Error('Google login failed: Invalid response structure');
       } catch (err) {
-        if (!get().isDemoMode) {
-          console.error('[AUTH_STORE] Google login error in Live mode:', err);
-          throw err;
-        }
-        console.log('[AUTH_STORE] Google login error in Demo mode. Using mock session fallback.');
-        const localProfile: UserProfile = {
-          id: 'user-google-mock-1',
-          email: 'google-test@orbitai.dev',
-          username: 'google_test',
-          role: 'user',
-          displayName: 'Google Test User',
-          avatarUrl: 'https://lh3.googleusercontent.com/a/default-user',
-          emailVerified: true
-        };
-        
-        const rememberMe = get().rememberMe;
-        const storage = rememberMe ? localStorage : sessionStorage;
-        localStorage.setItem('orbit_remember_me', String(rememberMe));
-        
-        set({ user: localProfile, token: 'google-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
-        storage.setItem('orbit_token', 'google-mock-token');
-        storage.setItem('orbit_user', JSON.stringify(localProfile));
-        localStorage.setItem('orbit_login_just_succeeded', 'true');
-        
-        return true;
+        console.error('[AUTH_STORE] Google login error:', err);
+        throw err;
       }
     },
 

@@ -134,7 +134,6 @@ interface NexusState {
   loginUser: (usernameOrEmail: string, password: string) => Promise<boolean>;
   registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
   loginWithGoogle: (idToken: string) => Promise<boolean>;
-  loginOAuth: (provider: 'google' | 'github') => Promise<void>;
   logoutUser: () => Promise<void>;
   logoutEverywhere: () => Promise<void>;
 }
@@ -666,7 +665,6 @@ export const useNexusStore = create<NexusState>((set, get) => {
     loginUser: (u, p) => useAuthStore.getState().loginUser(u, p),
     registerUser: (e, u, p, d, r) => useAuthStore.getState().registerUser(e, u, p, d, r),
     loginWithGoogle: (idToken) => useAuthStore.getState().loginWithGoogle(idToken),
-    loginOAuth: (provider) => useAuthStore.getState().loginOAuth(provider),
     logoutUser: () => useAuthStore.getState().logoutUser(),
     logoutEverywhere: () => useAuthStore.getState().logoutEverywhere()
   };
