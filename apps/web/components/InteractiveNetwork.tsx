@@ -1,202 +1,318 @@
 'use client';
 
-import { useRef, useMemo, useEffect, useState } from 'react';
-import * as THREE from 'three';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useEffect, useRef, useState } from 'react';
 
-function NetworkMesh() {
-  const { viewport } = useThree();
-  const count = 300;
+interface Node {
+  baseX: number;
+  baseY: number;
+  x: number;
+  y: number;
+  offsetX: number;
+  offsetY: number;
+  seedX: number;
+  seedY: number;
+}
 
-  // 1. Generate 300 node positions
-  const [positions, initialPositions] = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const initPos = [];
-    for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * 16;
-      const y = (Math.random() - 0.5) * 12;
-      const z = (Math.random() - 0.5) * 10;
-      pos[i * 3] = x;
-      pos[i * 3 + 1] = y;
-      pos[i * 3 + 2] = z;
-      initPos.push(new THREE.Vector3(x, y, z));
-    }
-    return [pos, initPos];
-  }, []);
+interface Edge {
+  a: number;
+  b: number;
+}
 
-  const pointsRef = useRef<THREE.Points>(null);
-  const linesRef = useRef<THREE.LineSegments>(null);
-
-  // Mouse coords tracking
-  const mouse = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
-  const scrollY = useRef(0);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      mouse.current.targetX = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.current.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-    const handleScroll = () => {
-      scrollY.current = window.scrollY;
-    };
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  // 2. Pre-calculate static edge connections based on proximity threshold
-  const edges = useMemo(() => {
-    const list = [];
-    const maxConnectionsPerNode = 2;
-    for (let i = 0; i < count; i++) {
-      let connections = 0;
-      for (let j = i + 1; j < count; j++) {
-        if (connections >= maxConnectionsPerNode) break;
-        const dist = initialPositions[i].distanceTo(initialPositions[j]);
-        if (dist < 3.2) {
-          list.push({ a: i, b: j });
-          connections++;
-        }
-      }
-    }
-    return list;
-  }, [initialPositions]);
-
-  // Initialize lines coordinate buffer
-  const linePositions = useMemo(() => {
-    return new Float32Array(edges.length * 2 * 3);
-  }, [edges]);
-
-  // Three.js Render Frame Loop (runs entirely on CPU/GPU without React re-renders)
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    const points = pointsRef.current;
-    const lines = linesRef.current;
-
-    if (!points || !lines) return;
-
-    // Damp mouse movement interpolation
-    mouse.current.x += (mouse.current.targetX - mouse.current.x) * 0.08;
-    mouse.current.y += (mouse.current.targetY - mouse.current.y) * 0.08;
-
-    const positionsAttr = points.geometry.attributes.position;
-    const linePositionsAttr = lines.geometry.attributes.position;
-
-    // Build 3D mouse vector
-    const mouse3D = new THREE.Vector3(
-      mouse.current.x * (viewport.width / 2),
-      mouse.current.y * (viewport.height / 2),
-      0
-    );
-
-    // Apply floating sines offset + mouse distortion
-    for (let i = 0; i < count; i++) {
-      const init = initialPositions[i];
-      const floatX = init.x + Math.sin(time * 0.35 + init.z * 0.5) * 0.25;
-      const floatY = init.y + Math.cos(time * 0.42 + init.x * 0.4) * 0.20;
-      const floatZ = init.z + Math.sin(time * 0.28 + init.y * 0.6) * 0.20;
-
-      const nodePos = new THREE.Vector3(floatX, floatY, floatZ);
-      const distToMouse = nodePos.distanceTo(mouse3D);
-
-      // Distort slightly if mouse is nearby
-      if (distToMouse < 2.5) {
-        const dir = nodePos.clone().sub(mouse3D).normalize();
-        const force = (2.5 - distToMouse) * 0.15;
-        nodePos.addScaledVector(dir, force);
-      }
-
-      positionsAttr.setXYZ(i, nodePos.x, nodePos.y, nodePos.z);
-    }
-    positionsAttr.needsUpdate = true;
-
-    // Update connecting line geometry coordinates
-    for (let k = 0; k < edges.length; k++) {
-      const edge = edges[k];
-      const ax = positionsAttr.getX(edge.a);
-      const ay = positionsAttr.getY(edge.a);
-      const az = positionsAttr.getZ(edge.a);
-
-      const bx = positionsAttr.getX(edge.b);
-      const by = positionsAttr.getY(edge.b);
-      const bz = positionsAttr.getZ(edge.b);
-
-      linePositionsAttr.setXYZ(k * 2, ax, ay, az);
-      linePositionsAttr.setXYZ(k * 2 + 1, bx, by, bz);
-    }
-    linePositionsAttr.needsUpdate = true;
-
-    // Rotate slowly
-    points.rotation.y = time * 0.015;
-    points.rotation.x = time * 0.008;
-    lines.rotation.y = time * 0.015;
-    lines.rotation.x = time * 0.008;
-
-    // Slightly tilt camera based on scroll
-    state.camera.position.y = -scrollY.current * 0.0018;
-    state.camera.lookAt(0, 0, 0);
-  });
-
-  return (
-    <group>
-      {/* Dynamic Points (Nodes) */}
-      <points ref={pointsRef}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[positions, 3]}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          color="#7CCBFF"
-          size={0.065}
-          transparent
-          opacity={0.55}
-          sizeAttenuation
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
-
-      {/* Network Edges */}
-      <lineSegments ref={linesRef}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[linePositions, 3]}
-          />
-        </bufferGeometry>
-        <lineBasicMaterial
-          color="#7CCBFF"
-          transparent
-          opacity={0.09}
-          blending={THREE.AdditiveBlending}
-        />
-      </lineSegments>
-    </group>
-  );
+interface Packet {
+  nodeA: number;
+  nodeB: number;
+  progress: number;
+  speed: number;
 }
 
 export default function InteractiveNetwork() {
-  const [isMounted, setIsMounted] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    setMounted(true);
   }, []);
 
-  if (!isMounted) return null;
+  useEffect(() => {
+    if (!mounted) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+
+    // Set canvas dimensions
+    const resizeCanvas = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+      initializeNodes();
+    };
+
+    let nodes: Node[] = [];
+    let edges: Edge[] = [];
+    let packets: Packet[] = [];
+    let lastEdgeUpdate = 0;
+    let lastPacketSpawn = 0;
+
+    const mouse = { x: -9999, y: -9999, targetX: -9999, targetY: -9999 };
+    let scrollY = 0;
+
+    // Generates 60 nodes sparse in the center
+    const initializeNodes = () => {
+      nodes = [];
+      const nodeCount = 60;
+      const cx = width / 2;
+      const cy = height / 2;
+      const exclusionRadius = Math.min(width, height) * 0.28; // Radius to keep center clean
+
+      let attempts = 0;
+      while (nodes.length < nodeCount && attempts < 1000) {
+        attempts++;
+        const rx = Math.random() * width;
+        const ry = Math.random() * height;
+
+        // Verify inside exclusion radius
+        const dx = rx - cx;
+        const dy = ry - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < exclusionRadius) {
+          continue; // Discard node close to center
+        }
+
+        nodes.push({
+          baseX: rx,
+          baseY: ry,
+          x: rx,
+          y: ry,
+          offsetX: 0,
+          offsetY: 0,
+          seedX: Math.random() * 1000,
+          seedY: Math.random() * 1000
+        });
+      }
+      updateConnections();
+    };
+
+    // Calculate nearest 2 neighbors for each node
+    const updateConnections = () => {
+      edges = [];
+      const edgeKeys = new Set<string>();
+
+      for (let i = 0; i < nodes.length; i++) {
+        const distances: { index: number; dist: number }[] = [];
+        for (let j = 0; j < nodes.length; j++) {
+          if (i === j) continue;
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          distances.push({ index: j, dist });
+        }
+        distances.sort((a, b) => a.dist - b.dist);
+
+        // Take 2 nearest neighbors
+        const nearest = distances.slice(0, 2);
+        nearest.forEach((item) => {
+          const key = i < item.index ? `${i}-${item.index}` : `${item.index}-${i}`;
+          if (!edgeKeys.has(key)) {
+            edgeKeys.add(key);
+            edges.push({ a: i, b: item.index });
+          }
+        });
+      }
+    };
+
+    // Smooth floating noise functions
+    const noiseX = (t: number, seed: number) => {
+      return Math.sin(t * 0.00045 + seed) * Math.cos(t * 0.0002 + seed * 1.5) * 35;
+    };
+    const noiseY = (t: number, seed: number) => {
+      return Math.cos(t * 0.0004 + seed * 2.1) * Math.sin(t * 0.00018 + seed * 0.8) * 30;
+    };
+
+    // Spawn execution packet along a random active edge
+    const spawnPacket = () => {
+      if (packets.length >= 2 || edges.length === 0) return;
+      const edge = edges[Math.floor(Math.random() * edges.length)];
+      packets.push({
+        nodeA: edge.a,
+        nodeB: edge.b,
+        progress: 0,
+        speed: 0.006 + Math.random() * 0.008
+      });
+    };
+
+    // Listeners
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.targetX = e.clientX;
+      mouse.targetY = e.clientY;
+    };
+
+    const handleMouseLeave = () => {
+      mouse.targetX = -9999;
+      mouse.targetY = -9999;
+    };
+
+    const handleScroll = () => {
+      scrollY = window.scrollY;
+    };
+
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('mouseleave', handleMouseLeave, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    resizeCanvas();
+
+    // Main animation render loop
+    const animate = (timestamp: number) => {
+      if (document.hidden) {
+        animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Damp mouse coordinates
+      if (mouse.targetX !== -9999) {
+        if (mouse.x === -9999) {
+          mouse.x = mouse.targetX;
+          mouse.y = mouse.targetY;
+        } else {
+          mouse.x += (mouse.targetX - mouse.x) * 0.08;
+          mouse.y += (mouse.targetY - mouse.y) * 0.08;
+        }
+      } else {
+        mouse.x = -9999;
+        mouse.y = -9999;
+      }
+
+      // Parallax scroll variable
+      const parallax = scrollY * 0.08;
+
+      // Update node drift positions & mouse distortion
+      nodes.forEach((node) => {
+        const driftX = noiseX(timestamp, node.seedX);
+        const driftY = noiseY(timestamp, node.seedY);
+
+        node.x = node.baseX + driftX;
+        node.y = node.baseY + driftY - parallax;
+
+        // Mouse distortion offset
+        if (mouse.x !== -9999) {
+          const dx = node.x - mouse.x;
+          const dy = node.y - mouse.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 180) {
+            const force = ((180 - dist) / 180) * 22; // max 22px push
+            node.offsetX += ((dx / dist) * force - node.offsetX) * 0.1;
+            node.offsetY += ((dy / dist) * force - node.offsetY) * 0.1;
+          } else {
+            node.offsetX += (0 - node.offsetX) * 0.1;
+            node.offsetY += (0 - node.offsetY) * 0.1;
+          }
+        } else {
+          node.offsetX += (0 - node.offsetX) * 0.1;
+          node.offsetY += (0 - node.offsetY) * 0.1;
+        }
+      });
+
+      // Recalculate edge graph connections only every 4 seconds
+      if (timestamp - lastEdgeUpdate > 4000) {
+        updateConnections();
+        lastEdgeUpdate = timestamp;
+      }
+
+      // Spawn data packet every 3.5 seconds
+      if (timestamp - lastPacketSpawn > 3500) {
+        spawnPacket();
+        lastPacketSpawn = timestamp;
+      }
+
+      // Draw connection lines
+      ctx.beginPath();
+      edges.forEach((edge) => {
+        const nodeA = nodes[edge.a];
+        const nodeB = nodes[edge.b];
+        if (!nodeA || !nodeB) return;
+        ctx.moveTo(nodeA.x + nodeA.offsetX, nodeA.y + nodeA.offsetY);
+        ctx.lineTo(nodeB.x + nodeB.offsetX, nodeB.y + nodeB.offsetY);
+      });
+      ctx.strokeStyle = 'rgba(124, 203, 255, 0.05)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Draw nodes
+      nodes.forEach((node) => {
+        ctx.beginPath();
+        ctx.arc(node.x + node.offsetX, node.y + node.offsetY, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.fill();
+      });
+
+      // Update and draw packets
+      packets = packets.filter((p) => {
+        const nodeA = nodes[p.nodeA];
+        const nodeB = nodes[p.nodeB];
+        if (!nodeA || !nodeB) return false;
+
+        p.progress += p.speed;
+        if (p.progress >= 1) return false;
+
+        const xA = nodeA.x + nodeA.offsetX;
+        const yA = nodeA.y + nodeA.offsetY;
+        const xB = nodeB.x + nodeB.offsetX;
+        const yB = nodeB.y + nodeB.offsetY;
+
+        const px = xA + (xB - xA) * p.progress;
+        const py = yA + (yB - yA) * p.progress;
+
+        // Draw packet node spark
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#7CCBFF';
+        ctx.shadowColor = '#7CCBFF';
+        ctx.shadowBlur = 4;
+        ctx.fill();
+        ctx.shadowBlur = 0; // Reset shadow state for next draws
+
+        return true;
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    // Clean listeners
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('scroll', handleScroll);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [mounted]);
 
   return (
-    <div className="absolute inset-0 z-0 select-none pointer-events-none w-full h-full">
-      <Canvas
-        camera={{ position: [0, 0, 9], fov: 60 }}
-        dpr={[1, 1.2]}
-        gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
-      >
-        <NetworkMesh />
-      </Canvas>
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 0,
+        backgroundColor: '#030303',
+        pointerEvents: 'none',
+      }}
+    />
   );
 }
