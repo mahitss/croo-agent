@@ -97,6 +97,15 @@ function getJwtExpiry(token: string): number | null {
 }
 
 function isJwtExpired(token: string): boolean {
+  if (
+    token === 'local-mock-token' ||
+    token === 'google-mock-token' ||
+    token.startsWith('mock-') ||
+    token.startsWith('oauth-') ||
+    token.includes('-mock-')
+  ) {
+    return false;
+  }
   const exp = getJwtExpiry(token);
   if (!exp) return false;
   const current = Math.floor(Date.now() / 1000);

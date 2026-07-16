@@ -10,6 +10,16 @@ const BASE_URL =
 
 function isJwtExpired(token: string): boolean {
   if (typeof window === 'undefined') return false;
+  // Bypass expiration check for local/oauth mock tokens
+  if (
+    token === 'local-mock-token' ||
+    token === 'google-mock-token' ||
+    token.startsWith('mock-') ||
+    token.startsWith('oauth-') ||
+    token.includes('-mock-')
+  ) {
+    return false;
+  }
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return true;
