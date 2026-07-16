@@ -245,7 +245,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         if (token && !isJwtExpired(token)) {
           console.log('[AUTH INIT] Valid token found in storage. Verifying session with backend...');
           try {
-            const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+            const meRes = await fetch(`${BASE_URL}/api/v1/users/me`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             if (meRes.ok) {
@@ -329,7 +329,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 document.cookie = `token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
                 
                 // Get user profile
-                const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+                const meRes = await fetch(`${BASE_URL}/api/v1/users/me`, {
                   headers: { 'Authorization': `Bearer ${parsedToken}` }
                 });
                 
