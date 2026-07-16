@@ -2,16 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ResponsiveContainer, AreaChart, Area, Tooltip } from 'recharts';
-import { useNexusStore } from '../store/nexusStore';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
-import { useUserWallet } from '../hooks/useUserWallet';
-import { apiService } from '../services/api';
 import { 
   Play, 
-  Sliders, 
-  Coins, 
-  RotateCcw, 
   Sparkles, 
   ArrowRight, 
   ShieldCheck, 
@@ -21,48 +15,19 @@ import {
   Terminal, 
   Wallet,
   TrendingUp,
-  Activity
+  Activity,
+  Layers,
+  ArrowUpRight,
+  ChevronRight,
+  CheckCircle,
+  HelpCircle,
+  Plus
 } from 'lucide-react';
-import { useToast } from '../components/Toast';
-import InteractiveNetwork from '../components/InteractiveNetwork';
 
-// Native IntersectionObserver Viewport Entry Component for zero layout shifts
-function ViewportAnimate({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true);
-        observer.unobserve(entry.target);
-      }
-    }, { threshold: 0.05 });
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translate3d(0, 0, 0)' : 'translate3d(0, 15px, 0)',
-        transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-        transitionDelay: `${delay}ms`,
-        willChange: 'transform, opacity',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// 3D Perspective Card Tilt (Bypasses React State, modifies style directly on GPU)
-function PerspectiveCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+// ----------------------------------------------------
+// NATIVE TILT MOCKUP CARD (COMPLETELY LIGHTWEIGHT)
+// ----------------------------------------------------
+function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   let isMoving = false;
 
@@ -70,15 +35,15 @@ function PerspectiveCard({ children, className = '' }: { children: React.ReactNo
     if (isMoving) return;
     isMoving = true;
     
-    // Throttle tilt style update to match screen refreshes
     requestAnimationFrame(() => {
       if (!cardRef.current) return;
       const box = cardRef.current.getBoundingClientRect();
       const x = e.clientX - box.left - box.width / 2;
       const y = e.clientY - box.top - box.height / 2;
       
-      const rx = -y / 35;
-      const ry = x / 35;
+      // Gentle tilt limits (5 degrees max)
+      const rx = -y / 45;
+      const ry = x / 45;
       
       cardRef.current.style.transform = `perspective(1000px) translate3d(0,0,0) rotateX(${rx}deg) rotateY(${ry}deg)`;
       isMoving = false;
@@ -95,371 +60,331 @@ function PerspectiveCard({ children, className = '' }: { children: React.ReactNo
       ref={cardRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`transition-transform duration-300 ease-out border border-white/6 bg-[#0D0D0D] rounded-[20px] overflow-hidden relative will-change-transform ${className}`}
+      className={`transition-transform duration-300 ease-out border border-white/6 bg-[#0D0D0D] rounded-2xl overflow-hidden relative will-change-transform ${className}`}
       style={{
         transform: 'perspective(1000px) translate3d(0,0,0) rotateX(0deg) rotateY(0deg)',
       }}
     >
+      {/* Light Reflection overlay */}
+      <div className="absolute inset-0 opacity-[0.02] bg-gradient-to-tr from-white to-transparent pointer-events-none" />
       {children}
     </div>
   );
 }
 
-// Live Activity Feed Component showing real-time agent updates
-function LiveActivityFeed() {
-  const [feed, setFeed] = useState<any[]>([
-    { type: 'Escrow Lock', desc: 'Locked 0.15 USDC for InsightFinder Pro', time: '1s ago' },
-    { type: 'Consensus Check', desc: 'SLA score 98.4% checked for FinAnalytica', time: '4s ago' },
-    { type: 'Payout Settle', desc: 'Released 0.08 USDC to Translatio P2P wallet', time: '12s ago' }
-  ]);
+// ----------------------------------------------------
+// HIGH-FIDELITY SIMULATED SCREENSHOTS / MOCKUPS
+// ----------------------------------------------------
 
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let active = true;
-    const fetchFeed = async () => {
-      try {
-        const res = await apiService.getActivityFeed();
-        if (res && res.success && Array.isArray(res.data) && active) {
-          setFeed(res.data.slice(0, 3));
-        }
-      } catch (err) {
-        console.warn('Failed to load activity feed:', err);
-      }
-    };
-    fetchFeed();
-    const interval = setInterval(fetchFeed, 5000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [isDemoMode, isAuthenticated]);
-
+function BrowserFrame({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="flex flex-col gap-4 font-mono text-xs h-full justify-between">
-      <div>
-        <div className="flex justify-between items-center border-b border-white/6 pb-2 mb-3">
-          <h4 className="font-bold text-white flex items-center gap-1.5 uppercase text-[9px]">
-            <span className="w-1 h-1 bg-[#6FCBFF] rounded-full animate-ping"></span>
-            Agent Activity Feed
-          </h4>
-          <span className="text-[8px] text-gray-500">Live Sync</span>
+    <div className="w-full h-full flex flex-col bg-[#0D0D0D]">
+      {/* Browser Bar */}
+      <div className="h-9 border-b border-white/6 px-4 flex items-center justify-between shrink-0 bg-black/40">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-white/10"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-white/10"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-white/10"></span>
         </div>
-        <div className="flex flex-col gap-2">
-          {feed.map((evt, idx) => (
-            <div key={idx} className="bg-white/1 border border-white/4 p-2 rounded flex flex-col gap-0.5">
-              <div className="flex justify-between text-[8px]">
-                <span className="text-[#6FCBFF] font-bold uppercase">{evt.type}</span>
-                <span className="text-gray-500">{evt.time}</span>
+        <span className="text-[9px] font-mono text-gray-500">{title}</span>
+        <div className="w-8"></div>
+      </div>
+      <div className="flex-1 min-h-0 relative overflow-hidden bg-black/60">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// 1. Workflow Builder Screenshot Mockup
+function WorkflowBuilderMockup() {
+  return (
+    <BrowserFrame title="orbit.ai/workflow/run-9812">
+      <div className="p-4 flex flex-col gap-4 font-mono text-[9px] h-full justify-between select-none">
+        <div className="flex justify-between items-center text-gray-400">
+          <span>Active Swarm Configuration</span>
+          <span className="text-[#7BC9FF]">Budget: 2.50 USDC</span>
+        </div>
+
+        {/* Nodes graph flow */}
+        <div className="flex flex-col gap-3 my-1">
+          {[
+            { step: '01', name: 'Swarm Planner', details: 'Intent: Compliance Audit', status: 'Completed' },
+            { step: '02', name: 'InsightFinder', details: 'Web search active on 4 nodes', status: 'Running' },
+            { step: '03', name: 'ConsensuVerify', details: 'SLA trust score: 98.4%', status: 'Pending' }
+          ].map((item, idx) => (
+            <div key={idx} className={`p-2.5 rounded-lg border flex items-center justify-between ${
+              item.status === 'Running' ? 'border-[#7BC9FF] bg-[#7BC9FF]/5' : 'border-white/4'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 font-bold">{item.step}</span>
+                <div>
+                  <span className="text-white block font-bold">{item.name}</span>
+                  <span className="text-gray-500 text-[8px]">{item.details}</span>
+                </div>
               </div>
-              <p className="text-[9px] text-gray-300 leading-normal">{evt.desc}</p>
+              <span className={item.status === 'Running' ? 'text-[#7BC9FF] animate-pulse' : 'text-gray-500'}>
+                {item.status}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-black border border-white/6 p-2 rounded flex justify-between text-gray-500 text-[8px]">
+          <span>Verifying payout channels...</span>
+          <span>CAP V2</span>
+        </div>
+      </div>
+    </BrowserFrame>
+  );
+}
+
+// 2. Marketplace Screenshot Mockup
+function MarketplaceMockup() {
+  const agents = [
+    { name: 'FinAnalytica Pro', capability: 'financial_analysis', fee: '0.25 USDC', ratings: '4.9 ⭐' },
+    { name: 'SentriScan Security', capability: 'code_audit', fee: '0.15 USDC', ratings: '4.8 ⭐' },
+    { name: 'DocumentCompliance', capability: 'compliance_check', fee: '0.10 USDC', ratings: '4.85 ⭐' }
+  ];
+  return (
+    <BrowserFrame title="orbit.ai/marketplace">
+      <div className="p-4 flex flex-col gap-3 font-mono text-[9px] h-full justify-between select-none">
+        <span className="text-gray-400 font-bold uppercase tracking-wider text-[8px] block">Verified Swarm Nodes</span>
+        
+        <div className="flex flex-col gap-2">
+          {agents.map((agent, idx) => (
+            <div key={idx} className="border border-white/4 p-2 rounded-lg flex items-center justify-between hover:border-white/10 transition-colors">
+              <div>
+                <span className="text-white block font-bold">{agent.name}</span>
+                <span className="text-gray-500 text-[8px]">{agent.capability}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[#7BC9FF] font-bold">{agent.fee}</span>
+                <span className="text-gray-500">{agent.ratings}</span>
+              </div>
             </div>
           ))}
         </div>
       </div>
-      <div className="text-[8px] text-gray-500 border-t border-white/6 pt-2 flex justify-between items-center">
-        <span>CAP Substrate</span>
-        <span>Secure Escrows</span>
-      </div>
-    </div>
+    </BrowserFrame>
   );
 }
 
-// ----------------------------------------------------
-// INTERACTIVE MOCKUPS
-// ----------------------------------------------------
-
-function WorkflowBuilderMockup() {
-  const [activeStep, setActiveStep] = useState(0);
-  const steps = [
-    { label: 'Swarm Planner', icon: <Sparkles className="w-3.5 h-3.5 text-[#6FCBFF]" /> },
-    { label: 'Market Research', icon: <Globe className="w-3.5 h-3.5 text-[#C9F4FF]" /> },
-    { label: 'Reasoning Engine', icon: <Cpu className="w-3.5 h-3.5 text-[#6FCBFF]" /> },
-    { label: 'SLA Verifier', icon: <ShieldCheck className="w-3.5 h-3.5 text-[#C9F4FF]" /> }
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % steps.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
+// 3. Agent Dashboard Mockup
+function AgentDashboardMockup() {
   return (
-    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
-      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Swarms Orchestrator</span>
-      <div className="flex flex-col gap-2.5">
-        {steps.map((s, idx) => {
-          const isActive = idx === activeStep;
-          return (
-            <div 
-              key={idx}
-              className={`p-2.5 rounded-lg border flex items-center justify-between transition-all duration-300 ${
-                isActive 
-                  ? 'border-[#6FCBFF] bg-[#6FCBFF]/5 shadow-[0_0_10px_rgba(111,203,255,0.04)]' 
-                  : 'border-white/4 bg-transparent opacity-50'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {s.icon}
-                <span className="text-white">{s.label}</span>
-              </div>
-              <span className={`text-[8px] ${isActive ? 'text-[#6FCBFF] font-bold' : 'text-gray-500'}`}>
-                {isActive ? 'Executing' : 'Pending'}
-              </span>
+    <BrowserFrame title="orbit.ai/dashboard">
+      <div className="p-4 flex flex-col gap-4 font-mono text-[9px] h-full justify-between select-none">
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Active Swarms', val: '4 runs' },
+            { label: 'Settled Escrows', val: '38,290' },
+            { label: 'Average Trust', val: '99.4%' }
+          ].map((item, idx) => (
+            <div key={idx} className="bg-white/1 border border-white/4 p-2 rounded text-center">
+              <span className="text-gray-500 text-[7px] uppercase">{item.label}</span>
+              <div className="text-white font-bold mt-0.5">{item.val}</div>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+          ))}
+        </div>
 
-function MarketplaceMockup() {
-  const list = [
-    { name: 'FinAnalytica Pro', cost: '0.25', latency: '1.2s' },
-    { name: 'InsightFinder', cost: '0.05', latency: '0.4s' },
-    { name: 'ConsensuVerify', cost: '0.10', latency: '0.8s' }
-  ];
-  return (
-    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
-      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Capability Registries</span>
-      <div className="flex flex-col gap-2">
-        {list.map((agent, idx) => (
-          <div key={idx} className="bg-white/1 border border-white/4 p-2.5 rounded-lg flex items-center justify-between">
-            <span className="text-white font-bold">{agent.name}</span>
-            <div className="flex items-center gap-3 text-[9px]">
-              <span className="text-[#6FCBFF]">{agent.cost} USDC</span>
-              <span className="text-gray-500">{agent.latency}</span>
-            </div>
+        <div className="bg-[#0D0D0D] border border-white/4 rounded-lg overflow-hidden flex-1 flex flex-col justify-between p-2">
+          <div className="flex justify-between border-b border-white/4 pb-1 text-gray-500 text-[8px]">
+            <span>RUN IDENTIFIER</span>
+            <span>NODES</span>
+            <span>STATUS</span>
           </div>
-        ))}
+          {[
+            { id: 'run-9122', nodes: '4 nodes', status: 'Settled' },
+            { id: 'run-9123', nodes: '6 nodes', status: 'Running' }
+          ].map((row, idx) => (
+            <div key={idx} className="flex justify-between py-1 text-white">
+              <span>{row.id}</span>
+              <span>{row.nodes}</span>
+              <span className={row.status === 'Running' ? 'text-[#7BC9FF]' : 'text-gray-400'}>{row.status}</span>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </BrowserFrame>
   );
 }
 
-function ExecutionConsoleMockup() {
-  const [progress, setProgress] = useState(20);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((p) => (p >= 100 ? 10 : p + 5));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return (
-    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
-      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Chain Visualizer</span>
-      <div className="flex flex-col gap-2 bg-black/30 p-2.5 rounded-lg border border-white/4">
-        <div className="flex justify-between text-gray-400">
-          <span>TASK RATE:</span>
-          <span className="text-[#6FCBFF]">2,410 t/s</span>
-        </div>
-        <div className="flex justify-between text-gray-400 mt-1">
-          <span>PIPELINE PROGRESS:</span>
-          <span className="text-white">{progress}%</span>
-        </div>
-      </div>
-      <div className="w-full h-1 bg-white/4 rounded-full overflow-hidden">
-        <div className="h-full bg-[#6FCBFF] transition-all duration-300" style={{ width: `${progress}%` }}></div>
-      </div>
-    </div>
-  );
-}
-
-function EscrowWalletMockup() {
-  const [balance, setBalance] = useState(100.00);
-  const [escrow, setEscrow] = useState(0.00);
-  
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setBalance((b) => (b === 100.00 ? 99.75 : 100.00));
-      setEscrow((e) => (e === 0.00 ? 0.25 : 0.00));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="p-5 flex flex-col gap-4 h-full justify-between font-mono text-[10px] text-left">
-      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">Agent Wallets Ledger</span>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white/1 border border-white/4 p-2.5 rounded-lg text-center">
-          <span className="text-gray-500 text-[8px]">Wallet Balance</span>
-          <h4 className="text-xs font-bold text-white mt-1">{balance.toFixed(2)} USDC</h4>
-        </div>
-        <div className="bg-[#6FCBFF]/5 border border-[#6FCBFF]/20 p-2.5 rounded-lg text-center">
-          <span className="text-[#6FCBFF] text-[8px]">Escrow Lock</span>
-          <h4 className="text-xs font-bold text-white mt-1">{escrow.toFixed(2)} USDC</h4>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// 4. Analytics Mockup
 function AnalyticsMockup() {
-  const data = [
-    { usage: 1200 },
-    { usage: 1800 },
-    { usage: 1400 },
-    { usage: 2200 },
-    { usage: 2900 },
-    { usage: 2400 }
-  ];
   return (
-    <div className="p-5 flex flex-col gap-3 h-full justify-between font-mono text-[10px] text-left">
-      <span className="text-gray-400 font-bold uppercase tracking-wider text-[9px]">SLA Throughput Ratio</span>
-      <div className="w-full h-[90px] select-none pointer-events-none">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
-            <defs>
-              <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6FCBFF" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#6FCBFF" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area type="monotone" dataKey="usage" stroke="#6FCBFF" strokeWidth={1} fillOpacity={1} fill="url(#usageGrad)" isAnimationActive={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+    <BrowserFrame title="orbit.ai/analytics">
+      <div className="p-4 flex flex-col gap-3 font-mono text-[9px] h-full justify-between select-none">
+        <span className="text-gray-400 font-bold uppercase tracking-wider text-[8px]">System Metrics</span>
+        <div className="w-full flex-1 flex items-end justify-between px-2 h-20 border-b border-white/4 pb-1">
+          {[20, 45, 30, 60, 85, 55, 90].map((h, idx) => (
+            <div 
+              key={idx} 
+              className="w-4 bg-gradient-to-t from-[#7BC9FF]/40 to-[#7BC9FF] rounded-t"
+              style={{ height: `${h}%` }}
+            ></div>
+          ))}
+        </div>
+        <div className="flex justify-between text-gray-500 text-[8px] mt-1">
+          <span>LATENCY: 850ms</span>
+          <span>THROUGHPUT: 2.4k tok/s</span>
+        </div>
       </div>
-    </div>
+    </BrowserFrame>
   );
 }
 
+// 5. Wallet Mockup
+function WalletMockup() {
+  return (
+    <BrowserFrame title="orbit.ai/wallet">
+      <div className="p-4 flex flex-col gap-4 font-mono text-[9px] h-full justify-between select-none">
+        <div className="flex flex-col gap-1">
+          <span className="text-gray-500 text-[8px] uppercase">CAP Escrow Vault</span>
+          <h2 className="text-xl font-bold text-white tracking-tight">120.50 USDC</h2>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center text-gray-400">
+            <span>Locked Escrow</span>
+            <span className="text-white font-bold">15.20 USDC</span>
+          </div>
+          <div className="flex justify-between items-center text-gray-400">
+            <span>Pending Release</span>
+            <span className="text-[#7BC9FF] font-bold">5.00 USDC</span>
+          </div>
+        </div>
+        <div className="border-t border-white/4 pt-2 text-[8px] text-gray-500">
+          🔒 Securing SLA releases via CROO V2 API keys
+        </div>
+      </div>
+    </BrowserFrame>
+  );
+}
 
+// 6. Publishing Mockup
+function PublishingMockup() {
+  return (
+    <BrowserFrame title="orbit.ai/developers/publish">
+      <div className="p-4 flex flex-col gap-3 font-mono text-[9px] h-full justify-between select-none">
+        <span className="text-gray-400 font-bold uppercase tracking-wider text-[8px]">Register Agent Capability</span>
+        
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-gray-500 text-[7px] uppercase">Agent Identifier</span>
+            <div className="bg-[#0D0D0D] border border-white/4 p-1.5 rounded text-white font-bold">sentinel-scan</div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-gray-500 text-[7px] uppercase">Capability Hash</span>
+            <div className="bg-[#0D0D0D] border border-white/4 p-1.5 rounded text-white truncate text-[7px] text-gray-400">0x8f2d11ac2b89...</div>
+          </div>
+        </div>
+
+        <button className="w-full bg-[#7BC9FF] hover:bg-[#7BC9FF]/90 text-black py-2 rounded font-bold uppercase text-[8px]">
+          Advertise to CAP Swarm
+        </button>
+      </div>
+    </BrowserFrame>
+  );
+}
+
+// ----------------------------------------------------
+// VIEWPORT OBSERVER TRIGGER ELEMENT (SECTION 4 DUAL SCROLL)
+// ----------------------------------------------------
+function StickyTrigger({ index, setActiveIndex, children }: { index: number; setActiveIndex: (i: number) => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setActiveIndex(index);
+      }
+    }, { threshold: 0.5 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [index, setActiveIndex]);
+  return (
+    <div ref={ref} className="min-h-[80vh] flex items-center justify-center py-6">
+      {children}
+    </div>
+  );
+}
 
 // ----------------------------------------------------
 // PORTAL PAGE COMPONENT
 // ----------------------------------------------------
 export default function PortalPage() {
-  const userQuery = useNexusStore((state) => state.userQuery);
-  const setUserQuery = useNexusStore((state) => state.setUserQuery);
-  const startExecution = useNexusStore((state) => state.startExecution);
-  const initialize = useNexusStore((state) => state.initialize);
-  
+  const [mounted, setMounted] = useState(false);
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
-  const { userWallet } = useUserWallet();
 
-  const [mounted, setMounted] = useState(false);
-  const [routingMode, setLocalRoutingMode] = useState<'cheapest' | 'fastest' | 'accuracy' | 'balanced'>('balanced');
-  const [budget, setLocalBudget] = useState<number>(2.0);
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
 
   useEffect(() => {
     setMounted(true);
-    initialize();
-  }, [initialize]);
+  }, []);
 
-  const quickQueries = [
-    "Compile Tesla Q1 financial analysis and translate reports to Chinese",
-    "Audit smart contract security vulnerability and write TS integration tests",
-    "Analyze EU compliance parameters for legal terms sheet document"
+  const section4Items = [
+    { title: 'Workflow Builder', desc: 'Graphically map out complex multi-agent execution channels. Wire dependencies, fallback limits, and verifiers.', mockup: <WorkflowBuilderMockup /> },
+    { title: 'Marketplace Nodes', desc: 'Discover and install specialized agents published by developers. Lock secure USDC-CAP SLA pricing keys.', mockup: <MarketplaceMockup /> },
+    { title: 'Agent Dashboard', desc: 'Audit active swarms and trace execution parameters. View live latency metrics and output validations.', mockup: <AgentDashboardMockup /> },
+    { title: 'SLA Analytics', desc: 'Benchmark latency records, cost margins, and token consumption graphs with zero rendering lag.', mockup: <AnalyticsMockup /> },
+    { title: 'Escrow Wallet', desc: 'Hold payouts securely. Credits are released automatically only after independent consensuses verify results.', mockup: <WalletMockup /> },
+    { title: 'Developer Publishing', desc: 'Advertise agent endpoints on the global CAP ledger. Monetize custom APIs with pre-audited trust hashes.', mockup: <PublishingMockup /> }
   ];
 
-  const handleLaunch = async () => {
-    if (!userQuery.trim()) return;
-    await startExecution(userQuery, routingMode, budget);
-    const active = useNexusStore.getState().activeWorkflow;
-    if (active) {
-      window.location.href = `/workflow?workflowId=${active.id}`;
-    }
-  };
-
-  const scrollToIntentionWorkspace = () => {
-    const el = document.getElementById('launchpad');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
-    <div className="flex-1 flex flex-col bg-[#030303] text-white overflow-x-hidden selection:bg-[#6FCBFF]/30 relative font-inter min-h-screen">
+    <div className="flex-1 flex flex-col bg-[#050505] text-white overflow-x-hidden selection:bg-[#7BC9FF]/30 relative font-inter min-h-screen">
       
-      {/* Dynamic Optimized CSS style declarations */}
+      {/* Optimized CSS stylesheet block */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,400italic;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap');
         
         .font-instrument {
           font-family: 'Instrument Serif', serif;
         }
-        
-        /* Grid background layout */
-        .bg-grid-overlay {
-          background-size: 60px 60px;
-          background-image: 
-            linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-          will-change: background-position;
-          animation: gridSlowMove 35s linear infinite;
-        }
 
-        /* Subtle procedural noise overlay */
+        /* Subtle procedural noise texture */
         .noise-overlay {
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
           pointer-events: none;
         }
 
-        /* GPU accelerated grid translation keyframe */
-        @keyframes gridSlowMove {
-          0% { background-position: 0 0; }
-          100% { background-position: 60px 60px; }
-        }
-
-        /* Slowly floating radial gradients */
-        @keyframes floatGradient1 {
+        /* Slowly floating radial gradient keys */
+        @keyframes floatVolumetricLight {
           0% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(40px, 20px, 0); }
-          100% { transform: translate3d(0, 0, 0); }
-        }
-        @keyframes floatGradient2 {
-          0% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(-30px, -15px, 0); }
+          50% { transform: translate3d(60px, 30px, 0); }
           100% { transform: translate3d(0, 0, 0); }
         }
 
-        .animate-radial-1 {
-          animation: floatGradient1 45s ease-in-out infinite;
-          will-change: transform;
-        }
-        .animate-radial-2 {
-          animation: floatGradient2 55s ease-in-out infinite;
+        .animate-ambient {
+          animation: floatVolumetricLight 55s ease-in-out infinite;
           will-change: transform;
         }
 
-        /* GPU Composited static fade up reveal for hero elements */
-        @keyframes heroFadeUp {
+        /* Composited fade-up entrance */
+        @keyframes fadeUpOnce {
           0% { opacity: 0; transform: translate3d(0, 15px, 0); }
           100% { opacity: 1; transform: translate3d(0, 0, 0); }
         }
 
-        .hero-reveal {
-          animation: heroFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        .fade-up-once {
+          animation: fadeUpOnce 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: transform, opacity;
         }
       `}} />
 
-      {/* BACKGROUND MATTE DECORATIONS */}
+      {/* AMBIENT LAYERS */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        {/* Layer 1: Matte coal-black background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#030303] via-[#050505] to-[#090909]"></div>
-
-        {/* Layer 2: Moving Grid */}
-        <div className="absolute inset-0 bg-grid-overlay opacity-90"></div>
-
-        {/* Layer 3: Noise Overlay */}
+        <div className="absolute inset-0 bg-[#050505]"></div>
+        {/* Soft volumetric light */}
+        <div className="absolute top-[10%] left-[20%] w-[65vw] h-[65vw] max-w-[900px] rounded-full bg-[#7BC9FF]/[0.012] blur-[140px] animate-ambient"></div>
         <div className="absolute inset-0 noise-overlay"></div>
-
-        {/* Layer 4: Two floating radial gradients (white and soft blue) */}
-        <div className="absolute top-[8%] left-[20%] w-[550px] h-[550px] rounded-full bg-[#6FCBFF]/3 blur-[120px] animate-radial-1"></div>
-        <div className="absolute top-[35%] right-[20%] w-[600px] h-[600px] rounded-full bg-white/[0.015] blur-[140px] animate-radial-2"></div>
       </div>
 
-      {/* Centered Floating Header Navigation (Backdrop blur simplified) */}
+      {/* FIXED HEADER NAVBAR */}
       <nav className="fixed top-0 left-0 right-0 z-50 h-[80px] bg-black/55 backdrop-blur-[20px] border-b border-white/6 px-8 flex items-center justify-between shadow-sm">
-        {/* LEFT: Orbit AI Logo & Text */}
+        {/* LEFT: Logo & Brand Name */}
         <Link href="/" className="flex items-center gap-3 select-none">
           <div className="w-[36px] h-[36px] rounded-xl bg-white flex items-center justify-center font-extrabold text-black text-xl">
             O
@@ -469,7 +394,7 @@ export default function PortalPage() {
           </span>
         </Link>
 
-        {/* RIGHT: Login & Register */}
+        {/* RIGHT: Auth triggers */}
         <div className="flex items-center gap-6">
           {mounted && token && user ? (
             <div className="relative group">
@@ -506,42 +431,37 @@ export default function PortalPage() {
         </div>
       </nav>
 
-      {/* HERO HERO SECTION VIEWPORT */}
-      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto pt-16">
-        
-        {/* WebGL React Three Fiber Background Neural Network */}
-        <InteractiveNetwork />
-
-        <div className="flex flex-col items-center gap-6 max-w-3xl relative z-10 mt-10">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-1.5 bg-[#0D0D0D] border border-white/6 rounded-full px-3.5 py-1 text-[8px] tracking-widest font-mono uppercase text-gray-400 hero-reveal [animation-delay:100ms] opacity-0">
-            <span className="w-1 h-1 rounded-full bg-[#6FCBFF]"></span>
-            AI Agent Substrate
+      {/* HERO SECTION */}
+      <section className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto pt-20">
+        <div className="flex flex-col items-center gap-6 max-w-3xl">
+          {/* Tagline */}
+          <div className="inline-flex items-center gap-1.5 bg-[#0D0D0D] border border-white/6 rounded-full px-3.5 py-1 text-[8px] tracking-widest font-mono uppercase text-gray-400 fade-up-once [animation-delay:100ms] opacity-0">
+            <span className="w-1 h-1 rounded-full bg-[#7BC9FF]"></span>
+            Autonomous Agent OS Substrate
           </div>
 
-          {/* Heading (Reveal line by line using fast CSS GPU keyframes) */}
+          {/* Heading */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-normal tracking-tight leading-[1.1] text-white font-instrument select-none">
-            <span className="block hero-reveal [animation-delay:250ms] opacity-0">Build AI Workers</span>
-            <span className="block italic font-light text-gray-400 hero-reveal [animation-delay:400ms] opacity-0">That Hire</span>
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#6FCBFF] via-[#FFFFFF] to-[#C9F4FF] hero-reveal [animation-delay:550ms] opacity-0">Other AI Workers</span>
+            <span className="block fade-up-once [animation-delay:250ms] opacity-0">Build AI Workers</span>
+            <span className="block italic font-light text-gray-400 fade-up-once [animation-delay:400ms] opacity-0">That Hire</span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#7BC9FF] via-[#FFFFFF] to-white/70 fade-up-once [animation-delay:550ms] opacity-0">Other AI Workers</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-gray-400 text-xs md:text-sm max-w-xl leading-relaxed font-inter hero-reveal [animation-delay:700ms] opacity-0">
+          <p className="text-gray-400 text-xs md:text-sm max-w-xl leading-relaxed font-inter fade-up-once [animation-delay:700ms] opacity-0">
             Deploy autonomous AI workers capable of planning, executing, collaborating and paying other AI workers securely.
           </p>
 
-          {/* CTAs */}
-          <div className="flex gap-4 justify-center items-center mt-2 hero-reveal [animation-delay:850ms] opacity-0">
+          {/* Actions */}
+          <div className="flex gap-4 justify-center items-center mt-4 fade-up-once [animation-delay:850ms] opacity-0">
             <button
-              onClick={scrollToIntentionWorkspace}
-              className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/95 text-black text-xs font-extrabold px-6 py-2.5 rounded-lg transition-transform hover:scale-[1.02] flex items-center gap-1.5 font-mono shadow"
+              onClick={() => setAuthModal(true, 'register')}
+              className="bg-[#7BC9FF] hover:bg-[#7BC9FF]/95 text-black text-xs font-extrabold px-6 py-2.5 rounded-lg transition-transform hover:scale-[1.02] font-mono shadow"
             >
               Launch Workspace
-              <Play className="w-3.5 h-3.5 fill-black" />
             </button>
             <a
-              href="#keynote-sections"
+              href="#product-showcases"
               className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/6 text-xs font-bold px-6 py-2.5 rounded-lg transition-colors"
             >
               Explore Features
@@ -550,220 +470,151 @@ export default function PortalPage() {
         </div>
       </section>
 
-      {/* KEYNOTE VIEWPANS (IntersectionObserver viewport loading) */}
-      <section id="keynote-sections" className="relative z-10 max-w-4xl mx-auto px-6 flex flex-col gap-24 pb-24">
+      {/* PRODUCT SHOWCASES SECTION */}
+      <section id="product-showcases" className="relative z-10 max-w-5xl mx-auto px-6 py-12 flex flex-col gap-24 md:gap-32">
         
-        {/* Section 1: Workflow */}
-        <ViewportAnimate>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="order-2 md:order-1">
-              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
-                <WorkflowBuilderMockup />
-              </PerspectiveCard>
-            </div>
-            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 01</span>
-              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
-                Orchestrator Swarm Builder
-              </h2>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                Graphically map out complex Multi-Agent Swarms. Define subtask routing limits, verify thresholds, and sequence execution structures concurrently.
-              </p>
-            </div>
+        {/* SECTION 1 */}
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center"
+        >
+          <div>
+            <TiltCard className="w-full aspect-[16/11]">
+              <WorkflowBuilderMockup />
+            </TiltCard>
           </div>
-        </ViewportAnimate>
-
-        {/* Section 2: Marketplace */}
-        <ViewportAnimate>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="text-left flex flex-col gap-3 max-w-sm">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-[#C9F4FF]">SLA Stage 02</span>
-              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
-                Registry Capabilities Store
-              </h2>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                Discover, publish, and load verified agent templates. Benchmark latency logs and review P2P prices dynamically.
-              </p>
-            </div>
-            <div>
-              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
-                <MarketplaceMockup />
-              </PerspectiveCard>
-            </div>
-          </div>
-        </ViewportAnimate>
-
-        {/* Section 3: Execution */}
-        <ViewportAnimate>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="order-2 md:order-1">
-              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
-                <ExecutionConsoleMockup />
-              </PerspectiveCard>
-            </div>
-            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 03</span>
-              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
-                Console Streaming Telemetry
-              </h2>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                Inspect running jobs dynamically. Real-time logging outputs active subtask states and execution timelines.
-              </p>
-            </div>
-          </div>
-        </ViewportAnimate>
-
-        {/* Section 4: Wallet */}
-        <ViewportAnimate>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="text-left flex flex-col gap-3 max-w-sm">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-[#C9F4FF]">SLA Stage 04</span>
-              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
-                Escrow Settlement Rails
-              </h2>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                USDC fees are locked inside smart contracts prior to run triggers. Settlements are disbursed autonomously after consensus verification reports.
-              </p>
-            </div>
-            <div>
-              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
-                <EscrowWalletMockup />
-              </PerspectiveCard>
-            </div>
-          </div>
-        </ViewportAnimate>
-
-        {/* Section 5: Analytics */}
-        <ViewportAnimate>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div className="order-2 md:order-1">
-              <PerspectiveCard className="w-full aspect-[16/10] flex items-center justify-center">
-                <AnalyticsMockup />
-              </PerspectiveCard>
-            </div>
-            <div className="order-1 md:order-2 text-left flex flex-col gap-3 max-w-sm">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-[#6FCBFF]">SLA Stage 05</span>
-              <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument">
-                Performance Dashboard
-              </h2>
-              <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
-                Optimize and analyze request load ratios, cost metrics, and latency averages with lightweight, zero-latency visualizations.
-              </p>
-            </div>
-          </div>
-        </ViewportAnimate>
-
-      </section>
-
-      {/* LAUNCHPAD WORKSPACE */}
-      <section id="launchpad" className="max-w-4xl w-full mx-auto px-6 pb-20 relative z-10 scroll-mt-24">
-        <ViewportAnimate>
-          <div className="text-left flex flex-col gap-2 mb-6">
-            <h2 className="text-2xl font-bold uppercase tracking-wider text-white font-instrument">
-              Orchestrator Workspace
+          <div className="text-left flex flex-col gap-3.5 max-w-md">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-[#7BC9FF] font-bold">Feature Stage 01</span>
+            <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument text-white">
+              Visual Agent Workflow Orchestration
             </h2>
-            <p className="text-xs text-gray-400 font-mono">
-              Input your swarm intention below. Smart routing coordinates nodes and locks secure SLA transaction escrows automatically.
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Assemble complex execution structures graphically. Drag nodes, configure limits, establish validation channels, and monitor routing pipelines dynamically.
+            </p>
+            <ul className="flex flex-col gap-1.5 text-[9px] font-mono text-gray-300 mt-1">
+              <li className="flex items-center gap-1.5">✓ Concurrent execution sequencing</li>
+              <li className="flex items-center gap-1.5">✓ Smart retry thresholds</li>
+              <li className="flex items-center gap-1.5">✓ Custom verification nodes</li>
+            </ul>
+          </div>
+        </motion.div>
+
+        {/* SECTION 2 */}
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center"
+        >
+          <div className="order-2 md:order-1 text-left flex flex-col gap-3.5 max-w-md">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-[#7BC9FF] font-bold">Feature Stage 02</span>
+            <h2 className="text-2xl md:text-3xl font-normal leading-tight font-instrument text-white">
+              Decentralized Agent Registries
+            </h2>
+            <p className="text-xs text-gray-400 leading-relaxed font-mono">
+              Lease specialized capability nodes created by verified developers. Confirm latency values, examine trust indices, and lock secure CAP SLAs before deployment.
             </p>
           </div>
+          <div className="order-1 md:order-2">
+            <TiltCard className="w-full aspect-[16/11]">
+              <MarketplaceMockup />
+            </TiltCard>
+          </div>
+        </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Left Workspace Panel */}
-            <div className="lg:col-span-2 bg-[#0D0D0D] border border-white/6 p-5 rounded-[20px] flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase font-bold tracking-wider text-gray-500 font-mono">
-                  Natural Language Prompt
-                </label>
-                <div className="flex flex-col md:flex-row gap-3">
-                  <input
-                    type="text"
-                    className="flex-1 bg-black/30 border border-white/6 focus:border-[#6FCBFF]/50 px-3.5 py-2.5 rounded-xl text-white text-xs outline-none transition-colors font-mono"
-                    placeholder="Describe intention swarm..."
-                    value={userQuery}
-                    onChange={(e) => setUserQuery(e.target.value)}
-                  />
-                  <button
-                    onClick={handleLaunch}
-                    disabled={!userQuery.trim()}
-                    className="bg-[#6FCBFF] hover:bg-[#6FCBFF]/95 text-black px-5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-transform hover:scale-[1.02] font-mono shrink-0"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-black" />
-                    Launch
-                  </button>
+        {/* SECTION 3: Horizontal Gallery */}
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="flex flex-col gap-6"
+        >
+          <div className="text-left">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500 font-bold">Visual Substrate Gallery</span>
+            <h2 className="text-2xl md:text-3xl font-normal font-instrument text-white mt-1">
+              Handcrafted Product Ecosystem
+            </h2>
+          </div>
+
+          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin select-none snap-x">
+            {[
+              { title: 'Workflow Builder', view: <WorkflowBuilderMockup /> },
+              { title: 'Agent Marketplace', view: <MarketplaceMockup /> },
+              { title: 'Agent Dashboard', view: <AgentDashboardMockup /> },
+              { title: 'Analytics Console', view: <AnalyticsMockup /> },
+              { title: 'USDC Escrow Wallet', view: <WalletMockup /> }
+            ].map((slide, idx) => (
+              <div 
+                key={idx} 
+                className="min-w-[280px] md:min-w-[320px] max-w-[320px] flex flex-col gap-3 bg-[#0D0D0D] border border-white/6 p-4 rounded-2xl hover:scale-[1.01] hover:border-white/12 transition-all snap-center"
+              >
+                <div className="w-full aspect-[16/11] rounded-xl overflow-hidden border border-white/4">
+                  {slide.view}
+                </div>
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[10px] font-bold text-white font-mono">{slide.title}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
                 </div>
               </div>
+            ))}
+          </div>
+        </motion.div>
 
-              {/* Advanced config layout */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-white/6">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-gray-400 font-mono uppercase">Routing mode</span>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['balanced', 'cheapest', 'fastest', 'accuracy'] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => setLocalRoutingMode(mode)}
-                        className={`text-[8px] py-1.5 rounded-lg border uppercase transition-colors font-mono ${
-                          routingMode === mode
-                            ? 'border-[#6FCBFF] text-[#6FCBFF] bg-[#6FCBFF]/5'
-                            : 'border-white/6 text-gray-400 bg-white/2 hover:text-white'
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 font-mono uppercase">
-                    <span>Budget Limit</span>
-                    <span className="text-[#6FCBFF]">{(budget || 0).toFixed(2)} USDC</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="5.0"
-                    step="0.5"
-                    value={budget}
-                    onChange={(e) => setLocalBudget(parseFloat(e.target.value))}
-                    className="w-full h-1 bg-[#0C0C0D] rounded appearance-none cursor-pointer accent-[#6FCBFF]"
-                  />
-                </div>
-              </div>
-
-              {/* Suggestions */}
-              <div className="flex flex-col gap-1 mt-2">
-                <span className="text-[8px] text-gray-500 uppercase tracking-widest font-mono">Suggested Intention seeds</span>
-                <div className="flex flex-col gap-1.5">
-                  {quickQueries.map((q, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setUserQuery(q)}
-                      className="text-left text-[10px] text-gray-400 hover:text-white hover:bg-white/2 p-2 rounded border border-white/4 transition-colors font-mono"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        {/* SECTION 4: Dual Scroll Sticky */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start relative mt-12 pb-20">
+          
+          {/* Left Sticky Column */}
+          <div className="sticky top-[140px] text-left flex flex-col gap-4 self-start">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-[#7BC9FF] font-bold">Orbit OS Walkthrough</span>
+            
+            <div className="min-h-[140px] flex flex-col gap-2">
+              <h2 className="text-3xl font-normal font-instrument text-white">
+                {section4Items[activeSectionIndex].title}
+              </h2>
+              <p className="text-xs text-gray-400 font-mono leading-relaxed max-w-sm mt-1">
+                {section4Items[activeSectionIndex].desc}
+              </p>
             </div>
 
-            {/* Right Activity Panel */}
-            <div className="lg:col-span-1 bg-[#0D0D0D] border border-white/6 p-5 rounded-[20px] flex flex-col justify-between">
-              <LiveActivityFeed />
+            {/* Step navigation dots */}
+            <div className="flex gap-2 mt-4">
+              {section4Items.map((_, idx) => (
+                <span 
+                  key={idx} 
+                  className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                    idx === activeSectionIndex ? 'bg-[#7BC9FF]' : 'bg-white/10'
+                  }`}
+                ></span>
+              ))}
             </div>
           </div>
-        </ViewportAnimate>
+
+          {/* Right Scrolling Column */}
+          <div className="flex flex-col gap-6 w-full">
+            {section4Items.map((item, idx) => (
+              <StickyTrigger key={idx} index={idx} setActiveIndex={setActiveSectionIndex}>
+                <div className="w-full aspect-[16/11] border border-white/6 rounded-2xl overflow-hidden bg-[#0D0D0D] shadow-xl hover:border-white/10 transition-colors">
+                  {item.mockup}
+                </div>
+              </StickyTrigger>
+            ))}
+          </div>
+        </div>
+
       </section>
 
-      {/* FOOTER */}
+      {/* MINIMAL FOOTER */}
       <footer className="w-full bg-[#030303] border-t border-white/6 py-8 relative z-10">
-        <div className="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-mono text-gray-500">
-          <span>© 2026 ORBIT AI. The Agentic Substrate Operating System.</span>
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-mono text-gray-500">
+          <span>© 2026 ORBIT AI. The Agentic Substrate OS.</span>
           <div className="flex gap-4">
-            <Link href="/docs" className="hover:text-white">Docs</Link>
-            <Link href="/marketplace" className="hover:text-white">Marketplace</Link>
-            <Link href="/workflow" className="hover:text-white">Builder</Link>
+            <span className="hover:text-white cursor-pointer" onClick={() => setAuthModal(true, 'login')}>Login</span>
+            <span className="hover:text-white cursor-pointer" onClick={() => setAuthModal(true, 'register')}>Register</span>
           </div>
         </div>
       </footer>
