@@ -50,8 +50,6 @@ export default function AuthModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const tokenClientRef = useRef<any>(null);
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -70,47 +68,24 @@ export default function AuthModal() {
       const handleScriptLoad = () => {
         console.log('[GOOGLE_AUTH_DEBUG] Google SDK loaded');
         const google = (window as any).google;
-        if (google?.accounts?.oauth2 && !tokenClientRef.current) {
+        if (google?.accounts?.id) {
           const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
           if (!googleClientId) {
             throw new Error('Missing Google Client ID environment variable (NEXT_PUBLIC_GOOGLE_CLIENT_ID)');
           }
 
-          tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+          google.accounts.id.initialize({
             client_id: googleClientId,
-            scope: 'openid email profile',
-            prompt: 'select_account',
-            callback: async (tokenResponse: any) => {
-              if (tokenResponse && tokenResponse.access_token) {
-                console.log('[GOOGLE_AUTH_DEBUG] Account selected');
-                console.log('[GOOGLE_AUTH_DEBUG] Authorization code/token received');
-                
+            callback: async (response: any) => {
+              if (response && response.credential) {
+                console.log('[GOOGLE_AUTH_DEBUG] ID Token received from Google popup');
                 setIsLoading(true);
                 try {
-                  console.log('[GOOGLE_AUTH_DEBUG] Fetching user profile from Google...');
-                  const userinfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${tokenResponse.access_token}`);
-                  if (!userinfoRes.ok) {
-                    throw new Error('Failed to fetch user profile from Google');
-                  }
-                  const userinfo = await userinfoRes.json();
-                  
-                  const mockPayload = {
-                    sub: userinfo.sub,
-                    email: userinfo.email,
-                    name: userinfo.name || userinfo.given_name || 'Google User',
-                    picture: userinfo.picture || ''
-                  };
-                  
-                  const idToken = `mock-google-token-${Buffer.from(JSON.stringify(mockPayload)).toString('base64')}`;
-                  
-                  console.log('[GOOGLE_AUTH_DEBUG] POST /api/v1/auth/google request');
-                  const ok = await loginWithGoogle(idToken);
+                  console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
+                  const ok = await loginWithGoogle(response.credential);
                   if (ok) {
-                    console.log('[GOOGLE_AUTH_DEBUG] Login completed');
-                    const msg = isDemoMode 
-                      ? 'Successfully signed in with Google (Demo Mode)!' 
-                      : 'Successfully signed in with Google!';
-                    toast(msg, 'success');
+                    console.log('[GOOGLE_AUTH_DEBUG] Login successfully verified on backend');
+                    toast('Successfully signed in with Google!', 'success');
                     setAuthModal(false);
                     if (typeof window !== 'undefined') {
                       const params = new URLSearchParams(window.location.search);
@@ -129,7 +104,17 @@ export default function AuthModal() {
               }
             }
           });
-          console.log('[GOOGLE_AUTH_DEBUG] OAuth client initialized');
+
+          // Wait a brief moment to ensure target container exists in DOM
+          setTimeout(() => {
+            const container = document.getElementById("google-signin-btn");
+            if (container) {
+              google.accounts.id.renderButton(
+                container,
+                { theme: "filled_blue", size: "large", width: 412, text: "continue_with" }
+              );
+            }
+          }, 100);
         }
       };
 
@@ -143,7 +128,7 @@ export default function AuthModal() {
         document.head.appendChild(script);
       } else {
         const google = (window as any).google;
-        if (google?.accounts?.oauth2) {
+        if (google?.accounts?.id) {
           handleScriptLoad();
         } else {
           script.addEventListener('load', handleScriptLoad);
@@ -157,20 +142,6 @@ export default function AuthModal() {
       };
     }
   }, [isAuthModalOpen, isDemoMode, loginWithGoogle, setAuthModal, toast]);
-
-  const handleGoogleOAuthClick = () => {
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!googleClientId) {
-      throw new Error('Missing Google Client ID environment variable (NEXT_PUBLIC_GOOGLE_CLIENT_ID)');
-    }
-
-    if (tokenClientRef.current) {
-      console.log('[GOOGLE_AUTH_DEBUG] Popup opened');
-      tokenClientRef.current.requestAccessToken();
-    } else {
-      toast('Google Sign-In is initializing. Please try again in a moment.', 'info');
-    }
-  };
 
   if (!mounted || !isAuthModalOpen) return null;
 
@@ -455,15 +426,8 @@ export default function AuthModal() {
               <div className="flex-1 h-[1px] bg-border-dark"></div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={handleGoogleOAuthClick}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-white/5 border border-border-dark hover:border-white/10 px-4 py-2.5 rounded-xl text-xs text-white font-mono hover:bg-white/10 transition-all"
-              >
-                Continue with Google
-              </button>
+            <div className="flex flex-col gap-3 items-center justify-center">
+              <div id="google-signin-btn" className="w-full flex justify-center overflow-hidden rounded-xl"></div>
             </div>
           </div>
         )}
