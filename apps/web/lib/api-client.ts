@@ -212,10 +212,12 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  console.log(`[API_CLIENT] fetchWithAuth start: ${BASE_URL}${url}`);
   let response = await fetch(`${BASE_URL}${url}`, {
     ...options,
     headers,
   });
+  console.log(`[API_CLIENT] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
 
   // Intercept 401 failures and try to refresh on the fly (Problem 7)
   if (response.status === 401 && !isServer && storage && !url.startsWith('/api/v1/auth/')) {

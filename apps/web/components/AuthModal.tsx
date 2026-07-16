@@ -82,7 +82,10 @@ export default function AuthModal() {
                 setIsLoading(true);
                 try {
                   console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
+                  console.log("Before request");
                   const ok = await loginWithGoogle(response.credential);
+                  console.log("After request");
+                  console.log("Response resolved to:", ok);
                   if (ok) {
                     console.log('[GOOGLE_AUTH_DEBUG] Login successfully verified on backend');
                     toast('Successfully signed in with Google!', 'success');
