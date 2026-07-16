@@ -221,9 +221,19 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const storedDemoMode = localStorage.getItem('orbit_demomode');
         const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
         
-        const token = localStorage.getItem('orbit_token') || sessionStorage.getItem('orbit_token');
-        const refreshToken = localStorage.getItem('orbit_refreshtoken') || sessionStorage.getItem('orbit_refreshtoken');
-        const userStr = localStorage.getItem('orbit_user') || sessionStorage.getItem('orbit_user');
+        const getCookie = (name: string) => {
+          if (typeof window === 'undefined') return null;
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          try {
+            return match ? decodeURIComponent(match[2]) : null;
+          } catch (e) {
+            return match ? match[2] : null;
+          }
+        };
+
+        const token = localStorage.getItem('orbit_token') || sessionStorage.getItem('orbit_token') || getCookie('orbit_token') || getCookie('token');
+        const refreshToken = localStorage.getItem('orbit_refreshtoken') || sessionStorage.getItem('orbit_refreshtoken') || getCookie('orbit_refreshtoken');
+        const userStr = localStorage.getItem('orbit_user') || sessionStorage.getItem('orbit_user') || getCookie('orbit_user');
         const parsedUser = userStr ? JSON.parse(userStr) : null;
         const storage = localStorage.getItem('orbit_token') ? localStorage : sessionStorage;
         
@@ -233,16 +243,62 @@ export const useAuthStore = create<AuthState>((set, get) => {
         });
         
         if (token && !isJwtExpired(token)) {
-          console.log('[AUTH READY] Valid token restored on startup. User ID:', parsedUser?.id);
-          set({
-            token,
-            user: parsedUser,
-            isAuthenticated: true,
-            initializationState: 'AUTHENTICATED',
-            isCheckingAuth: false
-          });
-          get().scheduleAutoRefresh();
-          return true;
+          console.log('[AUTH INIT] Valid token found in storage. Verifying session with backend...');
+          try {
+            const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              const freshUser = meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser;
+              console.log('[AUTH READY] Session verified. User ID:', freshUser?.id);
+              storage.setItem('orbit_user', JSON.stringify(freshUser));
+              set({
+                token,
+                user: freshUser,
+                isAuthenticated: true,
+                initializationState: 'AUTHENTICATED',
+                isCheckingAuth: false
+              });
+              get().scheduleAutoRefresh();
+              return true;
+            } else if (meRes.status === 401) {
+              console.warn('[AUTH INIT] Token is invalid or unauthorized. Clearing session.');
+              storage.removeItem('orbit_token');
+              storage.removeItem('orbit_user');
+              storage.removeItem('orbit_refreshtoken');
+              set({
+                token: null,
+                user: null,
+                isAuthenticated: false,
+                initializationState: 'UNAUTHENTICATED',
+                isCheckingAuth: false
+              });
+              return false;
+            } else {
+              console.log('[AUTH READY] Server returned error, restoring local cached session. User ID:', parsedUser?.id);
+              set({
+                token,
+                user: parsedUser,
+                isAuthenticated: true,
+                initializationState: 'AUTHENTICATED',
+                isCheckingAuth: false
+              });
+              get().scheduleAutoRefresh();
+              return true;
+            }
+          } catch (err) {
+            console.error('[AUTH INIT] Session validation request failed:', err);
+            set({
+              token,
+              user: parsedUser,
+              isAuthenticated: true,
+              initializationState: 'AUTHENTICATED',
+              isCheckingAuth: false
+            });
+            get().scheduleAutoRefresh();
+            return true;
+          }
         }
         
         // Attempt background silent refresh
@@ -266,6 +322,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 if (parsedNextRefresh) {
                   storage.setItem('orbit_refreshtoken', parsedNextRefresh);
                 }
+                
+                // Set cookies for authentication
+                const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+                document.cookie = `orbit_token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+                document.cookie = `token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
                 
                 // Get user profile
                 const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
@@ -358,6 +419,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
             storage.setItem('orbit_refreshtoken', refreshToken);
           }
           
+          // Set cookies for authentication
+          const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
           otherStorage.removeItem('orbit_token');
@@ -409,6 +475,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
             storage.setItem('orbit_refreshtoken', refreshToken);
           }
           
+          // Set cookies for authentication
+          const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
           otherStorage.removeItem('orbit_token');
@@ -422,33 +493,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
         }
         throw new Error(res.message || 'Registration failed: Invalid response structure');
       } catch (err) {
-        if (!get().isDemoMode) {
-          console.error('[AUTH_STORE] Registration error in Live mode:', err);
-          throw err;
-        }
-        console.log('[AUTH_STORE] Registration error in Demo mode. Using mock session fallback.');
-        const localProfile: UserProfile = {
-          id: 'user-mock-1',
-          email,
-          username,
-          role: mappedRole as any,
-          displayName: displayName || username,
-          emailVerified: true
-        };
-        
-        const rememberMe = get().rememberMe;
-        const storage = rememberMe ? localStorage : sessionStorage;
-        localStorage.setItem('orbit_remember_me', String(rememberMe));
-        
-        console.log('[REGISTER] User created');
-        set({ user: localProfile, token: 'local-mock-token', isAuthenticated: true, initializationState: 'AUTHENTICATED' });
-        console.log('[REGISTER] Auth state updated');
-        
-        storage.setItem('orbit_token', 'local-mock-token');
-        storage.setItem('orbit_user', JSON.stringify(localProfile));
-        localStorage.setItem('orbit_login_just_succeeded', 'true');
-        
-        return true;
+        console.error('[AUTH_STORE] Registration error:', err);
+        throw err;
       }
     },
 
@@ -538,6 +584,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
           if (refreshToken) {
             storage.setItem('orbit_refreshtoken', refreshToken);
           }
+          
+          // Set cookies for authentication
+          const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
           
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
