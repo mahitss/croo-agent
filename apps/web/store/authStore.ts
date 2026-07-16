@@ -250,7 +250,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             });
             if (meRes.ok) {
               const meData = await meRes.json();
-              const freshUser = meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser;
+              const freshUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser);
               console.log('[AUTH READY] Session verified. User ID:', freshUser?.id);
               storage.setItem('orbit_user', JSON.stringify(freshUser));
               set({
@@ -336,7 +336,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 let updatedUser = parsedUser;
                 if (meRes.ok) {
                   const meData = await meRes.json();
-                  updatedUser = meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser;
+                  updatedUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser);
                   storage.setItem('orbit_user', JSON.stringify(updatedUser));
                 }
                 
