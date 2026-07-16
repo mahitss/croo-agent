@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, User } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 interface ChatMessage {
   id: string;
@@ -10,6 +11,9 @@ interface ChatMessage {
 }
 
 export default function AiAssistant() {
+  const pathname = usePathname();
+  if (pathname === '/') return null;
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {

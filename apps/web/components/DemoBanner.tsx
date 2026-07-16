@@ -117,6 +117,8 @@ export default function DemoBanner() {
   const router = useRouter();
   const pathname = usePathname();
 
+  if (pathname === '/') return null;
+
   // Control Center States
   const [presenterMode, setPresenterMode] = useState(true);
   const [tourActive, setTourActive] = useState(false);
