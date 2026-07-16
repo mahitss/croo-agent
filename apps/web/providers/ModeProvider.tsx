@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
 import { useActiveWorkflow } from '../hooks/useActiveWorkflow';
 import { useUserWallet } from '../hooks/useUserWallet';
@@ -40,6 +41,9 @@ const ModeContext = createContext<ModeContextProps | undefined>(undefined);
 
 export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
+  const pathname = usePathname() || '';
+  const publicRoutes = ['/', '/pricing', '/docs', '/privacy', '/terms', '/about', '/careers', '/blog', '/login', '/register'];
+  const isPublicRoute = publicRoutes.includes(pathname);
   
   const { isDemoMode, userWallet: wallet, initialize, settleUserWallet } = useUserWallet();
   const { activeWorkflow, isRunning, executionLogs, appState, resetExecution } = useActiveWorkflow();
@@ -87,7 +91,7 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Prevent app render and protected calls until session init finishes
-  if (initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') {
+  if ((initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') && !isPublicRoute) {
     return (
       <div className="flex-1 bg-bg-dark flex items-center justify-center p-6 font-mono min-h-screen">
         <div className="flex flex-col items-center gap-4 text-center">

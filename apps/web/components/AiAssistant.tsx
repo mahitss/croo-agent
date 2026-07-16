@@ -12,7 +12,6 @@ interface ChatMessage {
 
 export default function AiAssistant() {
   const pathname = usePathname();
-  if (pathname === '/') return null;
 
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -28,6 +27,8 @@ export default function AiAssistant() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  if (pathname === '/') return null;
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();

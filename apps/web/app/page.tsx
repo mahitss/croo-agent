@@ -274,9 +274,6 @@ function PublishingMockup() {
 
 export default function PortalPage() {
   const [mounted, setMounted] = useState(false);
-  const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
-  const logoutUser = useAuthStore((state) => state.logoutUser);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
 
   useEffect(() => {
@@ -342,38 +339,18 @@ export default function PortalPage() {
 
         {/* RIGHT: Auth */}
         <div className="flex items-center gap-6">
-          {mounted && token && user ? (
-            <div className="relative group">
-              <button className="flex items-center gap-2 focus:outline-none py-1">
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-white/80 text-xs font-mono border border-white/10">
-                  {user.displayName?.substring(0, 2).toUpperCase() || 'US'}
-                </div>
-                <span className="text-xs text-white/80 font-mono hidden sm:inline max-w-[80px] truncate">
-                  {user.displayName || user.username || 'User'}
-                </span>
-              </button>
-              <div className="absolute w-36 hidden group-hover:block bg-black border border-white/6 rounded-lg p-1.5 right-0 top-full mt-1.5 font-mono text-[8px] z-50 shadow-xl">
-                <Link href="/dashboard" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Dashboard</Link>
-                <Link href="/wallet" className="block px-2 py-1.5 text-gray-300 hover:text-white hover:bg-white/5 rounded">Wallet</Link>
-                <button onClick={logoutUser} className="w-full text-left block px-2 py-1.5 text-red-400 hover:text-red-300 hover:bg-white/5 rounded">Logout</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <button
-                onClick={() => setAuthModal(true, 'login')}
-                className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => setAuthModal(true, 'register')}
-                className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans"
-              >
-                Register
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => setAuthModal(true, 'login')}
+            className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
+          >
+            Login
+          </button>
+          <button
+            onClick={() => setAuthModal(true, 'register')}
+            className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans"
+          >
+            Register
+          </button>
         </div>
       </nav>
 

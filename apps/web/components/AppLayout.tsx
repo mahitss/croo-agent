@@ -54,8 +54,8 @@ function AppSkeleton() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || '';
-  const user = useNexusStore((state) => state.user);
-  const token = useNexusStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   const isCheckingAuth = useAuthStore((state) => state.isCheckingAuth);
   
   useEffect(() => {
@@ -63,7 +63,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isAuthenticated = !!token && !!user;
-  const isPublicRoute = pathname === '/' || pathname === '/marketplace';
+  
+  const publicRoutes = [
+    '/',
+    '/pricing',
+    '/docs',
+    '/privacy',
+    '/terms',
+    '/about',
+    '/careers',
+    '/blog',
+    '/login',
+    '/register'
+  ];
+  const isPublicRoute = publicRoutes.includes(pathname);
 
   // Secure client-side redirect guard
   useEffect(() => {

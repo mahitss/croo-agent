@@ -218,7 +218,9 @@ export default function AuthModal() {
           toast('Successfully registered to Orbit!', 'success');
           setAuthModal(false);
           if (typeof window !== 'undefined') {
-            window.location.href = '/dashboard';
+            const params = new URLSearchParams(window.location.search);
+            const redirectUrl = params.get('redirect');
+            window.location.href = redirectUrl || '/dashboard';
           }
         } else {
           throw new Error('Registration failed: Invalid response structure');

@@ -212,12 +212,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
         
         const storedDemoMode = localStorage.getItem('orbit_demomode');
         const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
-        const storage = rememberMe ? localStorage : sessionStorage;
         
-        const token = storage.getItem('orbit_token');
-        const refreshToken = storage.getItem('orbit_refreshtoken');
-        const userStr = storage.getItem('orbit_user');
+        const token = localStorage.getItem('orbit_token') || sessionStorage.getItem('orbit_token');
+        const refreshToken = localStorage.getItem('orbit_refreshtoken') || sessionStorage.getItem('orbit_refreshtoken');
+        const userStr = localStorage.getItem('orbit_user') || sessionStorage.getItem('orbit_user');
         const parsedUser = userStr ? JSON.parse(userStr) : null;
+        const storage = localStorage.getItem('orbit_token') ? localStorage : sessionStorage;
         
         set({
           isDemoMode: storedDemoMode === null ? true : storedDemoMode === 'true',
