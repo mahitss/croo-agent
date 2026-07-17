@@ -44,18 +44,8 @@ export default function Navbar() {
         </span>
       </Link>
 
-      {/* CENTER: Navigation Links */}
-      <div className="hidden md:flex items-center gap-8">
-        <Link href="/templates" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
-          Templates
-        </Link>
-        <Link href="/pricing" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
-          Pricing
-        </Link>
-        <Link href="/docs" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
-          Docs
-        </Link>
-      </div>
+      {/* CENTER: Navigation Links (Empty under Guest/Public navbar rules) */}
+      <div className="hidden md:flex items-center gap-8" />
 
       {/* RIGHT: Auth Controls */}
       <div className="flex items-center gap-6">
@@ -122,25 +112,32 @@ export default function Navbar() {
                   {/* Dropdown Options */}
                   <div className="mt-1">
                     <Link 
-                      href="/settings?tab=profile" 
+                      href="/workspaces" 
                       onClick={() => setIsDropdownOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
                     >
-                      Settings
-                    </Link>
-                    <Link 
-                      href="/settings?tab=security" 
-                      onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
-                    >
-                      Account
+                      Dashboard
                     </Link>
                     <Link 
                       href="/settings?tab=billing" 
                       onClick={() => setIsDropdownOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
                     >
-                      Billing
+                      Wallet
+                    </Link>
+                    <Link 
+                      href="/settings?tab=profile" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
+                    >
+                      Profile
+                    </Link>
+                    <Link 
+                      href="/settings?tab=security" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
+                    >
+                      Settings
                     </Link>
                     <button
                       onClick={handleLogout}

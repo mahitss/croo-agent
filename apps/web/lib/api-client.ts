@@ -69,7 +69,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
       
       if (parsedToken) {
         if (typeof window !== 'undefined') {
-          const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+          const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
           const storage = rememberMe ? localStorage : sessionStorage;
           storage.setItem('orbit_token', parsedToken);
           if (parsedNextRefresh) {
@@ -163,7 +163,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     }
   }
 
-  const rememberMe = !isServer && localStorage.getItem('orbit_remember_me') === 'true';
+  const rememberMe = !isServer && localStorage.getItem('orbit_remember_me') !== 'false';
   const storage = isServer ? null : (rememberMe ? localStorage : sessionStorage);
   let token = storage ? storage.getItem('orbit_token') : null;
 

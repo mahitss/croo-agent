@@ -186,7 +186,7 @@ async function bootstrap() {
     });
 
     console.log('[STARTUP] Server listening');
-    const port = process.env.PORT || 10000;
+    const port = process.env.PORT || 5000;
     await app.listen(port, '0.0.0.0');
     console.log(`Orbit API Gateway listening on: ${await app.getUrl()}`);
   } catch (error) {

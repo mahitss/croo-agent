@@ -157,7 +157,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (delayMs > 0) {
         const timeoutId = setTimeout(async () => {
           console.log('[TOKEN REFRESH] Auto-refresh timer fired! Requesting token refresh...');
-          const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+          const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
           const storage = rememberMe ? localStorage : sessionStorage;
           const refreshToken = storage.getItem('orbit_refreshtoken');
           
@@ -192,7 +192,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ refreshTimeoutId: timeoutId } as any);
       } else {
         console.log('[TOKEN REFRESH] Token is already near expiry, refreshing immediately.');
-        const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+        const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
         const storage = rememberMe ? localStorage : sessionStorage;
         const refreshToken = storage.getItem('orbit_refreshtoken');
         if (refreshToken) {
@@ -219,7 +219,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ initializationState: 'CHECKING_SESSION', isCheckingAuth: true });
         
         const storedDemoMode = localStorage.getItem('orbit_demomode');
-        const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+        const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
         
         const getCookie = (name: string) => {
           if (typeof window === 'undefined') return null;
@@ -250,7 +250,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             });
             if (meRes.ok) {
               const meData = await meRes.json();
-              const freshUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser);
+              const freshUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.data || meData?.profile || meData?.user || parsedUser);
               console.log('[AUTH READY] Session verified. User ID:', freshUser?.id);
               storage.setItem('orbit_user', JSON.stringify(freshUser));
               set({
@@ -325,8 +325,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 
                 // Set cookies for authentication
                 const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-                document.cookie = `orbit_token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
-                document.cookie = `token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+                const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+                document.cookie = `orbit_token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
+                document.cookie = `token=${parsedToken}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
                 
                 // Get user profile
                 const meRes = await fetch(`${BASE_URL}/api/v1/users/me`, {
@@ -336,7 +337,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 let updatedUser = parsedUser;
                 if (meRes.ok) {
                   const meData = await meRes.json();
-                  updatedUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.profile || meData?.user || parsedUser);
+                  updatedUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.data || meData?.profile || meData?.user || parsedUser);
                   storage.setItem('orbit_user', JSON.stringify(updatedUser));
                 }
                 
@@ -421,8 +422,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
           
           // Set cookies for authentication
           const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
-          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
           
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
@@ -477,8 +479,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
           
           // Set cookies for authentication
           const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
-          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
           
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
@@ -587,8 +590,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
           
           // Set cookies for authentication
           const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
-          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax; Secure`;
+          const secureFlag = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
+          document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax${secureFlag}`;
           
           // Clear the other storage to avoid conflict
           const otherStorage = rememberMe ? sessionStorage : localStorage;
@@ -614,7 +618,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (user) {
         const updated = { ...user, emailVerified: true };
         set({ user: updated });
-        const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+        const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('orbit_user', JSON.stringify(updated));
       }
@@ -630,7 +634,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 if (typeof window !== 'undefined') {
   try {
     const storedDemoMode = localStorage.getItem('orbit_demomode');
-    const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+    const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
     const storage = rememberMe ? localStorage : sessionStorage;
     const token = storage.getItem('orbit_token');
     const userStr = storage.getItem('orbit_user');
@@ -658,7 +662,7 @@ if (typeof window !== 'undefined') {
         useAuthStore.getState().logoutUser();
       } else {
         console.log('[AUTH_STORE] Token updated in another tab, updating here...');
-        const rememberMe = localStorage.getItem('orbit_remember_me') === 'true';
+        const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
         const storage = rememberMe ? localStorage : sessionStorage;
         const userStr = storage.getItem('orbit_user');
         const parsedUser = userStr ? JSON.parse(userStr) : null;
