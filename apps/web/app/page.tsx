@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
 import { 
   Play, 
@@ -273,12 +274,21 @@ function PublishingMockup() {
 }
 
 export default function PortalPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const isAuthenticated = mounted && !!token && !!user;
+
+  const handleLaunchWorkspace = () => {
+    if (isAuthenticated) {
+      router.push('/workspaces');
+    } else {
+      setAuthModal(true, 'register');
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -447,7 +457,7 @@ export default function PortalPage() {
 
           <div className="flex gap-4 justify-center items-center mt-4 hero-reveal [animation-delay:850ms] opacity-0">
             <button
-              onClick={() => setAuthModal(true, 'register')}
+              onClick={handleLaunchWorkspace}
               className="bg-[#7BC9FF] hover:bg-[#7BC9FF]/95 text-black text-xs font-extrabold px-6 py-2.5 rounded-lg font-mono shadow"
             >
               Launch Workspace
@@ -626,7 +636,7 @@ export default function PortalPage() {
           Deploy, execute, and monetize multi-agent swarms. Settle transaction fees autonomously on the CAP agent commerce protocol.
         </p>
         <button
-          onClick={() => setAuthModal(true, 'register')}
+          onClick={handleLaunchWorkspace}
           className="bg-[#7BC9FF] hover:bg-[#7BC9FF]/90 text-black text-xs font-extrabold px-8 py-3 rounded-lg transition-transform hover:scale-[1.02] font-mono shadow-[0_0_15px_rgba(123,201,255,0.2)] mt-2"
         >
           Launch Workspace

@@ -21,21 +21,20 @@ const console = {
     if (!isProd) globalThis.console.info(...args);
   }
 };
-import { useNexusStore } from '../store/nexusStore';
 import { useAuthStore } from '../store/authStore';
 import { X, Mail, Lock, User, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useToast } from './Toast';
 
 export default function AuthModal() {
-  const isAuthModalOpen = useNexusStore((state) => state.isAuthModalOpen);
-  const authModalTab = useNexusStore((state) => state.authModalTab);
-  const setAuthModal = useNexusStore((state) => state.setAuthModal);
-  const loginUser = useNexusStore((state) => state.loginUser);
-  const registerUser = useNexusStore((state) => state.registerUser);
-  const loginWithGoogle = useNexusStore((state) => state.loginWithGoogle);
-  const forgotPassword = useNexusStore((state) => state.forgotPassword);
-  const verifyEmail = useNexusStore((state) => state.verifyEmail);
-  const isDemoMode = useNexusStore((state) => state.isDemoMode);
+  const isAuthModalOpen = useAuthStore((state) => state.isAuthModalOpen);
+  const authModalTab = useAuthStore((state) => state.authModalTab);
+  const setAuthModal = useAuthStore((state) => state.setAuthModal);
+  const loginUser = useAuthStore((state) => state.loginUser);
+  const registerUser = useAuthStore((state) => state.registerUser);
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const forgotPassword = useAuthStore((state) => state.forgotPassword);
+  const verifyEmail = useAuthStore((state) => state.verifyEmail);
+  const isDemoMode = useAuthStore((state) => state.isDemoMode);
   const rememberMe = useAuthStore((state) => state.rememberMe);
   const setRememberMe = useAuthStore((state) => state.setRememberMe);
   const { toast } = useToast();
@@ -74,36 +73,46 @@ export default function AuthModal() {
             throw new Error('Missing Google Client ID environment variable (NEXT_PUBLIC_GOOGLE_CLIENT_ID)');
           }
 
-          google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: async (response: any) => {
-              if (response && response.credential) {
-                console.log('[GOOGLE_AUTH_DEBUG] ID Token received from Google popup');
-                setIsLoading(true);
-                try {
-                  console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
-                  console.log("Before request");
-                  const ok = await loginWithGoogle(response.credential);
-                  console.log("After request");
-                  console.log("Response resolved to:", ok);
-                  if (ok) {
-                    console.log('[GOOGLE_AUTH_DEBUG] Login successfully verified on backend');
-                    toast('Successfully signed in with Google!', 'success');
-                    setAuthModal(false);
-                    if (typeof window !== 'undefined') {
-                      const params = new URLSearchParams(window.location.search);
-                      const redirectUrl = params.get('redirect');
-                      window.location.href = redirectUrl || '/workspaces';
-                    }
+          // Dynamically map or update the window callback to use the latest React closure state
+          (window as any).handleGoogleCredentialResponse = async (response: any) => {
+            if (response && response.credential) {
+              console.log('[GOOGLE_AUTH_DEBUG] ID Token received from Google popup');
+              setIsLoading(true);
+              try {
+                console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
+                console.log("Before request");
+                const ok = await loginWithGoogle(response.credential);
+                console.log("After request");
+                console.log("Response resolved to:", ok);
+                if (ok) {
+                  console.log('[GOOGLE_AUTH_DEBUG] Google login success. Routing...');
+                  toast('Successfully signed in with Google!', 'success');
+                  setAuthModal(false);
+                  if (typeof window !== 'undefined') {
+                    const params = new URLSearchParams(window.location.search);
+                    const redirectUrl = params.get('redirect');
+                    window.location.href = redirectUrl || '/workspaces';
                   }
-                } catch (err: any) {
-                  toast(`Google login failed: ${err.message}`, 'error');
-                } finally {
-                  setIsLoading(false);
                 }
+              } catch (err: any) {
+                toast(`Google login failed: ${err.message}`, 'error');
+              } finally {
+                setIsLoading(false);
               }
             }
-          });
+          };
+
+          if (!(window as any).google_gsi_initialized) {
+            google.accounts.id.initialize({
+              client_id: googleClientId,
+              callback: (response: any) => {
+                if (typeof window !== 'undefined' && (window as any).handleGoogleCredentialResponse) {
+                  (window as any).handleGoogleCredentialResponse(response);
+                }
+              }
+            });
+            (window as any).google_gsi_initialized = true;
+          }
 
           // Wait a brief moment to ensure target container exists in DOM
           setTimeout(() => {
