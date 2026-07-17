@@ -275,6 +275,10 @@ function PublishingMockup() {
 export default function PortalPage() {
   const [mounted, setMounted] = useState(false);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const logoutUser = useAuthStore((state) => state.logoutUser);
+  const isAuthenticated = !!token && !!user;
 
   useEffect(() => {
     setMounted(true);
@@ -339,18 +343,72 @@ export default function PortalPage() {
 
         {/* RIGHT: Auth */}
         <div className="flex items-center gap-6">
-          <button
-            onClick={() => setAuthModal(true, 'login')}
-            className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
-          >
-            Login
-          </button>
-          <button
-            onClick={() => setAuthModal(true, 'register')}
-            className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans"
-          >
-            Register
-          </button>
+          {mounted && isAuthenticated && user ? (
+            <div className="flex items-center gap-3">
+              <div className="relative group" style={{ position: 'relative' }}>
+                <button className="flex items-center gap-2 focus:outline-none bg-transparent border-0 cursor-pointer text-left py-1">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7BC9FF] to-white flex items-center justify-center font-bold text-black text-xs select-none">
+                    {user.displayName && user.displayName.length > 0 
+                      ? user.displayName.substring(0, 2).toUpperCase() 
+                      : user.username && user.username.length > 0 
+                        ? user.username.substring(0, 2).toUpperCase() 
+                        : (user.email ? user.email.substring(0, 2).toUpperCase() : 'US')
+                    }
+                  </div>
+                  <span className="text-xs text-white/80 hover:text-white font-sans hidden md:inline max-w-[100px] truncate select-none">
+                    {user.displayName || user.username || user.email || 'User'}
+                  </span>
+                </button>
+                
+                {/* Dropdown Menu Wrapper */}
+                <div 
+                  className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                    zIndex: 9999,
+                  }}
+                >
+                  <div className="bg-black border border-white/10 rounded-xl shadow-xl p-1.5 font-sans text-xs">
+                    <div className="px-3 py-2 border-b border-white/10 text-[10px] text-gray-500 uppercase tracking-wider">
+                      Role: <span className="text-[#7BC9FF] font-bold">{user.role}</span>
+                    </div>
+                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                      Dashboard
+                    </Link>
+                    <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                      Wallet
+                    </Link>
+                    <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                      Settings
+                    </Link>
+                    <button
+                      onClick={logoutUser}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto bg-transparent border-0 cursor-pointer"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setAuthModal(true, 'login')}
+                className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => setAuthModal(true, 'register')}
+                className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans cursor-pointer"
+              >
+                Register
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
