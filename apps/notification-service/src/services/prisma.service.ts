@@ -81,28 +81,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // Fallback
     }
 
-    try {
-      const parsed = new URL(modifiedUrl);
-      if (parsed.hostname.includes('.neon.tech') && !parsed.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-        const { execSync } = require('child_process');
-        const hostname = parsed.hostname;
-        const endpointId = hostname.split('.')[0];
-        const nslookupOut = execSync(`nslookup ${hostname}`).toString();
-        const nameParts = nslookupOut.split(/Name:\s+/);
-        if (nameParts.length > 1) {
-          const ips = nameParts[1].match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g);
-          if (ips && ips.length > 0) {
-            const ipv4 = ips[0];
-            parsed.hostname = ipv4;
-            parsed.searchParams.set('sslaccept', 'accept_invalid_certs');
-            parsed.searchParams.set('options', `options=project%3D${endpointId}`);
-            modifiedUrl = parsed.toString();
-          }
-        }
-      }
-    } catch (e) {
-      // Ignore
-    }
+    
 
     process.env.DATABASE_URL = modifiedUrl;
 
