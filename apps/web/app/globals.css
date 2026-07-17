@@ -1,12 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-neon: #00ffcc;
-  --color-secondary-neon: #ff007f;
-  --color-bg-dark: #07080a;
-  --color-card-dark: #0f1115;
-  --color-border-dark: #1b1e25;
-  --color-accent-blue: #00e5ff;
+  --color-bg-dark: #050505;
+  --color-card-dark: #111111;
+  --color-border-dark: #232323;
+  --color-accent-blue: #4EA3FF;
   --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -30,11 +28,11 @@ body {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary-neon);
+  background: var(--color-accent-blue);
 }
 
 .glass-card {
-  background: rgba(15, 17, 21, 0.7);
+  background: rgba(17, 17, 17, 0.7);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
@@ -44,29 +42,9 @@ body {
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .glass-card-hover:hover {
-  border-color: rgba(0, 255, 204, 0.25);
-  box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+  border-color: rgba(78, 163, 255, 0.25);
+  box-shadow: 0 0 20px rgba(78, 163, 255, 0.1);
   transform: translateY(-2px);
-}
-
-.neon-border {
-  border: 1px solid var(--color-primary-neon);
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
-}
-
-.neon-text-green {
-  color: var(--color-primary-neon);
-  text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
-}
-
-.neon-text-pink {
-  color: var(--color-secondary-neon);
-  text-shadow: 0 0 8px rgba(255, 0, 127, 0.4);
-}
-
-.glow-pink-border {
-  border: 1px solid var(--color-secondary-neon);
-  box-shadow: 0 0 10px rgba(255, 0, 127, 0.2);
 }
 
 /* Custom animations */
@@ -122,11 +100,10 @@ body {
 }
 
 .focus-glowing:focus-visible {
-  outline: 2px solid var(--color-primary-neon);
-  box-shadow: 0 0 12px rgba(0, 255, 204, 0.35);
+  outline: 2px solid var(--color-accent-blue);
+  box-shadow: 0 0 12px rgba(78, 163, 255, 0.35);
 }
 
-/* Staff Engineer Refined Animations */
 @keyframes nodePop {
   0% { transform: scale(0.9); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
@@ -149,46 +126,4 @@ body {
 }
 .animate-slide-in {
   animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes runningGlow {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(255, 0, 127, 0.2), inset 0 0 4px rgba(255, 0, 127, 0.1);
-    border-color: rgba(255, 0, 127, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 16px rgba(255, 0, 127, 0.55), inset 0 0 8px rgba(255, 0, 127, 0.25);
-    border-color: rgba(255, 0, 127, 0.7);
-  }
-}
-.animate-running-glow {
-  animation: runningGlow 1.6s ease-in-out infinite;
-}
-
-@keyframes completedGlow {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(0, 255, 204, 0.25);
-    border-color: rgba(0, 255, 204, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(0, 255, 204, 0.55);
-    border-color: rgba(0, 255, 204, 0.8);
-  }
-}
-.animate-completed-glow {
-  animation: completedGlow 2.5s ease-in-out infinite;
-}
-
-@keyframes particleExplosion {
-  0% {
-    transform: translate(0, 0) scale(1) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--tw-x, 100px), var(--tw-y, 100px)) scale(0) rotate(360deg);
-    opacity: 0;
-  }
-}
-.animate-particle {
-  animation: particleExplosion 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
 }

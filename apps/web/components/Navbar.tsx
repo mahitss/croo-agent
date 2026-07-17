@@ -2,338 +2,159 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useMode } from '../providers/ModeProvider';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
-import { useUserWallet } from '../hooks/useUserWallet';
 import { useToast } from './Toast';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { 
-  Cpu, 
-  Layers, 
-  TrendingUp, 
-  Wallet, 
-  PlusCircle, 
-  Shuffle, 
-  ShieldCheck,
-  LogOut,
-  User,
-  ChevronDown,
-  Menu,
-  X,
-  Settings
-} from 'lucide-react';
-
-const isProd = process.env.NODE_ENV === 'production';
-const console = {
-  log: (...args: any[]) => {
-    if (!isProd) globalThis.console.log(...args);
-  },
-  warn: (...args: any[]) => {
-    if (!isProd) globalThis.console.warn(...args);
-  },
-  error: (...args: any[]) => {
-    globalThis.console.error(...args);
-  },
-  debug: (...args: any[]) => {
-    if (!isProd) globalThis.console.debug(...args);
-  },
-  info: (...args: any[]) => {
-    if (!isProd) globalThis.console.info(...args);
-  }
-};
 
 export default function Navbar() {
-  useKeyboardShortcuts();
   const pathname = usePathname();
+  const router = useRouter();
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
-  const [isLargeDesktop, setIsLargeDesktop] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
-    const handleResize = () => {
-      setIsLargeDesktop(window.innerWidth >= 1536);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { isDemoMode, userWallet } = useUserWallet();
-  const { toggleMode: toggleDemoMode } = useMode();
-  
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
   
-  const toggleSidebar = useAuthStore((state) => state.toggleSidebar || (() => {}));
-  const isMobileSidebarOpen = useAuthStore((state) => state.isMobileSidebarOpen || false);
-  const setMobileSidebarOpen = useAuthStore((state) => state.setMobileSidebarOpen || (() => {}));
-
-  const handleLogoClick = (e: React.MouseEvent) => {
-    if (!token || !user) return;
-    e.preventDefault();
-    if (window.innerWidth < 768) {
-      setMobileSidebarOpen(!isMobileSidebarOpen);
-    } else {
-      toggleSidebar();
-    }
-  };
-
-  // Expiry check is managed by api-client.ts automatically to prevent login loops.
-
   const isAuthenticated = !!token && !!user;
   const authLoading = !mounted;
-  const session = token;
-  const walletConnected = !!userWallet.address && userWallet.address !== '0x0000000000000000000000000000000000000000';
 
-  console.log("Navbar State Update:", {
-    isAuthenticated,
-    user,
-    session: !!session,
-    walletConnected,
-    authLoading
-  });
-
-  globalThis.console.log("Navbar State Update:", {
-    isAuthenticated,
-    user,
-    session: !!session,
-    walletConnected,
-    authLoading
-  });
-
-  const leftLinks = isAuthenticated && user
-    ? [
-        { href: '/', label: 'Portal', icon: Cpu },
-        { href: '/marketplace', label: 'Marketplace', icon: Shuffle },
-      ]
-    : [
-        { href: '/', label: 'Portal', icon: Cpu },
-        { href: '/marketplace', label: 'Marketplace', icon: Shuffle },
-        { href: '/workflow', label: 'Workflow Builder', icon: Layers },
-        { href: '/dashboard', label: 'Dashboard', icon: TrendingUp },
-      ];
-
-
-
-  console.log("Rendering Login/Register", {
-    isAuthenticated,
-    user,
-    authLoading
-  });
+  const handleLogout = async () => {
+    await logoutUser();
+    setIsDropdownOpen(false);
+    toast('Logged out successfully.', 'info');
+    router.push('/');
+  };
 
   return (
-    <>
-      <nav 
-      className="glass-card border-b border-border-dark py-4 px-6 sticky top-0 z-50 box-border"
-      style={{
-        maxWidth: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      <div 
-        className="max-w-7xl mx-auto flex items-center justify-between"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
-        
-        {/* LEFT SECTION */}
-        <div className="flex items-center gap-6 flex-shrink-0">
-          <Link 
-            href="/" 
-            onClick={handleLogoClick}
-            className={`flex items-center gap-2 group flex-shrink-0 ${
-              isAuthenticated ? 'cursor-pointer hover:opacity-85 select-none' : ''
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-secondary-neon to-primary-neon flex items-center justify-center font-bold text-black text-lg transition-transform group-hover:rotate-12 duration-300">
-              O
-            </div>
-            <span className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-              ORBIT <span className="text-primary-neon font-normal text-sm tracking-widest ml-1 bg-none text-shadow-glow">AI</span>
-            </span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            {leftLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center gap-1.5 text-xs lg:text-sm font-medium transition-colors py-1.5 px-3 rounded-md flex-shrink-0 ${
-                    isActive
-                      ? 'text-primary-neon bg-white/5 border border-primary-neon/20'
-                      : 'text-gray-400 hover:text-white hover:bg-white/2'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+    <nav className="fixed top-0 left-0 right-0 z-50 h-[80px] bg-black/55 backdrop-blur-[20px] border-b border-white/6 px-8 flex items-center justify-between shadow-sm">
+      {/* LEFT: Logo & Brand Name */}
+      <Link href={isAuthenticated ? "/workspaces" : "/"} className="flex items-center gap-3 select-none no-underline">
+        <div className="w-[36px] h-[36px] rounded-xl bg-white flex items-center justify-center font-extrabold text-black text-xl">
+          O
         </div>
+        <span className="font-extrabold text-sm tracking-wider text-white/80 font-sans">
+          ORBIT AI
+        </span>
+      </Link>
 
-        {/* CENTER SECTION */}
-        <div className="flex-grow" />
+      {/* CENTER: Navigation Links */}
+      <div className="hidden md:flex items-center gap-8">
+        <Link href="/templates" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+          Templates
+        </Link>
+        <Link href="/pricing" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+          Pricing
+        </Link>
+        <Link href="/docs" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+          Docs
+        </Link>
+      </div>
 
-        {/* RIGHT SECTION */}
-        <div 
-          className="flex items-center gap-4 flex-shrink-0"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {mounted && isAuthenticated && user && (
-            <Link 
-              href="/wallet" 
-              className="flex items-center gap-2 bg-white/5 border border-border-dark hover:border-primary-neon/40 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all duration-300"
-              style={{
-                flexShrink: 0,
-                maxWidth: 'fit-content',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <Wallet className="w-4 h-4 text-primary-neon" />
-              <span className="text-sm font-mono font-bold text-white">
-                {mounted ? userWallet.balance.toFixed(2) : '0.00'} <span className="text-gray-400 text-xs">{isDemoMode ? 'Sandbox USDC' : 'USDC'}</span>
-              </span>
-            </Link>
-          )}
-
-          {mounted && isAuthenticated && user && (
+      {/* RIGHT: Auth Controls */}
+      <div className="flex items-center gap-6">
+        {authLoading ? (
+          <div className="w-[120px] h-8 rounded bg-white/5 animate-pulse" />
+        ) : !isAuthenticated ? (
+          <>
             <button
-              onClick={toggleDemoMode}
-              className={`text-[10px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-md border tracking-wider transition-all duration-300 flex-shrink-0 ${
-                isDemoMode
-                  ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400 hover:bg-yellow-400/30'
-                  : 'bg-primary-neon/20 border-primary-neon text-primary-neon hover:bg-primary-neon/30'
-              }`}
-              title="Toggle execution mode between demo sandbox and production live payments"
+              onClick={() => setAuthModal(true, 'login')}
+              className="text-xs font-medium text-white/80 hover:text-white transition-colors font-sans bg-transparent border-0 cursor-pointer"
             >
-              <span>{!isDemoMode ? 'Live Mode' : 'Demo Mode'}</span>
+              Login
             </button>
-          )}
-
-          <div 
-            className={`flex items-center gap-2 ${
-              isAuthenticated && user ? 'border-l border-border-dark pl-4' : ''
-            }`}
-            style={{ 
-              position: 'relative',
-              flexShrink: 0,
-              display: 'flex',
-              gap: '12px'
-            }}
-          >
-            {(() => {
-              console.log("Rendering Login/Register", {
-                isAuthenticated,
-                user,
-                session: !!session,
-                walletConnected,
-                authLoading
-              });
-              return null;
-            })()}
-            {authLoading ? (
-              <div 
-                className="w-[120px] h-7 rounded bg-white/5 animate-pulse"
-                style={{
-                  flexShrink: 0,
-                }}
-              />
-            ) : (!isAuthenticated || !user) ? (
-              <div 
-                className="flex items-center gap-2"
-                style={{
-                  flexShrink: 0,
-                  display: 'flex',
-                  gap: '12px'
-                }}
-              >
-                <button
-                  onClick={() => setAuthModal(true, 'login')}
-                  className="text-xs font-bold text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-all font-mono"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => setAuthModal(true, 'register')}
-                  className="bg-primary-neon text-black text-xs font-extrabold px-3 py-1.5 rounded-md hover:brightness-110 transition-all font-mono"
-                >
-                  Register
-                </button>
+            <button
+              onClick={() => setAuthModal(true, 'register')}
+              className="border border-white/15 bg-white/4 hover:bg-white/8 text-white/80 hover:text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors font-sans cursor-pointer"
+            >
+              Register
+            </button>
+          </>
+        ) : (
+          <div className="relative" style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2.5 focus:outline-none bg-transparent border-0 cursor-pointer text-left py-1"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#4EA3FF] to-white flex items-center justify-center font-bold text-black text-xs select-none">
+                {user.displayName && user.displayName.length > 0 
+                  ? user.displayName.substring(0, 2).toUpperCase() 
+                  : user.username && user.username.length > 0 
+                    ? user.username.substring(0, 2).toUpperCase() 
+                    : (user.email ? user.email.substring(0, 2).toUpperCase() : 'US')
+                }
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="relative group" style={{ position: 'relative' }}>
-                  <button className="flex items-center gap-1.5 focus:outline-none">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-neon to-accent-blue flex items-center justify-center font-bold text-black text-xs">
-                      {user.displayName && user.displayName.length > 0 
-                        ? user.displayName.substring(0, 2).toUpperCase() 
-                        : user.username && user.username.length > 0 
-                          ? user.username.substring(0, 2).toUpperCase() 
-                          : (user.email ? user.email.substring(0, 2).toUpperCase() : 'US')
-                      }
-                    </div>
-                    <span className="text-xs text-gray-300 hover:text-white font-mono hidden lg:inline max-w-[80px] truncate">
-                      {user.displayName || user.username || user.email || 'User'}
+              <span className="text-xs text-white/80 hover:text-white font-sans hidden md:inline max-w-[100px] truncate select-none">
+                {user.displayName || user.username || 'User'}
+              </span>
+            </button>
+            
+            {isDropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setIsDropdownOpen(false)}
+                />
+                <div 
+                  className="absolute w-56 bg-black border border-white/10 rounded-xl shadow-2xl p-1.5 font-sans text-xs z-50 animate-in fade-in duration-100"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: '0',
+                  }}
+                >
+                  {/* User Profile Header */}
+                  <div className="px-3 py-2 border-b border-white/10 flex flex-col gap-0.5 select-none">
+                    <span className="font-semibold text-white truncate">
+                      {user.displayName || user.username || 'Mahit Saxena'}
                     </span>
-                  </button>
-                  
-                  {/* Dropdown Menu Wrapper (Bridges the hover gap and secures high z-index & pointer-events) */}
-                  <div 
-                    className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 8px)',
-                      right: '0',
-                      zIndex: 9999,
-                    }}
-                  >
-                    <div className="bg-black border border-border-dark rounded-xl shadow-xl p-1.5 font-mono text-xs">
-                      <div className="px-3 py-2 border-b border-border-dark text-[10px] text-gray-500 uppercase tracking-wider">
-                        Role: <span className="text-primary-neon font-bold">{user.role}</span>
-                      </div>
-                      <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                        Dashboard
-                      </Link>
-                      <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all">
-                        Wallet ({userWallet.balance.toFixed(2)} {isDemoMode ? 'Sandbox USDC' : 'USDC'})
-                      </Link>
-                      <button
-                        onClick={logoutUser}
-                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Logout
-                      </button>
-                    </div>
+                    <span className="text-[10px] text-gray-500 truncate">
+                      {user.email || 'mahitsaxena008@gmail.com'}
+                    </span>
+                  </div>
+
+                  {/* Dropdown Options */}
+                  <div className="mt-1">
+                    <Link 
+                      href="/settings?tab=profile" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
+                    >
+                      Settings
+                    </Link>
+                    <Link 
+                      href="/settings?tab=security" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
+                    >
+                      Account
+                    </Link>
+                    <Link 
+                      href="/settings?tab=billing" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline"
+                    >
+                      Billing
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto bg-transparent border-0 cursor-pointer"
+                    >
+                      Logout
+                    </button>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
-          
-        </div>
-
+        )}
       </div>
     </nav>
-    </>
   );
 }

@@ -4,7 +4,6 @@ import "./globals.css";
 import AppLayout from "../components/AppLayout";
 import AiAssistant from "../components/AiAssistant";
 import { ToastProvider } from "../components/Toast";
-import DemoBanner from "../components/DemoBanner";
 import AuthModal from "../components/AuthModal";
 import ErrorBoundary from "../components/ErrorBoundary";
 
@@ -31,7 +30,6 @@ export default function RootLayout({
         <ToastProvider>
           <ModeProvider>
             <ErrorBoundary>
-              <DemoBanner />
               <AppLayout>
                 {children}
               </AppLayout>

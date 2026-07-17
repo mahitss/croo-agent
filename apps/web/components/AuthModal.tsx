@@ -93,10 +93,7 @@ export default function AuthModal() {
                     if (typeof window !== 'undefined') {
                       const params = new URLSearchParams(window.location.search);
                       const redirectUrl = params.get('redirect');
-                      if (redirectUrl) {
-                        window.location.href = redirectUrl;
-                        return;
-                      }
+                      window.location.href = redirectUrl || '/workspaces';
                     }
                   }
                 } catch (err: any) {
@@ -160,10 +157,7 @@ export default function AuthModal() {
           if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const redirectUrl = params.get('redirect');
-            if (redirectUrl) {
-              window.location.href = redirectUrl;
-              return;
-            }
+            window.location.href = redirectUrl || '/workspaces';
           }
         }
       } else if (tab === 'register') {
@@ -193,7 +187,7 @@ export default function AuthModal() {
           if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const redirectUrl = params.get('redirect');
-            window.location.href = redirectUrl || '/dashboard';
+            window.location.href = redirectUrl || '/workspaces';
           }
         } else {
           throw new Error('Registration failed: Invalid response structure');

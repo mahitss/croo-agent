@@ -332,7 +332,7 @@ export default function PortalPage() {
       {/* CLEAN NAVBAR */}
       <nav className="fixed top-0 left-0 right-0 z-50 h-[80px] bg-black/55 backdrop-blur-[20px] border-b border-white/6 px-8 flex items-center justify-between shadow-sm">
         {/* LEFT: Logo & Brand Name */}
-        <Link href="/" className="flex items-center gap-3 select-none">
+        <Link href={isAuthenticated ? "/workspaces" : "/"} className="flex items-center gap-3 select-none no-underline">
           <div className="w-[36px] h-[36px] rounded-xl bg-white flex items-center justify-center font-extrabold text-black text-xl">
             O
           </div>
@@ -341,13 +341,26 @@ export default function PortalPage() {
           </span>
         </Link>
 
+        {/* CENTER: Navigation Links */}
+        <div className="hidden md:flex items-center gap-8">
+          <Link href="/templates" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+            Templates
+          </Link>
+          <Link href="/pricing" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+            Pricing
+          </Link>
+          <Link href="/docs" className="text-xs font-medium text-gray-400 hover:text-white transition-colors font-sans no-underline">
+            Docs
+          </Link>
+        </div>
+
         {/* RIGHT: Auth */}
         <div className="flex items-center gap-6">
           {mounted && isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <div className="relative group" style={{ position: 'relative' }}>
                 <button className="flex items-center gap-2 focus:outline-none bg-transparent border-0 cursor-pointer text-left py-1">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7BC9FF] to-white flex items-center justify-center font-bold text-black text-xs select-none">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#4EA3FF] to-white flex items-center justify-center font-bold text-black text-xs select-none">
                     {user.displayName && user.displayName.length > 0 
                       ? user.displayName.substring(0, 2).toUpperCase() 
                       : user.username && user.username.length > 0 
@@ -356,13 +369,13 @@ export default function PortalPage() {
                     }
                   </div>
                   <span className="text-xs text-white/80 hover:text-white font-sans hidden md:inline max-w-[100px] truncate select-none">
-                    {user.displayName || user.username || user.email || 'User'}
+                    {user.displayName || user.username || 'User'}
                   </span>
                 </button>
                 
                 {/* Dropdown Menu Wrapper */}
                 <div 
-                  className="absolute w-48 hidden group-hover:block hover:block animate-in fade-in duration-100"
+                  className="absolute w-56 hidden group-hover:block hover:block animate-in fade-in duration-100"
                   style={{
                     position: 'absolute',
                     top: 'calc(100% + 8px)',
@@ -371,24 +384,33 @@ export default function PortalPage() {
                   }}
                 >
                   <div className="bg-black border border-white/10 rounded-xl shadow-xl p-1.5 font-sans text-xs">
-                    <div className="px-3 py-2 border-b border-white/10 text-[10px] text-gray-500 uppercase tracking-wider">
-                      Role: <span className="text-[#7BC9FF] font-bold">{user.role}</span>
+                    {/* User Profile Header */}
+                    <div className="px-3 py-2 border-b border-white/10 flex flex-col gap-0.5 select-none text-left">
+                      <span className="font-semibold text-white truncate">
+                        {user.displayName || user.username || 'Mahit Saxena'}
+                      </span>
+                      <span className="text-[10px] text-gray-500 truncate">
+                        {user.email || 'mahitsaxena008@gmail.com'}
+                      </span>
                     </div>
-                    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
-                      Dashboard
-                    </Link>
-                    <Link href="/wallet" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
-                      Wallet
-                    </Link>
-                    <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
-                      Settings
-                    </Link>
-                    <button
-                      onClick={logoutUser}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto bg-transparent border-0 cursor-pointer"
-                    >
-                      Logout
-                    </button>
+
+                    <div className="mt-1">
+                      <Link href="/settings?tab=profile" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                        Settings
+                      </Link>
+                      <Link href="/settings?tab=security" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                        Account
+                      </Link>
+                      <Link href="/settings?tab=billing" className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all text-left no-underline">
+                        Billing
+                      </Link>
+                      <button
+                        onClick={logoutUser}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all pointer-events-auto bg-transparent border-0 cursor-pointer"
+                      >
+                        Logout
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

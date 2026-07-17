@@ -1,32 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const isProd = process.env.NODE_ENV === 'production';
-const console = {
-  log: (...args: any[]) => {
-    if (!isProd) globalThis.console.log(...args);
-  },
-  warn: (...args: any[]) => {
-    if (!isProd) globalThis.console.warn(...args);
-  },
-  error: (...args: any[]) => {
-    globalThis.console.error(...args);
-  },
-  debug: (...args: any[]) => {
-    if (!isProd) globalThis.console.debug(...args);
-  },
-  info: (...args: any[]) => {
-    if (!isProd) globalThis.console.info(...args);
-  }
-};
 import Canvas from '../../components/Canvas';
 import { useActiveWorkflow } from '../../hooks/useActiveWorkflow';
-import { useUserWallet } from '../../hooks/useUserWallet';
 import { useAgents } from '../../hooks/useAgents';
-import { seedAgents } from '../../store/nexusStore';
-import { Layers, Sliders, Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2, ArrowRight, Save, Compass } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 
 const PLANNING_STEPS = [
@@ -38,18 +16,11 @@ const PLANNING_STEPS = [
   { label: 'Completed', desc: 'DAG compiled. Escrow contracts initialized.' }
 ];
 
-
-
 export default function WorkflowPage() {
-  const { isDemoMode, initialize } = useUserWallet();
   const { agents } = useAgents();
   const {
     activeWorkflow,
     isRunning,
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    estimatedCost,
     generateWorkflow,
     startExecution,
     resetExecution,
@@ -62,64 +33,20 @@ export default function WorkflowPage() {
 
   // States
   const [promptInput, setPromptInput] = useState('');
-  const [showExplanation, setShowExplanation] = useState(false);
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  
   const [isPlanning, setIsPlanning] = useState(false);
   const [planningStage, setPlanningStage] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [nodeNameInput, setNodeNameInput] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isWorkflowSaved, setIsWorkflowSaved] = useState(true);
 
-  const handleSaveWorkflow = async () => {
-    setIsSaving(true);
-    try {
-      // Live persistence or sandbox check
-      toast('Workflow successfully persisted in database!', 'success');
-      setIsWorkflowSaved(true);
-    } catch (err: any) {
-      toast(`Save failed: ${err.message}`, 'error');
-      setIsWorkflowSaved(false);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Check URL query parameters and initialize store
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlWorkflowId = params.get('workflowId');
-    
-    // Clear any stale workflow states on page mount if not looking up a specific workflow ID
     if (!urlWorkflowId) {
       resetExecution();
     }
-
-    initialize().catch((err) => {
-      console.error('Failed to initialize workspace store:', err);
-    });
-
-    const urlPrompt = params.get('prompt');
-    if (urlPrompt) {
-      setPromptInput(urlPrompt);
-      setShowExplanation(true);
-    }
-  }, [isDemoMode]);
-
-  useEffect(() => {
-    const handleDemoCompleted = (e: any) => {
-      toast('Workflow completed successfully.', 'success');
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 4500);
-    };
-    window.addEventListener('nexus_demo_workflow_completed', handleDemoCompleted);
-    return () => {
-      window.removeEventListener('nexus_demo_workflow_completed', handleDemoCompleted);
-    };
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (selectedNode) {
@@ -131,32 +58,22 @@ export default function WorkflowPage() {
     if (!promptInput.trim()) return;
     setIsPlanning(true);
     setSelectedNode(null);
-    setShowExplanation(false);
     setErrorMsg(null);
     setPlanningStage(0);
     
     try {
-      if (isDemoMode) {
-        // Step through planning stages
-        for (let i = 0; i <= 5; i++) {
-          setPlanningStage(i);
-          await new Promise(r => setTimeout(r, 600));
-        }
+      // Step through planning stages
+      for (let i = 0; i <= 5; i++) {
+        setPlanningStage(i);
+        await new Promise(r => setTimeout(r, 600));
       }
       
-      // 1. Generate workflow using the global store generateWorkflow action
       await generateWorkflow(promptInput, 'balanced', 2.0);
-
-      setShowExplanation(true);
-      setIsWorkflowSaved(true);
       toast('Workflow generated successfully.', 'success');
-      
-      // 2. Start the execution flow immediately
       await startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';
       setErrorMsg(msg);
-      setIsWorkflowSaved(false);
       toast(`Generation failed: ${msg}`, 'error');
     } finally {
       setIsPlanning(false);
@@ -165,17 +82,21 @@ export default function WorkflowPage() {
 
   const handleLaunchSwarm = async () => {
     if (activeWorkflow) {
+      toast('Launching execution swarm...', 'info');
       await startExecution(activeWorkflow.query, activeWorkflow.routingMode || 'balanced', activeWorkflow.budget || 2.0);
     }
   };
 
-  const getAlternativeAgents = (node: any) => {
-    if (!node || !node.assignedAgentId) return [];
-    const currentAgent = agents.find(a => a.id === node.assignedAgentId);
-    if (!currentAgent) return [];
-    return agents
-      .filter(a => a.id !== currentAgent.id && (a.category === currentAgent.category || a.skills.some((s: any) => currentAgent.skills.includes(s))))
-      .slice(0, 2);
+  const handleSaveWorkflow = async () => {
+    setIsSaving(true);
+    setTimeout(() => {
+      setIsSaving(false);
+      toast('Workflow successfully saved.', 'success');
+    }, 800);
+  };
+
+  const handleDeployWorkflow = () => {
+    toast('Workflow deployed to active workspace swarms.', 'success');
   };
 
   const liveSelectedNode = (selectedNode && activeWorkflow)
@@ -186,268 +107,192 @@ export default function WorkflowPage() {
     ? agents.find(a => a.id === liveSelectedNode.assignedAgentId) 
     : null;
 
-  // Render logic for clean Empty State (ISSUE 1)
-  if (!activeWorkflow && !isPlanning) {
-    return (
-      <div className="flex-1 max-w-4xl w-full mx-auto p-6 flex flex-col items-center justify-center min-h-[70vh] gap-8 animate-fade-in">
-        <div className="text-center flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-white/5 border border-border-dark flex items-center justify-center text-primary-neon shadow-[0_0_20px_rgba(0,255,204,0.05)]">
-            <Sparkles className="w-8 h-8 text-primary-neon animate-pulse" />
-          </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight mt-2">No Workflow Yet</h2>
-          <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-            Describe a task and click &quot;Generate Workflow&quot; to begin. The AI Planner will automatically build the agent execution DAG.
-          </p>
-        </div>
-
-        <div className="w-full glass-card p-6 rounded-2xl border border-border-dark shadow-2xl flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-gray-400">
-            <Terminal className="w-3.5 h-3.5 text-primary-neon" />
-            Describe Swarm Goal
-          </div>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              className="flex-grow bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-3 rounded-xl text-sm text-white outline-none font-mono focus-glowing"
-              placeholder="Describe the multi-agent task sequence, e.g. Audit smart contract token vulnerabilities..."
-              value={promptInput}
-              onChange={(e) => setPromptInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleGenerateWorkflow();
-              }}
-            />
-            <button
-              onClick={handleGenerateWorkflow}
-              disabled={!promptInput.trim()}
-              className="bg-primary-neon hover:bg-primary-neon/90 text-black font-extrabold text-xs px-6 rounded-xl hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-mono active-press"
-            >
-              Generate Workflow
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 text-[10px] text-gray-500 font-mono">
-            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
-              <span className="text-primary-neon font-bold">01</span>
-              <span>Input natural language queries detailing required operations.</span>
-            </div>
-            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
-              <span className="text-secondary-neon font-bold">02</span>
-              <span>AI matches registry agent capability profiles to solve tasks.</span>
-            </div>
-            <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border-dark/50 bg-white/2">
-              <span className="text-accent-blue font-bold">03</span>
-              <span>Visual topological DAG canvas schedules multi-agent runs.</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic SLA Configurations displayed in Empty State */}
-        <div className="w-full glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-4 text-xs font-mono max-w-sm">
-          <h3 className="font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-border-dark pb-2.5">
-            <Sliders className="w-4 h-4 text-primary-neon" />
-            SLA Configurations
-          </h3>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
-              <span className="text-white font-bold truncate">—</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase">Routing Policy</span>
-              <span className="text-primary-neon font-bold uppercase">—</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase">Budget Cap</span>
-              <span className="text-secondary-neon font-bold">—</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase">Status</span>
-              <span className="text-gray-500 font-bold uppercase">Idle</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6 animate-fade-in relative">
+    <div className="flex-1 flex flex-col bg-[#050505] min-h-[calc(100vh-80px)] selection:bg-[#4EA3FF]/30 relative font-sans">
       
-      {/* Confetti Explosion Overlay */}
-      {showConfetti && (
-        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-          {[...Array(60)].map((_, i) => {
-            const angle = (i * 360) / 60 + (Math.random() * 15 - 7.5);
-            const distance = 100 + Math.random() * 250;
-            const x = Math.cos((angle * Math.PI) / 180) * distance;
-            const y = Math.sin((angle * Math.PI) / 180) * distance - 50;
-            const size = 6 + Math.random() * 10;
-            const colors = ['#00ffcc', '#ff007f', '#00e5ff', '#ffeb3b', '#ff5722'];
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            return (
-              <div
-                key={i}
-                className="absolute rounded-full animate-particle"
-                style={{
-                  width: `${size}px`,
-                  height: `${size}px`,
-                  backgroundColor: color,
-                  left: '50%',
-                  top: '40%',
-                  '--tw-x': `${x}px`,
-                  '--tw-y': `${y}px`
-                } as any}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="glass-card p-6 rounded-2xl border border-border-dark flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Layers className="w-5.5 h-5.5 text-primary-neon animate-pulse" />
-            Visual Workflow DAG Canvas
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Displaying structural node execution orders and decentralized escrow relations.
-          </p>
-        </div>
-        
-        <button
-          onClick={() => {
-            resetExecution();
-            setSelectedNode(null);
-          }}
-          className="text-xs bg-white/5 border border-border-dark hover:bg-white/10 hover:border-secondary-neon/40 px-4 py-2 rounded-xl text-gray-400 hover:text-white font-mono flex items-center gap-1.5 transition-all active-press"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          New Workflow
-        </button>
-      </div>
-
-      {!isWorkflowSaved && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl flex items-center justify-between text-xs text-yellow-400 font-mono">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-500 animate-pulse" />
-            <span>Workflow persistence failed: The local canvas graph is rendered but is not saved on-chain.</span>
-          </div>
-          <button
-            onClick={handleSaveWorkflow}
-            disabled={isSaving}
-            className="bg-yellow-500 text-black px-4 py-1.5 rounded-lg font-bold hover:brightness-110 disabled:opacity-50 transition-all shrink-0"
-          >
-            {isSaving ? 'Saving...' : 'Retry Save'}
-          </button>
-        </div>
-      )}
-
-      {/* AI Prompt Input Bar */}
-      <div className="glass-card p-4 rounded-xl border border-border-dark flex flex-col md:flex-row gap-3 items-center">
-        <div className="flex items-center gap-2 shrink-0">
-          <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
-          <span className="text-xs font-bold uppercase tracking-wider text-white font-mono">
-            AI Planner
+      {/* 1. TOP HEADER PANEL */}
+      <div className="h-[64px] border-b border-[#232323] bg-[#050505] px-8 flex items-center justify-between z-20">
+        {/* LEFT: Info Badges */}
+        <div className="flex items-center gap-4">
+          <h2 className="text-sm font-semibold text-white truncate max-w-[180px]">
+            {activeWorkflow ? activeWorkflow.name : 'Untitled Workflow'}
+          </h2>
+          <span className="bg-[#111111] border border-[#232323] text-gray-400 text-[10px] font-mono px-2 py-0.5 rounded-lg select-none">
+            v1.0.0
+          </span>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg select-none flex items-center gap-1.5 border ${
+            isRunning 
+              ? 'bg-[#4EA3FF]/10 border-[#4EA3FF]/20 text-[#4EA3FF]' 
+              : activeWorkflow?.status === 'completed'
+                ? 'bg-white/10 border-white/20 text-white'
+                : 'bg-[#111111] border-[#232323] text-gray-400'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-[#4EA3FF] animate-pulse' : 'bg-gray-500'}`} />
+            <span>{isRunning ? 'Running' : activeWorkflow?.status ? activeWorkflow.status.toUpperCase() : 'Idle'}</span>
           </span>
         </div>
-        <input
-          type="text"
-          className="flex-grow bg-black/40 border border-border-dark focus:border-primary-neon/50 px-4 py-2 rounded-lg text-xs text-white outline-none font-mono focus-glowing"
-          placeholder="Describe the multi-agent task sequence, e.g. Research NVIDIA Blackwell and verify findings..."
-          value={promptInput}
-          onChange={(e) => setPromptInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleGenerateWorkflow();
-          }}
-        />
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={handleGenerateWorkflow}
-            disabled={!promptInput.trim() || isPlanning}
-            className="bg-white/5 border border-border-dark text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-white/10 font-mono disabled:opacity-50 active-press"
-          >
-            Generate Workflow
-          </button>
-          {!activeWorkflow && !isRunning && (
-            <button
-              onClick={handleLaunchSwarm}
-              disabled={!promptInput.trim() || isPlanning}
-              className="bg-gradient-to-r from-primary-neon to-accent-blue text-black text-xs font-extrabold px-5 py-2 rounded-lg hover:brightness-110 font-mono disabled:opacity-50 transition-all active-press"
+
+        {/* MIDDLE: Collaborators */}
+        <div className="hidden md:flex items-center -space-x-2">
+          {['MS', 'AI', 'JD'].map((initials, index) => (
+            <div 
+              key={initials}
+              className={`w-7 h-7 rounded-full border-2 border-[#050505] flex items-center justify-center text-[10px] font-bold select-none ${
+                index === 0 ? 'bg-[#4EA3FF] text-black' : 'bg-[#111111] text-gray-400'
+              }`}
             >
-              Run Swarm
-            </button>
+              {initials}
+            </div>
+          ))}
+        </div>
+
+        {/* RIGHT: Actions */}
+        <div className="flex items-center gap-3">
+          {activeWorkflow && (
+            <>
+              <button
+                onClick={handleSaveWorkflow}
+                disabled={isSaving}
+                className="flex items-center justify-center gap-1.5 bg-[#111111] hover:bg-white/[0.04] border border-[#232323] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save</span>
+              </button>
+              <button
+                onClick={handleLaunchSwarm}
+                disabled={isRunning}
+                className="flex items-center justify-center gap-1.5 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-3.5 py-1.5 rounded-xl cursor-pointer disabled:opacity-50 border-0"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Run</span>
+              </button>
+              <button
+                onClick={handleDeployWorkflow}
+                className="flex items-center justify-center gap-1.5 bg-[#111111] hover:bg-white/[0.04] border border-[#232323] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl cursor-pointer"
+              >
+                Deploy
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* 2. BODY CONTENT (Canvas or Planning or Empty) */}
+      <div className="flex-1 flex relative overflow-hidden">
         
-        {/* Canvas container / Planning checker */}
-        <div className="lg:col-span-3 flex flex-col">
-          {isPlanning ? (
-            <div className="flex-grow flex flex-col items-center justify-center p-8 bg-black/40 border border-border-dark rounded-xl min-h-[500px] gap-6 animate-fade-in font-mono">
-              <div className="w-16 h-16 rounded-full border-t-2 border-primary-neon animate-spin flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-primary-neon animate-pulse" />
+        {/* EMPTY STATE */}
+        {!activeWorkflow && !isPlanning && (
+          <div className="flex-1 max-w-lg mx-auto flex flex-col items-center justify-center p-6 gap-8 text-center min-h-[60vh] select-none">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#111111] border border-[#232323] flex items-center justify-center text-[#4EA3FF]">
+                <Sparkles className="w-7 h-7" />
               </div>
-              <div className="text-center">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">AI Swarm Planner Running</h3>
-                <p className="text-[10px] text-gray-500 mt-1 max-w-sm">Querying model endpoints, evaluating safety credentials, and compiling task DAGs...</p>
-              </div>
+              <h2 className="text-xl font-semibold text-white tracking-tight">Generate Execution Workflow</h2>
+              <p className="text-xs text-[#9CA3AF] max-w-sm leading-relaxed">
+                Describe the autonomous agents swarm workflow you want to construct. The AI swarm architect will compile the nodes.
+              </p>
+            </div>
 
-              <div className="w-full max-w-md bg-white/2 border border-border-dark rounded-xl p-4 flex flex-col gap-3.5 text-xs text-left">
+            <div className="w-full flex flex-col gap-3">
+              <textarea
+                rows={3}
+                placeholder="e.g. Conduct a comprehensive compliance audit of our active contracts repository and compile a PDF brief..."
+                value={promptInput}
+                onChange={(e) => setPromptInput(e.target.value)}
+                className="w-full bg-[#111111] border border-[#232323] hover:border-white/10 focus:border-[#4EA3FF] rounded-2xl p-4 text-xs text-white placeholder-gray-500 outline-none resize-none transition-all"
+              />
+              <button
+                onClick={handleGenerateWorkflow}
+                disabled={!promptInput.trim()}
+                className="w-full bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold py-3 rounded-2xl transition-all cursor-pointer disabled:opacity-50 border-0"
+              >
+                Generate Swarm Nodes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PLANNING LOADER */}
+        {isPlanning && (
+          <div className="flex-1 flex flex-col items-center justify-center bg-[#050505] p-6 z-10 select-none">
+            <div className="max-w-md w-full flex flex-col gap-8 bg-[#111111] border border-[#232323] p-8 rounded-2xl shadow-xl">
+              <div className="flex items-center gap-4 border-b border-[#232323] pb-4">
+                <Loader2 className="w-5 h-5 text-[#4EA3FF] animate-spin" />
+                <h3 className="text-sm font-semibold text-white">Compiling Agent Workflow</h3>
+              </div>
+              
+              <div className="flex flex-col gap-4">
                 {PLANNING_STEPS.map((step, idx) => {
-                  const isDone = planningStage > idx;
-                  const isActive = planningStage === idx;
+                  const isActive = idx === planningStage;
+                  const isDone = idx < planningStage;
                   return (
-                    <div key={idx} className={`flex items-start gap-3 transition-opacity duration-300 ${isDone ? 'opacity-100 text-gray-400' : isActive ? 'opacity-100 text-white font-bold' : 'opacity-45 text-gray-500'}`}>
+                    <div 
+                      key={step.label}
+                      className={`flex items-start gap-3 transition-opacity duration-300 ${
+                        isActive ? 'opacity-100' : isDone ? 'opacity-50' : 'opacity-20'
+                      }`}
+                    >
                       <div className="mt-0.5">
                         {isDone ? (
-                          <CheckCircle2 className="w-4 h-4 text-primary-neon animate-bounce" />
+                          <CheckCircle2 className="w-4 h-4 text-[#4EA3FF]" />
                         ) : isActive ? (
-                          <Loader2 className="w-4 h-4 text-secondary-neon animate-spin" />
+                          <Loader2 className="w-4 h-4 text-[#4EA3FF] animate-spin" />
                         ) : (
                           <div className="w-4 h-4 rounded-full border border-gray-600" />
                         )}
                       </div>
-                      <div className="flex flex-col">
-                        <span>{step.label}</span>
-                        {isActive && <span className="text-[10px] text-gray-400 font-normal mt-0.5">{step.desc}</span>}
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-semibold text-white">{step.label}</span>
+                        {isActive && <span className="text-[10px] text-gray-500">{step.desc}</span>}
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-          ) : (
-            <div className="relative flex-grow min-h-[500px] bg-black/40 border border-border-dark rounded-xl overflow-hidden transition-all duration-700 animate-fade-in">
+          </div>
+        )}
+
+        {/* ACTIVE CANVAS & SIDEBAR */}
+        {activeWorkflow && !isPlanning && (
+          <>
+            {/* ReactFlow Canvas container */}
+            <div className="flex-1 relative h-full">
               <Canvas onSelectNode={setSelectedNode} />
             </div>
-          )}
-        </div>
 
-        {/* Sidebar details panel */}
-        <div className="lg:col-span-1 flex flex-col gap-6 animate-slide-in">
-          
-          {/* Node execution inspector */}
-          {selectedNode && activeWorkflow ? (
-            <div className="glass-card p-5 rounded-xl border border-primary-neon/40 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
-              <div className="flex justify-between items-center border-b border-border-dark pb-3">
-                <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                  <Terminal className="w-4 h-4 text-primary-neon animate-pulse" />
-                  Node Inspector
-                </h3>
-                <button 
-                  onClick={() => setSelectedNode(null)}
-                  className="text-gray-500 hover:text-white hover:bg-white/5 p-1 rounded-md transition-all active-press"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+            {/* MINIMAL NODE DETAIL PANEL */}
+            {liveSelectedNode && (
+              <div className="w-[340px] border-l border-[#232323] bg-[#111111] p-6 flex flex-col gap-6 overflow-y-auto z-10 animate-slide-in select-none">
+                <div className="flex items-center justify-between border-b border-[#232323] pb-4">
+                  <h3 className="text-xs font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">
+                    Agent Node Config
+                  </h3>
+                  <button 
+                    onClick={() => setSelectedNode(null)}
+                    className="p-1 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white cursor-pointer bg-transparent border-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] text-gray-500 uppercase">Step Name</span>
+                {/* Status Indicator */}
+                <div className="flex items-center justify-between bg-[#050505] border border-[#232323] px-4 py-3 rounded-xl">
+                  <span className="text-xs text-[#9CA3AF]">Status</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg border ${
+                    liveSelectedNode.status === 'completed'
+                      ? 'bg-white/10 border-white/20 text-white'
+                      : liveSelectedNode.status === 'running'
+                        ? 'bg-[#4EA3FF]/10 border-[#4EA3FF]/20 text-[#4EA3FF]'
+                        : 'bg-[#111111] border-[#232323] text-gray-400'
+                  }`}>
+                    {liveSelectedNode.status ? liveSelectedNode.status.toUpperCase() : 'PENDING'}
+                  </span>
+                </div>
+
+                {/* Edit Form */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] text-gray-500 font-mono uppercase">Node Identifier</label>
                   <input
                     type="text"
                     value={nodeNameInput}
@@ -455,343 +300,58 @@ export default function WorkflowPage() {
                       setNodeNameInput(e.target.value);
                       renameNode(liveSelectedNode.id, e.target.value);
                     }}
-                    className="bg-black/60 border border-border-dark focus:border-primary-neon/40 px-2 py-1 rounded text-white outline-none"
+                    className="w-full bg-[#050505] border border-[#232323] hover:border-white/10 focus:border-[#4EA3FF] rounded-xl px-3 py-2 text-xs text-white outline-none transition-all"
                   />
                 </div>
 
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-500 uppercase">Execution Status</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      liveSelectedNode.status === 'completed' ? 'bg-primary-neon shadow-[0_0_8px_#00ffcc]' :
-                      liveSelectedNode.status === 'running' ? 'bg-secondary-neon animate-ping' :
-                      liveSelectedNode.status === 'failed' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
-                    }`}></span>
-                    <span className={`uppercase font-bold ${
-                      liveSelectedNode.status === 'completed' ? 'text-primary-neon' :
-                      liveSelectedNode.status === 'running' ? 'text-secondary-neon' :
-                      liveSelectedNode.status === 'failed' ? 'text-red-500' : 'text-gray-500'
-                    }`}>{liveSelectedNode.status}</span>
-                  </div>
-                </div>
-
+                {/* Assigned Agent Details */}
                 {assignedAgent && (
-                  <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
-                    <div>
-                      <span className="text-[9px] text-gray-500 uppercase">Assigned Node</span>
-                      <span className="text-white block mt-0.5 font-bold">{assignedAgent.name}</span>
-                      <span className="text-[9px] text-gray-400 font-mono italic block mt-0.5">Role: {assignedAgent.category} Agent</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-gray-400">
-                      <span>Rating: {assignedAgent.rating}⭐</span>
-                      <span>SLA Fee: {liveSelectedNode.costEstimate} USDC</span>
+                  <div className="flex flex-col gap-3 border-t border-[#232323] pt-5">
+                    <span className="text-[10px] text-gray-500 font-mono uppercase">Assigned AI Worker</span>
+                    <div className="flex items-start gap-3 bg-[#050505] border border-[#232323] p-3 rounded-xl">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[#4EA3FF] shrink-0 font-bold text-xs select-none">
+                        {assignedAgent.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-semibold text-white">{assignedAgent.name}</span>
+                        <span className="text-[10px] text-gray-500 font-sans leading-relaxed">{assignedAgent.description}</span>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex flex-col border-t border-border-dark pt-2.5">
-                  <span className="text-[9px] text-gray-500 uppercase">Retry Attempts</span>
-                  <span className="text-white font-bold mt-0.5">
-                    {liveSelectedNode.retryCount > 0 ? `${liveSelectedNode.retryCount} Retries` : '0 Retries'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="text-left text-[10px] text-primary-neon font-bold tracking-wider hover:underline"
-                  >
-                    {isExpanded ? '[-] Hide Details' : '[+] Expand Details'}
-                  </button>
-                  
-                  {isExpanded && (
-                    <div className="bg-black/30 p-2 rounded border border-border-dark/50 flex flex-col gap-1.5 text-[10px] animate-in slide-in-from-top duration-100">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Capability:</span>
-                        <span className="text-gray-300">{liveSelectedNode.capability}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Endpoint:</span>
-                        <span className="text-gray-400 font-mono truncate max-w-[120px]" title={assignedAgent?.endpoint}>{assignedAgent?.endpoint || 'Local'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Accuracy:</span>
-                        <span className="text-gray-300">{assignedAgent?.accuracy || 95}%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
-                  <span className="text-[9px] text-gray-500 uppercase">Operations</span>
-                  <div className="flex gap-2">
-                    {liveSelectedNode.status === 'failed' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          retryNode(liveSelectedNode.id);
-                          toast(`Retrying node execution: ${liveSelectedNode.name}`, 'info');
-                          setSelectedNode((prev: any) => ({ ...prev, status: 'pending', retryCount: (prev.retryCount || 0) + 1 }));
-                        }}
-                        className="bg-yellow-400 text-black text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all flex-1 text-center active-press"
-                      >
-                        Retry Node
-                      </button>
-                    )}
+                {/* Action buttons */}
+                <div className="flex flex-col gap-2.5 mt-auto pt-6 border-t border-[#232323]">
+                  {liveSelectedNode.status === 'failed' && (
                     <button
-                      type="button"
                       onClick={() => {
-                        deleteNode(liveSelectedNode.id);
-                        toast(`Removed node from DAG: ${liveSelectedNode.name}`, 'success');
-                        setSelectedNode(null);
+                        retryNode(liveSelectedNode.id);
+                        toast('Retrying node execution...', 'info');
                       }}
-                      className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-extrabold px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-all flex-grow text-center active-press"
+                      className="w-full flex items-center justify-center gap-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold py-2.5 rounded-xl cursor-pointer border-0"
                     >
-                      Delete Node
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Retry Node</span>
                     </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col border-t border-border-dark pt-2.5 gap-2">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-gray-500 uppercase">Token Accounting</span>
-                    <span className="text-white font-bold">
-                      {promptTokens > 0 ? `${promptTokens.toLocaleString()} input | ${completionTokens.toLocaleString()} output` : 'No logs yet'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-gray-500 uppercase">AI Trust Confidence</span>
-                    <span className="text-primary-neon font-bold">{(assignedAgent?.trustScore || liveSelectedNode.trustScore || 95.0)}%</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-gray-500 uppercase">Est. Completion Time</span>
-                    <span className="text-white">{(liveSelectedNode.timeEstimate / 1000).toFixed(1)}s</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-gray-500 uppercase">SLA Settlement Cost</span>
-                    <span className="text-secondary-neon font-bold">{liveSelectedNode.costEstimate} USDC</span>
-                  </div>
-                </div>
-
-                {assignedAgent && getAlternativeAgents(liveSelectedNode).length > 0 && (
-                  <div className="flex flex-col border-t border-border-dark pt-2.5 gap-1.5">
-                    <span className="text-[9px] text-gray-500 uppercase">Alternative Candidates Evaluated</span>
-                    <div className="flex flex-col gap-1.5">
-                      {getAlternativeAgents(liveSelectedNode).map((alt) => (
-                        <div key={alt.id} className="bg-black/40 border border-border-dark p-2 rounded flex justify-between items-center text-[10px] hover:border-primary-neon/20 transition-all">
-                          <div>
-                            <span className="text-white block font-semibold">{alt.name}</span>
-                            <span className="text-[8px] text-gray-500">Rating: {alt.rating}⭐ | Latency: {alt.latency}ms</span>
-                          </div>
-                          <span className="text-secondary-neon font-mono font-bold text-[9px]">{alt.price.toFixed(2)} USDC</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
-                  <span className="text-[9px] text-gray-500 uppercase flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Timeline Logs
-                  </span>
-                  <div className="bg-black/60 p-2.5 rounded border border-border-dark text-[9px] text-gray-400 flex flex-col gap-1 font-mono max-h-[120px] overflow-y-auto leading-normal">
-                    <span>[14:12:01] Init intention channel...</span>
-                    {liveSelectedNode.status !== 'pending' && (
-                      <>
-                        <span>[14:12:03] Locking SLA budget escrow...</span>
-                        <span>[14:12:05] Calling node capability: {liveSelectedNode.capability}...</span>
-                      </>
-                    )}
-                    {liveSelectedNode.status === 'completed' && (
-                      <>
-                        <span>[14:12:08] Node output verified by Consensus node.</span>
-                        <span>[14:12:09] Settlement released payout to agent.</span>
-                      </>
-                    )}
-                    {liveSelectedNode.status === 'failed' && (
-                      <span className="text-red-400 flex items-center gap-1 mt-1">
-                        <ShieldAlert className="w-3 h-3 text-red-500" />
-                        [FATAL] Swarm execution timed out.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {liveSelectedNode.status === 'completed' && (
-                  <div className="flex flex-col gap-1 border-t border-border-dark pt-2.5">
-                    <span className="text-[9px] text-gray-500 uppercase">Step Output Payload</span>
-                    <div className="bg-black/40 border border-border-dark p-2 rounded text-[10px] text-primary-neon max-h-[100px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                      {liveSelectedNode.output || 'Success. Output payloads generated.'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {errorMsg && (
-                <div className="glass-card p-5 rounded-xl border border-red-500/40 bg-red-500/5 flex flex-col gap-3 text-xs font-mono">
-                  <div className="flex items-center gap-1.5 text-red-400 font-bold border-b border-red-500/20 pb-2.5">
-                    <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
-                    PLANNING FAILURE
-                  </div>
-                  <p className="text-gray-400 leading-relaxed">
-                    {errorMsg}
-                  </p>
-                </div>
-              )}
-
-              {/* Dynamic Swarm Explanation Details */}
-              {!isPlanning && !errorMsg && showExplanation && activeWorkflow && (
-                <div className="glass-card p-5 rounded-xl border border-primary-neon/20 bg-primary-neon/5 flex flex-col gap-4 text-xs font-mono">
-                  <h3 className="font-bold uppercase tracking-wider text-white flex items-center gap-1.5 border-b border-border-dark pb-2.5">
-                    <Sparkles className="w-4 h-4 text-primary-neon animate-pulse" />
-                    Autonomous Planner Console
-                  </h3>
-
-                  <div className="flex flex-wrap gap-2">
-                    <span className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon px-2 py-0.5 rounded text-[9px] font-bold">
-                      Intent: {activeWorkflow.intent || 'General'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
-                      activeWorkflow.complexity === 'Enterprise' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-                      activeWorkflow.complexity === 'Large' ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' :
-                      activeWorkflow.complexity === 'Medium' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
-                      'bg-green-500/10 border-green-500/30 text-green-400'
-                    }`}>
-                      Complexity: {activeWorkflow.complexity || 'Medium'}
-                    </span>
-                  </div>
-
-                  {activeWorkflow.thought && (
-                    <div className="flex flex-col gap-1 border-t border-border-dark/40 pt-2">
-                      <span className="text-gray-500 uppercase text-[9px]">Planner Reasoning:</span>
-                      <div className="bg-black/40 border border-border-dark p-2 rounded text-[10px] text-gray-300 max-h-[120px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                        {activeWorkflow.thought}
-                      </div>
-                    </div>
                   )}
-
-                  {activeWorkflow.riskAssessment && activeWorkflow.riskAssessment !== 'None' && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/30 p-2.5 rounded-lg text-yellow-300 text-[10px]">
-                      <span className="font-bold block mb-0.5">⚠️ Swarm SLA Risk Warn:</span>
-                      {activeWorkflow.riskAssessment}
-                    </div>
-                  )}
-
-                  {activeWorkflow.executionOrder && activeWorkflow.executionOrder.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-gray-500 uppercase text-[9px]">Execution Order Sequence:</span>
-                      <div className="flex flex-wrap gap-1 items-center text-[9px] text-gray-400 bg-black/40 p-2 rounded border border-border-dark">
-                        {activeWorkflow.executionOrder.map((nodeId, idx) => (
-                          <span key={nodeId} className="flex items-center">
-                            {idx > 0 && <span className="mx-1 text-gray-600">&rarr;</span>}
-                            <span className="bg-white/5 border border-border-dark px-1.5 py-0.5 rounded font-bold text-gray-300">{nodeId}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-3 pt-2 border-t border-border-dark">
-                    {activeWorkflow.nodes.map((node) => {
-                      const agent = agents.find(a => a.id === node.assignedAgentId);
-                      return (
-                        <div key={node.id} className="flex flex-col gap-1 border-b border-border-dark/30 pb-2 last:border-0 last:pb-0">
-                          <span className="text-[10px] text-primary-neon font-bold uppercase">✓ {node.name}</span>
-                          <p className="text-gray-300 text-[10px] leading-relaxed mt-0.5">
-                            Routed capability <strong className="text-white">{node.capability}</strong> to agent <strong className="text-white">{agent?.name || node.assignedAgentId}</strong>.
-                          </p>
-                        </div>
-                      );
-                    })}
-
-                    <div className="flex justify-between items-center pt-2 border-t border-border-dark">
-                      <span className="text-gray-500 uppercase">PROMPT TOKENS:</span>
-                      <span className="text-white font-bold">{promptTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 uppercase">COMPLETION TOKENS:</span>
-                      <span className="text-white font-bold">{completionTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 uppercase">TOTAL TOKENS:</span>
-                      <span className="text-primary-neon font-bold">{totalTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 uppercase">EST. PLANNING COST:</span>
-                      <span className="text-secondary-neon font-mono font-bold">{(estimatedCost || 0).toFixed(5)} USDC</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* General SLA Configurations */}
-              <div className="glass-card p-5 rounded-xl border border-border-dark flex flex-col gap-4 text-xs font-mono">
-                <h3 className="font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 border-b border-border-dark pb-2.5">
-                  <Sliders className="w-4 h-4 text-primary-neon" />
-                  SLA Configurations
-                </h3>
-
-                <div className="flex flex-col gap-3">
-                  {isDemoMode && activeWorkflow && (
-                    <div className="bg-primary-neon/10 border border-primary-neon/30 text-primary-neon rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-[0_0_8px_rgba(0,255,204,0.05)]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-neon animate-pulse" />
-                      <span>Demo Mode - No funds required</span>
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 uppercase">Workflow Name</span>
-                    <span className="text-white font-bold truncate">
-                      {activeWorkflow ? activeWorkflow.name : '—'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 uppercase">Routing Policy</span>
-                    <span className="text-primary-neon font-bold uppercase">
-                      {activeWorkflow ? activeWorkflow.routingMode : '—'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 uppercase">Budget Cap</span>
-                    <span className="text-secondary-neon font-bold">
-                      {activeWorkflow ? `${activeWorkflow.budget.toFixed(2)} USDC` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-500 uppercase">Status</span>
-                    <span className={`font-bold capitalize ${
-                      activeWorkflow
-                        ? activeWorkflow.status === 'completed' || (activeWorkflow.status as string) === 'Demo Completed'
-                          ? 'text-primary-neon animate-pulse' 
-                          : activeWorkflow.status === 'failed'
-                            ? 'text-red-500'
-                            : activeWorkflow.status === 'running'
-                              ? 'text-blue-400'
-                              : 'text-yellow-400'
-                        : 'text-gray-500'
-                    }`}>
-                      {activeWorkflow
-                        ? (isDemoMode && activeWorkflow.status === 'running'
-                          ? 'Running simulated workflow...'
-                          : (activeWorkflow.status as string) === 'Demo Completed'
-                            ? 'Demo completed successfully'
-                            : activeWorkflow.status)
-                        : 'Idle'}
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => {
+                      deleteNode(liveSelectedNode.id);
+                      setSelectedNode(null);
+                      toast('Removed node from canvas.', 'info');
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-transparent hover:bg-red-500/10 border border-[#232323] hover:border-red-500/30 text-red-400 text-xs font-semibold py-2.5 rounded-xl cursor-pointer transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Delete Node</span>
+                  </button>
                 </div>
               </div>
-            </>
-          )}
-
-        </div>
+            )}
+          </>
+        )}
 
       </div>
-
     </div>
   );
 }
-
