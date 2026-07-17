@@ -22,7 +22,7 @@ export default function Navbar() {
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const setAuthModal = useAuthStore((state) => state.setAuthModal);
   
-  const isAuthenticated = !!token && !!user;
+  const isAuthenticated = mounted && !!token && !!user;
   const authLoading = !mounted;
 
   const handleLogout = async () => {

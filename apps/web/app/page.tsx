@@ -278,7 +278,7 @@ export default function PortalPage() {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const logoutUser = useAuthStore((state) => state.logoutUser);
-  const isAuthenticated = !!token && !!user;
+  const isAuthenticated = mounted && !!token && !!user;
 
   useEffect(() => {
     setMounted(true);

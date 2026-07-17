@@ -63,23 +63,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [mounted, isCheckingAuth, isAuthenticated, isPublicRoute, pathname]);
 
-  if (!mounted || isCheckingAuth) {
-    return <AppSkeleton />;
-  }
+  // Immediate render for public routes to enable full SSR and prevent hydration mismatches
+  if (isPublicRoute) {
+    if (pathname === '/') {
+      return (
+        <div className="min-h-screen flex flex-col bg-[#050505]">
+          <main className="flex-grow flex flex-col">
+            {children}
+          </main>
+        </div>
+      );
+    }
 
-  // If page is protected and user is not authenticated, continue showing skeleton while redirect resolves
-  if (!isAuthenticated && !isPublicRoute) {
-    return <AppSkeleton />;
-  }
-
-  if (pathname === '/') {
     return (
-      <div className="min-h-screen flex flex-col bg-[#050505]">
-        <main className="flex-grow flex flex-col">
+      <div className="min-h-screen flex flex-col bg-[#050505] text-white">
+        <Navbar />
+        <main className="flex-1 flex flex-col min-w-0 pt-[80px] relative z-10">
           {children}
         </main>
       </div>
     );
+  }
+
+  // Auth checking skeleton for protected routes
+  if (!mounted || isCheckingAuth) {
+    return <AppSkeleton />;
+  }
+
+  // Redirecting state skeleton
+  if (!isAuthenticated) {
+    return <AppSkeleton />;
   }
 
   return (
