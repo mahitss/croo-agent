@@ -76,11 +76,10 @@ export default function AuthModal() {
           // Dynamically map or update the window callback to use the latest React closure state
           (window as any).handleGoogleCredentialResponse = async (response: any) => {
             if (response && response.credential) {
-              console.log('[GOOGLE_AUTH_DEBUG] ID Token received from Google popup');
+              console.log('[STEP 1 - Button clicked / Token received] Google credential popup completed');
               setIsLoading(true);
               try {
                 console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
-                console.log("Before request");
                 const ok = await loginWithGoogle(response.credential);
                 console.log("After request");
                 console.log("Response resolved to:", ok);

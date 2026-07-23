@@ -212,12 +212,20 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  console.log(`[API_CLIENT] fetchWithAuth start: ${BASE_URL}${url}`);
-  let response = await fetch(`${BASE_URL}${url}`, {
-    ...options,
-    headers,
-  });
-  console.log(`[API_CLIENT] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
+  console.log(`[STEP 2 - API request created] fetchWithAuth start: ${BASE_URL}${url}`);
+  let response: Response;
+  try {
+    const timeoutSignal = (options as any).signal || AbortSignal.timeout(15000);
+    response = await fetch(`${BASE_URL}${url}`, {
+      ...options,
+      headers,
+      signal: timeoutSignal,
+    });
+    console.log(`[STEP 10 - Response returned to frontend] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
+  } catch (fetchErr: any) {
+    console.error(`[API_CLIENT_ERROR] fetchWithAuth request to ${BASE_URL}${url} failed/timed out:`, fetchErr.message);
+    throw fetchErr;
+  }
 
   // Intercept 401 failures and try to refresh on the fly (Problem 7)
   if (response.status === 401 && !isServer && storage && !url.startsWith('/api/v1/auth/')) {

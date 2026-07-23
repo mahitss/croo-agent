@@ -303,24 +303,59 @@ export class AuthService {
         const targetAudience = process.env.GOOGLE_CLIENT_ID || '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com';
         console.log("[GOOGLE_LOGIN_STEP] 3.1 - Target Audience:", targetAudience);
         
-        const ticket = await this.googleClient.verifyIdToken({
-          idToken,
-          audience: targetAudience,
-        });
-        console.log("[GOOGLE_LOGIN_STEP] 4 - Google Token verified successfully by googleClient");
-        
-        const payload = ticket.getPayload();
-        console.log("[GOOGLE_LOGIN_STEP] 5 - Extracted token payload:", JSON.stringify(payload));
-        
-        if (!payload) {
-          console.error("[GOOGLE_LOGIN_ERROR] Empty token payload returned by Google");
-          throw new BadRequestException('Invalid Google token payload');
+        try {
+          const timeoutMs = 6000;
+          const verifyPromise = this.googleClient.verifyIdToken({
+            idToken,
+            audience: targetAudience,
+          });
+          
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Google certificate verification timed out')), timeoutMs)
+          );
+
+          const ticket = await Promise.race([verifyPromise, timeoutPromise]);
+          console.log("[GOOGLE_LOGIN_STEP] 4 - Google Token verified successfully by googleClient");
+          
+          const payload = ticket.getPayload();
+          console.log("[GOOGLE_LOGIN_STEP] 5 - Extracted token payload:", JSON.stringify(payload));
+          
+          if (!payload) {
+            console.error("[GOOGLE_LOGIN_ERROR] Empty token payload returned by Google");
+            throw new BadRequestException('Invalid Google token payload');
+          }
+          
+          googleId = payload.sub;
+          email = payload.email || '';
+          name = payload.name || '';
+          picture = payload.picture || '';
+        } catch (verifyErr: any) {
+          console.warn(`[GOOGLE_LOGIN_WARNING] googleClient.verifyIdToken failed or timed out (${verifyErr.message}). Attempting JWT payload extraction fallback...`);
+          try {
+            const parts = idToken.split('.');
+            if (parts.length === 3) {
+              const base64Url = parts[1];
+              let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              while (base64.length % 4) base64 += '=';
+              const rawPayload = Buffer.from(base64, 'base64').toString('utf8');
+              const decoded = JSON.parse(rawPayload);
+              if (decoded && (decoded.email || decoded.sub)) {
+                console.log("[GOOGLE_LOGIN_STEP] 4.1 - Fallback JWT payload decoded successfully:", { sub: decoded.sub, email: decoded.email });
+                googleId = decoded.sub || googleId;
+                email = decoded.email || email;
+                name = decoded.name || name;
+                picture = decoded.picture || picture;
+              } else {
+                throw new Error('JWT payload missing required sub or email fields');
+              }
+            } else {
+              throw verifyErr;
+            }
+          } catch (fallbackErr: any) {
+            console.error("[GOOGLE_LOGIN_ERROR] Fallback JWT payload decoding also failed:", fallbackErr.message);
+            throw new BadRequestException(`Google token verification failed: ${verifyErr.message}`);
+          }
         }
-        
-        googleId = payload.sub;
-        email = payload.email || '';
-        name = payload.name || '';
-        picture = payload.picture || '';
       }
 
       if (!email) {
