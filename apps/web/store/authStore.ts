@@ -246,7 +246,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
           console.log('[AUTH INIT] Valid token found in storage. Verifying session with backend...');
           try {
             const meRes = await fetch(`${BASE_URL}/api/v1/users/me`, {
-              headers: { 'Authorization': `Bearer ${token}` }
+              headers: { 'Authorization': `Bearer ${token}` },
+              credentials: 'include'
             });
             if (meRes.ok) {
               const meData = await meRes.json();
@@ -263,20 +264,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
               get().scheduleAutoRefresh();
               return true;
             } else if (meRes.status === 401) {
-              console.warn('[AUTH INIT] Token is invalid or unauthorized. Clearing session.');
-              storage.removeItem('orbit_token');
-              storage.removeItem('orbit_user');
-              storage.removeItem('orbit_refreshtoken');
-              set({
-                token: null,
-                user: null,
-                isAuthenticated: false,
-                initializationState: 'UNAUTHENTICATED',
-                isCheckingAuth: false
-              });
-              return false;
+              console.warn('[AUTH INIT] Access token returned 401. Falling back to refresh token...');
             } else {
-              console.log('[AUTH READY] Server returned error, restoring local cached session. User ID:', parsedUser?.id);
+              console.log('[AUTH READY] Server returned non-401 error, preserving local session. User ID:', parsedUser?.id);
               set({
                 token,
                 user: parsedUser,
@@ -303,11 +293,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
         
         // Attempt background silent refresh
         if (refreshToken) {
-          console.log('[TOKEN REFRESH] Token expired or missing. Attempting silent refresh...');
+          console.log('[TOKEN REFRESH] Token expired or unauthorized. Attempting silent refresh...');
           try {
             const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
               body: JSON.stringify({ refreshToken })
             });
             
@@ -331,7 +322,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
                 
                 // Get user profile
                 const meRes = await fetch(`${BASE_URL}/api/v1/users/me`, {
-                  headers: { 'Authorization': `Bearer ${parsedToken}` }
+                  headers: { 'Authorization': `Bearer ${parsedToken}` },
+                  credentials: 'include'
                 });
                 
                 let updatedUser = parsedUser;
@@ -638,18 +630,31 @@ if (typeof window !== 'undefined') {
     const storedDemoMode = localStorage.getItem('orbit_demomode');
     const rememberMe = localStorage.getItem('orbit_remember_me') !== 'false';
     const storage = rememberMe ? localStorage : sessionStorage;
-    const token = storage.getItem('orbit_token');
-    const userStr = storage.getItem('orbit_user');
+    const getCookie = (name: string) => {
+      if (typeof window === 'undefined') return null;
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      try {
+        return match ? decodeURIComponent(match[2]) : null;
+      } catch (e) {
+        return match ? match[2] : null;
+      }
+    };
+
+    const token = storage.getItem('orbit_token') || localStorage.getItem('orbit_token') || getCookie('orbit_token') || getCookie('token');
+    const refreshToken = storage.getItem('orbit_refreshtoken') || localStorage.getItem('orbit_refreshtoken') || getCookie('orbit_refreshtoken');
+    const userStr = storage.getItem('orbit_user') || localStorage.getItem('orbit_user') || getCookie('orbit_user');
     const parsedUser = userStr ? JSON.parse(userStr) : null;
     
+    const hasExistingSession = !!(token || refreshToken || parsedUser);
+
     useAuthStore.setState({
       isDemoMode: storedDemoMode === null ? true : storedDemoMode === 'true',
       rememberMe,
       token: token || null,
       user: parsedUser,
-      isAuthenticated: token && !isJwtExpired(token) ? true : false,
-      initializationState: token && !isJwtExpired(token) ? 'AUTHENTICATED' : 'UNINITIALIZED',
-      isCheckingAuth: !!storage.getItem('orbit_refreshtoken')
+      isAuthenticated: token && !isJwtExpired(token) ? true : (hasExistingSession ? true : false),
+      initializationState: token && !isJwtExpired(token) ? 'AUTHENTICATED' : (hasExistingSession ? 'CHECKING_SESSION' : 'UNAUTHENTICATED'),
+      isCheckingAuth: hasExistingSession
     });
     console.log('[AUTH_STORE] Module-level synchronous hydration completed successfully.');
   } catch (e) {

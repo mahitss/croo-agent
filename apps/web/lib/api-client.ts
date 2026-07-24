@@ -59,6 +59,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
     const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ refreshToken })
     });
     
@@ -220,6 +221,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     response = await fetch(`${BASE_URL}${url}`, {
       ...options,
       headers,
+      credentials: 'include',
       signal: timeoutSignal,
     });
     console.log(`[API_CLIENT] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);

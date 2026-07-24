@@ -7,6 +7,39 @@ import { GatewayAuthGuard } from '../guards/auth.guard';
 export class AuthController {
   private readonly authUrl = process.env.AUTH_SERVICE_URL || 'http://127.0.0.1:5001/api/v1';
 
+  private setAuthCookies(response: any, data: any, rememberMe: boolean = true) {
+    if (!response || !data) return;
+    const token = data?.token || data?.accessToken || data?.data?.token || data?.data?.accessToken;
+    const refreshToken = data?.refreshToken || data?.data?.refreshToken;
+    const userId = data?.user?.id || data?.profile?.id || data?.data?.user?.id || data?.data?.id;
+    const maxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+    if (token && response.cookie) {
+      response.cookie('orbit_token', token, { maxAge, path: '/', sameSite: 'lax', httpOnly: false });
+      response.cookie('access_token', token, { maxAge, path: '/', sameSite: 'lax', httpOnly: false });
+      response.cookie('token', token, { maxAge, path: '/', sameSite: 'lax', httpOnly: false });
+    }
+
+    if (refreshToken && response.cookie) {
+      response.cookie('orbit_refreshtoken', refreshToken, { maxAge, path: '/', sameSite: 'lax', httpOnly: true });
+      response.cookie('refresh_token', refreshToken, { maxAge, path: '/', sameSite: 'lax', httpOnly: true });
+    }
+
+    if (userId && response.cookie) {
+      response.cookie('session_id', userId, { maxAge, path: '/', sameSite: 'lax', httpOnly: false });
+    }
+  }
+
+  private clearAuthCookies(response: any) {
+    if (!response || !response.clearCookie) return;
+    response.clearCookie('orbit_token', { path: '/' });
+    response.clearCookie('access_token', { path: '/' });
+    response.clearCookie('token', { path: '/' });
+    response.clearCookie('orbit_refreshtoken', { path: '/' });
+    response.clearCookie('refresh_token', { path: '/' });
+    response.clearCookie('session_id', { path: '/' });
+  }
+
   @Post('auth/register')
   async register(@Body() body: any, @Res({ passthrough: true }) response: any) {
     try {
@@ -17,6 +50,9 @@ export class AuthController {
       });
       const data = await res.json();
       response.status(res.status);
+      if (res.ok) {
+        this.setAuthCookies(response, data, body?.rememberMe !== false);
+      }
       return data;
     } catch (err: any) {
       response.status(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -34,6 +70,9 @@ export class AuthController {
       });
       const data = await res.json();
       response.status(res.status);
+      if (res.ok) {
+        this.setAuthCookies(response, data, body?.rememberMe !== false);
+      }
       return data;
     } catch (err: any) {
       response.status(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -60,6 +99,9 @@ export class AuthController {
       const data = await res.json();
       console.log(`[GATEWAY_AUTH_STEP 3] Response received from auth-service. Status: ${res.status}`);
       response.status(res.status);
+      if (res.ok) {
+        this.setAuthCookies(response, data, body?.rememberMe !== false);
+      }
       console.log('[GATEWAY_AUTH_STEP 4] Gateway returning response payload to frontend client');
       return data;
     } catch (err: any) {
@@ -76,28 +118,38 @@ export class AuthController {
 
   @Post('auth/wallet')
   @HttpCode(HttpStatus.OK)
-  async walletLogin(@Body() body: any) {
+  async walletLogin(@Body() body: any, @Res({ passthrough: true }) response: any) {
     try {
       const res = await fetch(`${this.authUrl}/auth/wallet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      response.status(res.status);
+      if (res.ok) {
+        this.setAuthCookies(response, data, body?.rememberMe !== false);
+      }
+      return data;
     } catch (err: any) {
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
   }
 
   @Post('auth/refresh')
-  async refresh(@Body('refreshToken') refreshToken: string) {
+  async refresh(@Body('refreshToken') refreshToken: string, @Res({ passthrough: true }) response: any) {
     try {
       const res = await fetch(`${this.authUrl}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       });
-      return await res.json();
+      const data = await res.json();
+      response.status(res.status);
+      if (res.ok) {
+        this.setAuthCookies(response, data, true);
+      }
+      return data;
     } catch (err: any) {
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
@@ -105,7 +157,7 @@ export class AuthController {
 
   @Post('auth/logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: any) {
+  async logout(@Req() req: any, @Res({ passthrough: true }) response: any) {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (req.headers.authorization) {
@@ -115,8 +167,11 @@ export class AuthController {
         method: 'POST',
         headers,
       });
-      return await res.json();
+      const data = await res.json();
+      this.clearAuthCookies(response);
+      return data;
     } catch (err: any) {
+      this.clearAuthCookies(response);
       return { success: false, message: `Auth service unreachable: ${err.message}` };
     }
   }

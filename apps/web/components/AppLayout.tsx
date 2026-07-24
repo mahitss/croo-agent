@@ -32,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const isCheckingAuth = useAuthStore((state) => state.isCheckingAuth);
+  const initializationState = useAuthStore((state) => state.initializationState);
   
   useEffect(() => {
     setMounted(true);
@@ -56,12 +57,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Secure client-side redirect guard
   useEffect(() => {
-    if (mounted && !isCheckingAuth && !isAuthenticated && !isPublicRoute) {
+    if (!mounted) return;
+    // Guard against premature redirect while auth is still restoring/verifying session
+    if (isCheckingAuth || initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') {
+      return;
+    }
+    if (!isAuthenticated && !isPublicRoute) {
       console.warn(`[ROUTE_GUARD] Redirecting unauthenticated user from ${pathname} to portal`);
       const currentPath = window.location.pathname + window.location.search;
       window.location.href = `/?auth=login&redirect=${encodeURIComponent(currentPath)}`;
     }
-  }, [mounted, isCheckingAuth, isAuthenticated, isPublicRoute, pathname]);
+  }, [mounted, isCheckingAuth, initializationState, isAuthenticated, isPublicRoute, pathname]);
 
   // Immediate render for public routes to enable full SSR and prevent hydration mismatches
   if (isPublicRoute) {
