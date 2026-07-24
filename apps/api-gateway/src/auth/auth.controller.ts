@@ -87,25 +87,28 @@ export class AuthController {
 
   @Post('auth/google')
   async googleLogin(@Body() body: any, @Res({ passthrough: true }) response: any) {
-    console.log('[GATEWAY_AUTH_STEP 1] Request received at API Gateway: POST /api/v1/auth/google');
-    console.log('[GATEWAY_AUTH_STEP 2] Forwarding request to auth-service at:', `${this.authUrl}/auth/google`);
+    const startTime = Date.now();
+    console.log(`[GATEWAY_AUTH_STEP 1] [${new Date().toISOString()}] Request received at API Gateway: POST /api/v1/auth/google`);
+    console.log(`[GATEWAY_AUTH_STEP 2] [${new Date().toISOString()}] Forwarding request to auth-service at: ${this.authUrl}/auth/google`);
     try {
       const res = await fetch(`${this.authUrl}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(120000), // Extended to 120s for Render cold starts & DB operations
       });
       const data = await res.json();
-      console.log(`[GATEWAY_AUTH_STEP 3] Response received from auth-service. Status: ${res.status}`);
+      const duration = Date.now() - startTime;
+      console.log(`[GATEWAY_AUTH_STEP 3] [${new Date().toISOString()}] Response received from auth-service. Status: ${res.status} (Duration: ${duration}ms)`);
       response.status(res.status);
       if (res.ok) {
         this.setAuthCookies(response, data, body?.rememberMe !== false);
       }
-      console.log('[GATEWAY_AUTH_STEP 4] Gateway returning response payload to frontend client');
+      console.log(`[GATEWAY_AUTH_STEP 4] [${new Date().toISOString()}] Gateway returning response payload to frontend client (Total Duration: ${duration}ms)`);
       return data;
     } catch (err: any) {
-      console.error('[GATEWAY_AUTH_ERROR] Google auth forwarding failed:', err.message);
+      const duration = Date.now() - startTime;
+      console.error(`[GATEWAY_AUTH_ERROR] [${new Date().toISOString()}] Google auth forwarding failed after ${duration}ms:`, err.message);
       response.status(HttpStatus.INTERNAL_SERVER_ERROR);
       return { success: false, message: `Auth service unreachable or timed out: ${err.message}` };
     }

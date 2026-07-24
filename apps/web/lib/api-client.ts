@@ -213,20 +213,27 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  console.log(`[API_CLIENT] fetchWithAuth start: ${BASE_URL}${url} (Method: ${options.method || 'GET'})`);
+  const isAuthRoute = url.startsWith('/api/v1/auth/');
+  const startTime = Date.now();
+  const isoTime = new Date().toISOString();
+  console.log(`[API_CLIENT] [${isoTime}] fetchWithAuth start: ${BASE_URL}${url} (Method: ${options.method || 'GET'})`);
   let response: Response;
   try {
-    const timeoutSignal = (options as any).signal || AbortSignal.timeout(15000);
-    console.log(`[API_CLIENT] Sending network request: ${BASE_URL}${url}`);
+    // 120s for auth routes (accommodates Render cold starts & DB queries), 60s for standard API routes
+    const defaultTimeoutMs = isAuthRoute ? 120000 : 60000;
+    const timeoutSignal = (options as any).signal || AbortSignal.timeout(defaultTimeoutMs);
+    console.log(`[API_CLIENT] [${new Date().toISOString()}] Sending network request to ${BASE_URL}${url} (Timeout: ${defaultTimeoutMs}ms)...`);
     response = await fetch(`${BASE_URL}${url}`, {
       ...options,
       headers,
       credentials: 'include',
       signal: timeoutSignal,
     });
-    console.log(`[API_CLIENT] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
+    const duration = Date.now() - startTime;
+    console.log(`[API_CLIENT] [${new Date().toISOString()}] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status} (Duration: ${duration}ms)`);
   } catch (fetchErr: any) {
-    console.error(`[API_CLIENT_ERROR] fetchWithAuth request to ${BASE_URL}${url} failed/timed out:`, fetchErr.message);
+    const duration = Date.now() - startTime;
+    console.error(`[API_CLIENT_ERROR] [${new Date().toISOString()}] fetchWithAuth request to ${BASE_URL}${url} failed/timed out after ${duration}ms:`, fetchErr.message);
     throw fetchErr;
   }
 

@@ -76,14 +76,17 @@ export default function AuthModal() {
           // Dynamically map or update the window callback to use the latest React closure state
           (window as any).handleGoogleCredentialResponse = async (response: any) => {
             if (response && response.credential) {
-              console.log('[FRONTEND_GOOGLE_STAGE 1] Google Account picker closed. Credential received.');
+              const startTime = Date.now();
+              console.log(`[FRONTEND_GOOGLE_STAGE 1] [${new Date().toISOString()}] Google Account picker closed. Credential received.`);
               setIsLoading(true);
               try {
-                console.log('[FRONTEND_GOOGLE_STAGE 2] Invoking loginWithGoogle store method...');
+                console.log(`[FRONTEND_GOOGLE_STAGE 2] [${new Date().toISOString()}] Invoking loginWithGoogle store method (Request started)...`);
+                console.log(`[FRONTEND_GOOGLE_STAGE 3] [${new Date().toISOString()}] Headers sent. Waiting for response...`);
                 const ok = await loginWithGoogle(response.credential);
-                console.log('[FRONTEND_GOOGLE_STAGE 3] Promise resolved to:', ok);
+                const duration = Date.now() - startTime;
+                console.log(`[FRONTEND_GOOGLE_STAGE 4] [${new Date().toISOString()}] Response received and parsed in ${duration}ms. Promise resolved to:`, ok);
                 if (ok) {
-                  console.log('[FRONTEND_GOOGLE_STAGE 4] Google sign-in successful. Updating state & navigating.');
+                  console.log(`[FRONTEND_GOOGLE_STAGE 5] [${new Date().toISOString()}] User stored in state & storage. Navigating...`);
                   toast('Successfully signed in with Google!', 'success');
                   setAuthModal(false);
                   if (typeof window !== 'undefined') {
@@ -93,11 +96,12 @@ export default function AuthModal() {
                   }
                 }
               } catch (err: any) {
-                console.error('[FRONTEND_GOOGLE_ERROR] Google sign-in rejected:', err.message);
+                const duration = Date.now() - startTime;
+                console.error(`[FRONTEND_GOOGLE_ERROR] [${new Date().toISOString()}] Google sign-in rejected after ${duration}ms:`, err.message);
                 toast(`Google login failed: ${err.message}`, 'error');
               } finally {
                 setIsLoading(false);
-                console.log('[FRONTEND_GOOGLE_STAGE 5] Loading state cleared.');
+                console.log(`[FRONTEND_GOOGLE_STAGE 6] [${new Date().toISOString()}] Loading state cleared.`);
               }
             }
           };
