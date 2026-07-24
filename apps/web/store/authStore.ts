@@ -562,10 +562,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
 
     loginWithGoogle: async (idToken) => {
-      console.log('[AUTH_STORE] loginWithGoogle initiated');
+      console.log('[FRONTEND_AUTH_STAGE 1] loginWithGoogle initiated in authStore');
       try {
         const rememberMe = get().rememberMe;
+        console.log('[FRONTEND_AUTH_STAGE 2] Dispatching POST /api/v1/auth/google via apiClient');
         const res = await apiClient.post<any>('/api/v1/auth/google', { credential: idToken, idToken, rememberMe });
+        console.log('[FRONTEND_AUTH_STAGE 3] Response payload received by authStore:', res);
         
         const success = res.success !== undefined ? res.success : true;
         const data = res.data !== undefined ? res.data : res;
@@ -579,7 +581,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const storage = rememberMe ? localStorage : sessionStorage;
           localStorage.setItem('orbit_remember_me', String(rememberMe));
           
-          console.log('[AUTH_STORE] Google login success: updating state');
+          console.log('[FRONTEND_AUTH_STAGE 4] Updating Zustand authStore state and local storage');
           set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
           
           storage.setItem('orbit_token', token);
@@ -605,9 +607,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
           get().scheduleAutoRefresh();
           return true;
         }
-        throw new Error('Google login failed: Invalid response structure');
+        throw new Error(res?.message || 'Google login failed: Invalid response structure');
       } catch (err) {
-        console.error('[AUTH_STORE] Google login error:', err);
+        console.error('[FRONTEND_AUTH_ERROR] Google login failed in authStore:', err);
         throw err;
       }
     },

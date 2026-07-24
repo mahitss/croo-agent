@@ -270,12 +270,13 @@ export class AuthService {
   }
 
   async googleLogin(idToken: string, rememberMe: boolean = false) {
-    console.log("[GOOGLE_LOGIN_STEP] 1 - Initiated googleLogin service call");
-    console.log("[GOOGLE_LOGIN_STEP] 1.1 - Parameters:", { idTokenLength: idToken?.length, rememberMe });
-    console.log("[GOOGLE_LOGIN_STEP] 1.2 - Env variables check:", {
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-      JWT_SECRET_EXISTS: !!process.env.JWT_SECRET,
-      NODE_ENV: process.env.NODE_ENV
+    console.log("AUTH STEP 3 - Google token received. Token length:", idToken?.length);
+    console.log("[GOOGLE_OAUTH_DIAGNOSTICS]", {
+      hasToken: !!idToken,
+      tokenPrefix: idToken?.substring(0, 15),
+      rememberMe,
+      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasJwtSecret: !!process.env.JWT_SECRET
     });
 
     if (!idToken) {
@@ -289,39 +290,35 @@ export class AuthService {
       let name = 'Google User';
       let picture = '';
 
+      console.log("AUTH STEP 4 - Verifying Google token");
       if (idToken.startsWith('mock-google-token-')) {
-        console.log("[GOOGLE_LOGIN_STEP] 2 - Parsing mock Google token...");
+        console.log("[GOOGLE_LOGIN_DEBUG] Parsing mock Google token payload...");
         const payloadStr = Buffer.from(idToken.replace('mock-google-token-', ''), 'base64').toString('utf8');
         const parsed = JSON.parse(payloadStr);
         googleId = parsed.sub || googleId;
         email = parsed.email || email;
         name = parsed.name || name;
         picture = parsed.picture || picture;
-        console.log("[GOOGLE_LOGIN_STEP] 2.1 - Mock payload parsed successfully:", { googleId, email, name });
+        console.log("AUTH STEP 5 - Google verification finished (mock payload parsed successfully)");
       } else {
-        console.log("[GOOGLE_LOGIN_STEP] 3 - Verifying Google ID Token using googleClient...");
         const targetAudience = process.env.GOOGLE_CLIENT_ID || '365360191111-idl7frf1q7mch73j661jtgr56i8h74pk.apps.googleusercontent.com';
-        console.log("[GOOGLE_LOGIN_STEP] 3.1 - Target Audience:", targetAudience);
-        
+        let timerId: NodeJS.Timeout | null = null;
         try {
-          const timeoutMs = 6000;
+          const timeoutMs = 4000;
           const verifyPromise = this.googleClient.verifyIdToken({
             idToken,
             audience: targetAudience,
           });
           
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Google certificate verification timed out')), timeoutMs)
-          );
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timerId = setTimeout(() => reject(new Error('Google certificate verification timed out')), timeoutMs);
+          });
 
           const ticket = await Promise.race([verifyPromise, timeoutPromise]);
-          console.log("[GOOGLE_LOGIN_STEP] 4 - Google Token verified successfully by googleClient");
-          
+          if (timerId) clearTimeout(timerId);
+
           const payload = ticket.getPayload();
-          console.log("[GOOGLE_LOGIN_STEP] 5 - Extracted token payload:", JSON.stringify(payload));
-          
           if (!payload) {
-            console.error("[GOOGLE_LOGIN_ERROR] Empty token payload returned by Google");
             throw new BadRequestException('Invalid Google token payload');
           }
           
@@ -329,8 +326,10 @@ export class AuthService {
           email = payload.email || '';
           name = payload.name || '';
           picture = payload.picture || '';
+          console.log("AUTH STEP 5 - Google verification finished (googleClient verified token)");
         } catch (verifyErr: any) {
-          console.warn(`[GOOGLE_LOGIN_WARNING] googleClient.verifyIdToken failed or timed out (${verifyErr.message}). Attempting JWT payload extraction fallback...`);
+          if (timerId) clearTimeout(timerId);
+          console.warn(`[GOOGLE_LOGIN_WARNING] googleClient.verifyIdToken failed or timed out (${verifyErr.message}). Attempting fast JWT payload extraction fallback...`);
           try {
             const parts = idToken.split('.');
             if (parts.length === 3) {
@@ -340,11 +339,11 @@ export class AuthService {
               const rawPayload = Buffer.from(base64, 'base64').toString('utf8');
               const decoded = JSON.parse(rawPayload);
               if (decoded && (decoded.email || decoded.sub)) {
-                console.log("[GOOGLE_LOGIN_STEP] 4.1 - Fallback JWT payload decoded successfully:", { sub: decoded.sub, email: decoded.email });
                 googleId = decoded.sub || googleId;
                 email = decoded.email || email;
                 name = decoded.name || name;
                 picture = decoded.picture || picture;
+                console.log("AUTH STEP 5 - Google verification finished (fallback JWT payload decoded successfully)");
               } else {
                 throw new Error('JWT payload missing required sub or email fields');
               }
@@ -363,11 +362,12 @@ export class AuthService {
         throw new BadRequestException('Email not provided in Google profile');
       }
 
-      console.log("[GOOGLE_LOGIN_STEP] 6 - Querying repository for existing user with email:", email);
+      console.log("AUTH STEP 6 - Database lookup started for email:", email);
       let user = await this.userRepository.findByEmail(email);
+      console.log("AUTH STEP 7 - Database lookup finished");
 
       if (!user) {
-        console.log("[GOOGLE_LOGIN_STEP] 7 - User not found in database. Starting auto-registration...");
+        console.log("[GOOGLE_LOGIN_DEBUG] User not found in DB. Auto-registering user...");
         const baseUsername = email.split('@')[0];
         let username = baseUsername;
         let counter = 1;
@@ -375,12 +375,10 @@ export class AuthService {
           username = `${baseUsername}${counter}`;
           counter++;
         }
-        console.log("[GOOGLE_LOGIN_STEP] 7.1 - Autogenerated username:", username);
 
         const randomPassword = crypto.randomBytes(32).toString('hex');
         const passwordHash = this.cryptoService.hashPassword(randomPassword);
 
-        console.log("[GOOGLE_LOGIN_STEP] 7.2 - Creating user in database...");
         user = await this.userRepository.createUser({
           email,
           username,
@@ -389,9 +387,8 @@ export class AuthService {
           avatarUrl: picture,
           role: 'user' as any,
         });
-        console.log("[GOOGLE_LOGIN_STEP] 7.3 - User created successfully. ID:", user.id);
+        console.log("AUTH STEP 8 - User created. ID:", user.id);
 
-        console.log("[GOOGLE_LOGIN_STEP] 8 - Pre-creating wallet and balance via raw SQL queries...");
         try {
           const walletId = crypto.randomUUID();
           const randomHex = crypto.randomBytes(4).toString('hex');
@@ -406,30 +403,11 @@ export class AuthService {
             `INSERT INTO "wallet"."balances" ("wallet_id", "available", "reserved", "pending", "updated_at") VALUES ($1, $2, $3, $4, NOW())`,
             walletId, 0.0000, 0.0000, 0.0000
           );
-          console.log(`[GOOGLE_LOGIN_STEP] 8.1 - Wallet address pre-created: ${walletAddress}`);
-        } catch (dbErr) {
-          console.error('[GOOGLE_LOGIN_ERROR] Failed to pre-create Google user wallet via raw SQL:', dbErr);
+        } catch (dbErr: any) {
+          console.warn('[GOOGLE_LOGIN_WARNING] Pre-creating Google user wallet via raw SQL skipped or failed:', dbErr.message);
         }
 
-        console.log("[GOOGLE_LOGIN_STEP] 9 - Creating oauthAccount record for Google identifier...");
-        await this.prisma.oauthAccount.create({
-          data: {
-            userId: user.id,
-            provider: 'google',
-            providerUserId: googleId,
-          }
-        });
-        console.log("[GOOGLE_LOGIN_STEP] 9.1 - oauthAccount created successfully");
-      } else {
-        console.log("[GOOGLE_LOGIN_STEP] 10 - Existing user found in database. Checking oauthAccount link...");
-        const existingOauth = await this.prisma.oauthAccount.findFirst({
-          where: {
-            provider: 'google',
-            providerUserId: googleId,
-          }
-        });
-        if (!existingOauth) {
-          console.log("[GOOGLE_LOGIN_STEP] 10.1 - oauthAccount link missing. Creating link for user ID:", user.id);
+        try {
           await this.prisma.oauthAccount.create({
             data: {
               userId: user.id,
@@ -437,38 +415,60 @@ export class AuthService {
               providerUserId: googleId,
             }
           });
-          console.log("[GOOGLE_LOGIN_STEP] 10.2 - Link created successfully");
-        } else {
-          console.log("[GOOGLE_LOGIN_STEP] 10.3 - Link verification succeeded");
+        } catch (oauthErr: any) {
+          console.warn('[GOOGLE_LOGIN_WARNING] Creating oauthAccount record skipped or failed:', oauthErr.message);
+        }
+      } else {
+        console.log("AUTH STEP 8 - Existing user found. ID:", user.id);
+        try {
+          const existingOauth = await this.prisma.oauthAccount.findFirst({
+            where: {
+              provider: 'google',
+              providerUserId: googleId,
+            }
+          });
+          if (!existingOauth) {
+            await this.prisma.oauthAccount.create({
+              data: {
+                userId: user.id,
+                provider: 'google',
+                providerUserId: googleId,
+              }
+            });
+          }
+        } catch (oauthErr: any) {
+          console.warn('[GOOGLE_LOGIN_WARNING] Checking oauthAccount link skipped or failed:', oauthErr.message);
         }
       }
 
-      console.log("[GOOGLE_LOGIN_STEP] 11 - Generating authentication JWT for user...");
+      console.log("AUTH STEP 9 - Session creation started");
       const token = this.cryptoService.signJwt({ sub: user.id, email: user.email, role: user.role });
-      console.log("[GOOGLE_LOGIN_STEP] 11.1 - JWT signed. Token length:", token?.length);
+      console.log("AUTH STEP 11 - JWT created. Token length:", token?.length);
       
       const refreshToken = crypto.randomBytes(40).toString('hex');
       const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
-      console.log("[GOOGLE_LOGIN_STEP] 12 - Creating active session in session repository...");
       await this.userRepository.createSession({
         userId: user.id,
         refreshTokenHash,
         expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
       });
-      console.log("[GOOGLE_LOGIN_STEP] 12.1 - Session record inserted successfully");
+      console.log("AUTH STEP 10 - Session stored in database");
 
-      console.log("[GOOGLE_LOGIN_STEP] 13 - Recording login action in audit log repository...");
-      await this.userRepository.writeAuditLog({
-        actorId: user.id,
-        action: 'USER_GOOGLE_LOGIN',
-        resourceType: 'user',
-        resourceId: user.id,
-      });
-      console.log("[GOOGLE_LOGIN_STEP] 13.1 - Audit log inserted successfully");
+      console.log("AUTH STEP 12 - Cookie attached / Auth payload formatted");
+      try {
+        await this.userRepository.writeAuditLog({
+          actorId: user.id,
+          action: 'USER_GOOGLE_LOGIN',
+          resourceType: 'user',
+          resourceId: user.id,
+        });
+      } catch (auditErr: any) {
+        console.warn('[GOOGLE_LOGIN_WARNING] Audit log creation failed:', auditErr.message);
+      }
 
-      console.log("[GOOGLE_LOGIN_STEP] 14 - Returning authenticated response payload");
-      return {
+      console.log("AUTH STEP 13 - Response serialized");
+      const responsePayload = {
         success: true,
         data: {
           accessToken: token,
@@ -483,6 +483,9 @@ export class AuthService {
           }
         }
       };
+
+      console.log("AUTH STEP 14 - Response sent to caller");
+      return responsePayload;
     } catch (err: any) {
       console.error('[GOOGLE_OAUTH_ERROR] Google auth flow failed with error:', err.message, err.stack);
       throw new UnauthorizedException(`Google authentication failed: ${err.message}`);

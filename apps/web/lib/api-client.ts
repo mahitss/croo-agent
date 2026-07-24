@@ -167,8 +167,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   const storage = isServer ? null : (rememberMe ? localStorage : sessionStorage);
   let token = storage ? storage.getItem('orbit_token') : null;
 
-  // Enforce queue during ongoing refresh
-  if (token && isJwtExpired(token) && !isServer && storage) {
+  // Enforce queue during ongoing refresh (skip for auth routes)
+  if (token && isJwtExpired(token) && !isServer && storage && !url.startsWith('/api/v1/auth/')) {
     const refreshToken = storage.getItem('orbit_refreshtoken');
     if (refreshToken) {
       if (!isRefreshing) {
@@ -208,20 +208,21 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     'x-execution-mode': isDemo ? 'DEMO' : 'LIVE'
   } as Record<string, string>;
 
-  if (token) {
+  if (token && !url.startsWith('/api/v1/auth/google')) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  console.log(`[STEP 2 - API request created] fetchWithAuth start: ${BASE_URL}${url}`);
+  console.log(`[API_CLIENT] fetchWithAuth start: ${BASE_URL}${url} (Method: ${options.method || 'GET'})`);
   let response: Response;
   try {
     const timeoutSignal = (options as any).signal || AbortSignal.timeout(15000);
+    console.log(`[API_CLIENT] Sending network request: ${BASE_URL}${url}`);
     response = await fetch(`${BASE_URL}${url}`, {
       ...options,
       headers,
       signal: timeoutSignal,
     });
-    console.log(`[STEP 10 - Response returned to frontend] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
+    console.log(`[API_CLIENT] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status}`);
   } catch (fetchErr: any) {
     console.error(`[API_CLIENT_ERROR] fetchWithAuth request to ${BASE_URL}${url} failed/timed out:`, fetchErr.message);
     throw fetchErr;

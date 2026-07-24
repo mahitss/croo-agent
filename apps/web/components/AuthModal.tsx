@@ -76,15 +76,14 @@ export default function AuthModal() {
           // Dynamically map or update the window callback to use the latest React closure state
           (window as any).handleGoogleCredentialResponse = async (response: any) => {
             if (response && response.credential) {
-              console.log('[STEP 1 - Button clicked / Token received] Google credential popup completed');
+              console.log('[FRONTEND_GOOGLE_STAGE 1] Google Account picker closed. Credential received.');
               setIsLoading(true);
               try {
-                console.log('[GOOGLE_AUTH_DEBUG] Sending ID Token to backend...');
+                console.log('[FRONTEND_GOOGLE_STAGE 2] Invoking loginWithGoogle store method...');
                 const ok = await loginWithGoogle(response.credential);
-                console.log("After request");
-                console.log("Response resolved to:", ok);
+                console.log('[FRONTEND_GOOGLE_STAGE 3] Promise resolved to:', ok);
                 if (ok) {
-                  console.log('[GOOGLE_AUTH_DEBUG] Google login success. Routing...');
+                  console.log('[FRONTEND_GOOGLE_STAGE 4] Google sign-in successful. Updating state & navigating.');
                   toast('Successfully signed in with Google!', 'success');
                   setAuthModal(false);
                   if (typeof window !== 'undefined') {
@@ -94,9 +93,11 @@ export default function AuthModal() {
                   }
                 }
               } catch (err: any) {
+                console.error('[FRONTEND_GOOGLE_ERROR] Google sign-in rejected:', err.message);
                 toast(`Google login failed: ${err.message}`, 'error');
               } finally {
                 setIsLoading(false);
+                console.log('[FRONTEND_GOOGLE_STAGE 5] Loading state cleared.');
               }
             }
           };

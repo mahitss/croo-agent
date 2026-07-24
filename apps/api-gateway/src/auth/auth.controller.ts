@@ -48,20 +48,22 @@ export class AuthController {
 
   @Post('auth/google')
   async googleLogin(@Body() body: any, @Res({ passthrough: true }) response: any) {
-    console.log('[STEP 3 - Request reached API Gateway] Forwarding POST /auth/google to auth-service...');
+    console.log('[GATEWAY_AUTH_STEP 1] Request received at API Gateway: POST /api/v1/auth/google');
+    console.log('[GATEWAY_AUTH_STEP 2] Forwarding request to auth-service at:', `${this.authUrl}/auth/google`);
     try {
       const res = await fetch(`${this.authUrl}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(12000),
       });
       const data = await res.json();
-      console.log('[STEP 9 - Response received from auth-service] Status:', res.status);
+      console.log(`[GATEWAY_AUTH_STEP 3] Response received from auth-service. Status: ${res.status}`);
       response.status(res.status);
+      console.log('[GATEWAY_AUTH_STEP 4] Gateway returning response payload to frontend client');
       return data;
     } catch (err: any) {
-      console.error('[API_GATEWAY_ERROR] Google auth forwarding failed:', err.message);
+      console.error('[GATEWAY_AUTH_ERROR] Google auth forwarding failed:', err.message);
       response.status(HttpStatus.INTERNAL_SERVER_ERROR);
       return { success: false, message: `Auth service unreachable or timed out: ${err.message}` };
     }

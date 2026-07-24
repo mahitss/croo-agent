@@ -122,8 +122,9 @@ export class AuthController {
   @Post('auth/google')
   @HttpCode(HttpStatus.OK)
   async googleLogin(@Body() dto: GoogleLoginDto) {
+    console.log('AUTH STEP 1 - Request received at auth-service googleLogin controller');
+    console.log('AUTH STEP 2 - Request body parsed:', JSON.stringify({ hasCredential: !!dto.credential, hasIdToken: !!dto.idToken, rememberMe: dto.rememberMe }));
     const token = dto.idToken || dto.credential;
-    console.log('[GOOGLE_OAUTH_BACKEND] Received google login request body:', JSON.stringify(dto));
     try {
       return await this.authService.googleLogin(token, dto.rememberMe);
     } catch (error: any) {
