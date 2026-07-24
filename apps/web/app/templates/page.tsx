@@ -9,17 +9,17 @@ export default function TemplatesPage() {
   const { toast } = useToast();
 
   const templates = [
-    { name: 'Sales Swarms', icon: ArrowRight, desc: 'Automate high-converting cold outreach sequences, client follow-ups, and lead score classification.' },
-    { name: 'Research Consensuses', icon: BookOpen, desc: 'Query multiple search models, perform automatic cross-verification, and compile structured PDF briefs.' },
-    { name: 'Finance Audits', icon: Layers, desc: 'Aggregate financial statements, compute portfolio analytics metrics, and generate expense report summaries.' },
-    { name: 'Marketing Scribes', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms, blog templates, and social posts optimized for conversion.' },
-    { name: 'Legal Term Examiners', icon: Shield, desc: 'Ingest contract PDFs, extract critical risk markers, and cross-examine liability terms against rules.' },
-    { name: 'Healthcare Data Convergers', icon: Cpu, desc: 'Scan clinical trial logs, optimize staff schedules, and safely map medical records to standard schemas.' }
+    { name: 'Sales Swarms', route: '/marketing', icon: ArrowRight, desc: 'Automate high-converting cold outreach sequences, client follow-ups, and lead score classification.' },
+    { name: 'Research Consensuses', route: '/research', icon: BookOpen, desc: 'Query multiple search models, perform automatic cross-verification, and compile structured PDF briefs.' },
+    { name: 'Finance Audits', route: '/finance', icon: Layers, desc: 'Aggregate financial statements, compute portfolio analytics metrics, and generate expense report summaries.' },
+    { name: 'Marketing Scribes', route: '/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms, blog templates, and social posts optimized for conversion.' },
+    { name: 'Legal Term Examiners', route: '/legal', icon: Shield, desc: 'Ingest contract PDFs, extract critical risk markers, and cross-examine liability terms against rules.' },
+    { name: 'Healthcare Data Convergers', route: '/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize staff schedules, and safely map medical records to standard schemas.' }
   ];
 
-  const handleLaunchTemplate = (name: string) => {
-    toast(`Loading template: "${name}" into canvas...`, 'success');
-    router.push('/workflow');
+  const handleLaunchTemplate = (name: string, route: string) => {
+    toast(`Navigating to ${name} portal...`, 'info');
+    router.push(route);
   };
 
   return (
@@ -39,7 +39,7 @@ export default function TemplatesPage() {
           return (
             <div 
               key={tmpl.name}
-              onClick={() => handleLaunchTemplate(tmpl.name)}
+              onClick={() => handleLaunchTemplate(tmpl.name, tmpl.route)}
               className="bg-[#111111] border border-[#232323] hover:border-white/10 p-6 rounded-2xl flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-300 group"
             >
               <div className="p-3 rounded-xl bg-white/5 text-[#4EA3FF] shrink-0 group-hover:scale-105 transition-transform duration-300">

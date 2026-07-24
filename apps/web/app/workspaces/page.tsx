@@ -33,12 +33,12 @@ export default function WorkspacesPage() {
   );
 
   const templates = [
-    { name: 'Sales', icon: ArrowRight, desc: 'Automate outreach swarms, lead lists, and follow-ups.' },
-    { name: 'Research', icon: BookOpen, desc: 'Aggregate compliance briefs, competitor analysis, and sources.' },
-    { name: 'Finance', icon: Layers, desc: 'Analyze portfolio performance, expense audits, and tax briefs.' },
-    { name: 'Marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms and social posts.' },
-    { name: 'Legal', icon: Shield, desc: 'Parse contract terms, extract compliance risks, and verify briefs.' },
-    { name: 'Healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize schedules, and map records.' }
+    { name: 'Sales', route: '/marketing', icon: ArrowRight, desc: 'Automate outreach swarms, lead lists, and follow-ups.' },
+    { name: 'Research', route: '/research', icon: BookOpen, desc: 'Aggregate compliance briefs, competitor analysis, and sources.' },
+    { name: 'Finance', route: '/finance', icon: Layers, desc: 'Analyze portfolio performance, expense audits, and tax briefs.' },
+    { name: 'Marketing', route: '/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms and social posts.' },
+    { name: 'Legal', route: '/legal', icon: Shield, desc: 'Parse contract terms, extract compliance risks, and verify briefs.' },
+    { name: 'Healthcare', route: '/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize schedules, and map records.' }
   ];
 
   const handleCreateWorkflow = () => {
@@ -138,7 +138,7 @@ export default function WorkspacesPage() {
             return (
               <div 
                 key={tmpl.name}
-                onClick={handleCreateWorkflow}
+                onClick={() => router.push(tmpl.route)}
                 className="bg-[#111111] border border-[#232323] hover:border-white/10 p-5 rounded-2xl flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-300"
               >
                 <div className="p-2.5 rounded-xl bg-white/5 text-[#4EA3FF] shrink-0">
