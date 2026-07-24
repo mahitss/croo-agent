@@ -33,17 +33,17 @@ export default function WorkspacesPage() {
   );
 
   const templates = [
-    { name: 'Sales', route: '/marketing', icon: ArrowRight, desc: 'Automate outreach swarms, lead lists, and follow-ups.' },
-    { name: 'Research', route: '/research', icon: BookOpen, desc: 'Aggregate compliance briefs, competitor analysis, and sources.' },
-    { name: 'Finance', route: '/finance', icon: Layers, desc: 'Analyze portfolio performance, expense audits, and tax briefs.' },
-    { name: 'Marketing', route: '/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms and social posts.' },
-    { name: 'Legal', route: '/legal', icon: Shield, desc: 'Parse contract terms, extract compliance risks, and verify briefs.' },
-    { name: 'Healthcare', route: '/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize schedules, and map records.' }
+    { name: 'Sales', route: '/templates/sales', icon: ArrowRight, desc: 'Automate outreach swarms, lead lists, and follow-ups.' },
+    { name: 'Research', route: '/templates/research', icon: BookOpen, desc: 'Aggregate compliance briefs, competitor analysis, and sources.' },
+    { name: 'Finance', route: '/templates/finance', icon: Layers, desc: 'Analyze portfolio performance, expense audits, and tax briefs.' },
+    { name: 'Marketing', route: '/templates/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms and social posts.' },
+    { name: 'Legal', route: '/templates/legal', icon: Shield, desc: 'Parse contract terms, extract compliance risks, and verify briefs.' },
+    { name: 'Healthcare', route: '/templates/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize schedules, and map records.' }
   ];
 
   const handleCreateWorkflow = () => {
     toast('Initializing new workflow builder canvas...', 'success');
-    router.push('/workflow');
+    router.push('/workspace/new');
   };
 
   return (

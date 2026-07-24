@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/workflow')}
+            onClick={() => router.push('/workspace/new')}
             className="flex items-center justify-center gap-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-0 shadow-lg"
           >
             <Plus className="w-4 h-4" />
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                   {wf.status}
                 </span>
                 <Link 
-                  href={`/workflow?workflowId=${wf.id}`}
+                  href={`/workspace/${wf.id}`}
                   className="flex items-center gap-1.5 text-xs text-[#4EA3FF] hover:underline no-underline"
                 >
                   <span>Launch</span>

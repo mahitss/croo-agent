@@ -20,7 +20,66 @@ export class DemoWorkflowRepository implements WorkflowRepository {
     if (active && active.id === id) return active;
     const stored = this.getStored<Workflow | null>('orbit-demo-workflow', null);
     if (stored && stored.id === id) return stored;
-    return null;
+
+    const presets: Record<string, Workflow> = {
+      'research-agent': {
+        id: 'research-agent',
+        name: 'Research Consensus Agent Swarm',
+        query: 'Conduct web research consensus audit & compile PDF executive brief',
+        budget: 1.50,
+        routingMode: 'balanced',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Web Search Engine', task: 'Web Search', description: 'Aggregates search queries across Google and Perplexity.', capability: 'search', costEstimate: 0.20, timeEstimate: 400, trustScore: 98, status: 'completed', assignedAgentId: 'agent-search-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Claim Verifier', task: 'Fact Verification', description: 'Cross-checks claim citations against primary sources.', capability: 'analysis', costEstimate: 0.35, timeEstimate: 600, trustScore: 96, status: 'completed', assignedAgentId: 'agent-qa-1', positionX: 320, positionY: 200 },
+          { id: 'n3', name: 'PDF Brief Compiler', task: 'Document Synthesis', description: 'Generates formatted PDF executive summary brief.', capability: 'document', costEstimate: 0.40, timeEstimate: 500, trustScore: 99, status: 'completed', assignedAgentId: 'agent-writer-1', positionX: 540, positionY: 200 }
+        ],
+        edges: [
+          { id: 'e1', source: 'n1', target: 'n2' },
+          { id: 'e2', source: 'n2', target: 'n3' }
+        ]
+      },
+      'sales-outreach': {
+        id: 'sales-outreach',
+        name: 'Sales Lead Outreach Swarm',
+        query: 'Scrape lead contacts, calculate lead fit score, and generate cold email sequences',
+        budget: 2.00,
+        routingMode: 'fastest',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Company Profile Scraper', task: 'Lead Extraction', description: 'Extracts decision maker LinkedIn & domain contacts.', capability: 'scraping', costEstimate: 0.30, timeEstimate: 300, trustScore: 94, status: 'completed', assignedAgentId: 'agent-lead-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Lead Score Classifier', task: 'Scoring', description: 'Computes ICP fit score based on firmographic data.', capability: 'analytics', costEstimate: 0.25, timeEstimate: 400, trustScore: 97, status: 'completed', assignedAgentId: 'agent-score-1', positionX: 320, positionY: 200 },
+          { id: 'n3', name: 'Cold Sequence Writer', task: 'Copy Generation', description: 'Generates 3-step personalized outreach email sequence.', capability: 'writing', costEstimate: 0.45, timeEstimate: 500, trustScore: 98, status: 'completed', assignedAgentId: 'agent-writer-2', positionX: 540, positionY: 200 }
+        ],
+        edges: [
+          { id: 'e1', source: 'n1', target: 'n2' },
+          { id: 'e2', source: 'n2', target: 'n3' }
+        ]
+      },
+      'compliance-audit': {
+        id: 'compliance-audit',
+        name: 'Legal Terms & GDPR Compliance Audit',
+        query: 'Parse MSA contract PDF, flag liability caps, and verify GDPR compliance',
+        budget: 0.80,
+        routingMode: 'cheapest',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Contract PDF Parser', task: 'PDF Extraction', description: 'Extracts clauses, indemnity, and data protection terms.', capability: 'legal', costEstimate: 0.25, timeEstimate: 350, trustScore: 99, status: 'completed', assignedAgentId: 'agent-legal-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Liability Risk Classifier', task: 'Risk Assessment', description: 'Flags uncapped liability terms and breach damages.', capability: 'security', costEstimate: 0.30, timeEstimate: 450, trustScore: 95, status: 'completed', assignedAgentId: 'agent-audit-1', positionX: 320, positionY: 200 }
+        ],
+        edges: [
+          { id: 'e1', source: 'n1', target: 'n2' }
+        ]
+      }
+    };
+
+    return presets[id] || null;
   }
 
   async getWorkflowLogs(id: string): Promise<ExecutionLog[]> {

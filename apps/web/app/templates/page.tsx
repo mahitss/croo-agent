@@ -9,12 +9,12 @@ export default function TemplatesPage() {
   const { toast } = useToast();
 
   const templates = [
-    { name: 'Sales Swarms', route: '/marketing', icon: ArrowRight, desc: 'Automate high-converting cold outreach sequences, client follow-ups, and lead score classification.' },
-    { name: 'Research Consensuses', route: '/research', icon: BookOpen, desc: 'Query multiple search models, perform automatic cross-verification, and compile structured PDF briefs.' },
-    { name: 'Finance Audits', route: '/finance', icon: Layers, desc: 'Aggregate financial statements, compute portfolio analytics metrics, and generate expense report summaries.' },
-    { name: 'Marketing Scribes', route: '/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms, blog templates, and social posts optimized for conversion.' },
-    { name: 'Legal Term Examiners', route: '/legal', icon: Shield, desc: 'Ingest contract PDFs, extract critical risk markers, and cross-examine liability terms against rules.' },
-    { name: 'Healthcare Data Convergers', route: '/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize staff schedules, and safely map medical records to standard schemas.' }
+    { name: 'Sales Swarms', route: '/templates/sales', icon: ArrowRight, desc: 'Automate high-converting cold outreach sequences, client follow-ups, and lead score classification.' },
+    { name: 'Research Consensuses', route: '/templates/research', icon: BookOpen, desc: 'Query multiple search models, perform automatic cross-verification, and compile structured PDF briefs.' },
+    { name: 'Finance Audits', route: '/templates/finance', icon: Layers, desc: 'Aggregate financial statements, compute portfolio analytics metrics, and generate expense report summaries.' },
+    { name: 'Marketing Scribes', route: '/templates/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms, blog templates, and social posts optimized for conversion.' },
+    { name: 'Legal Term Examiners', route: '/templates/legal', icon: Shield, desc: 'Ingest contract PDFs, extract critical risk markers, and cross-examine liability terms against rules.' },
+    { name: 'Healthcare Data Convergers', route: '/templates/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize staff schedules, and safely map medical records to standard schemas.' }
   ];
 
   const handleLaunchTemplate = (name: string, route: string) => {

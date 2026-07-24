@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Canvas from '../../components/Canvas';
 import { useActiveWorkflow } from '../../hooks/useActiveWorkflow';
+import { useNexusStore } from '../../store/nexusStore';
+import { DemoWorkflowRepository } from '../../services/demo/DemoWorkflowRepository';
 import { useAgents } from '../../hooks/useAgents';
 import { Play, RotateCcw, AlertTriangle, Sparkles, CheckCircle2, X, Terminal, Clock, ShieldAlert, Loader2, ArrowRight, Save, Compass } from 'lucide-react';
 import { useToast } from '../../components/Toast';
@@ -45,6 +47,16 @@ export default function WorkflowPage() {
     const urlWorkflowId = params.get('workflowId');
     if (!urlWorkflowId) {
       resetExecution();
+    } else {
+      const repo = new DemoWorkflowRepository();
+      repo.getWorkflow(urlWorkflowId).then((wf) => {
+        if (wf) {
+          useNexusStore.setState({
+            activeWorkflow: wf,
+            appState: wf.status === 'completed' ? 'completed' : 'running'
+          });
+        }
+      });
     }
   }, []);
 
