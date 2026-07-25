@@ -33,6 +33,9 @@ export interface TaskNode {
   output?: string;
   error?: string;
   retryCount?: number;
+  trustScore?: number;
+  positionX?: number;
+  positionY?: number;
 }
 
 export interface WorkflowEdge {

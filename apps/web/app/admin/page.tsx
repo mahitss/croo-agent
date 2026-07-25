@@ -162,7 +162,7 @@ export default function AdminPage() {
         <div className="bg-[#111111] border border-[#232323] rounded-2xl p-4 text-xs font-mono space-y-2">
           <div className="text-gray-400 font-bold border-b border-[#232323] pb-2">System Audit Event Stream</div>
           <div className="text-emerald-400">[2026-07-25T06:14:02Z] USER_GOOGLE_LOGIN - mahitsaxena008@gmail.com (IP: 127.0.0.1)</div>
-          <div className="text-blue-400">[2026-07-25T06:10:15Z] ESCROW_RELEASE - 1.50 USDC -> 0xUserWallet8f2b</div>
+          <div className="text-blue-400">[2026-07-25T06:10:15Z] ESCROW_RELEASE - 1.50 USDC -&gt; 0xUserWallet8f2b</div>
           <div className="text-gray-400">[2026-07-25T05:52:00Z] AGENT_NODE_REGISTRATION - sentinel-scan (Status: Approved)</div>
         </div>
       )}

@@ -18,6 +18,7 @@ export const liveWalletService: IWalletService = {
         address: walletRes.data.address,
         balance: Number(balanceData.available || 0),
         escrowBalance: Number(balanceData.reserved || 0),
+        pendingBalance: 0,
         history: []
       };
     } catch (err) {

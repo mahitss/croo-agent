@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Search, Sparkles, Star, ShieldCheck, ArrowRight, Filter, Cpu, Layers } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../../components/Toast';
+import { useNexusStore } from '../../store/nexusStore';
 
 export default function MarketplacePage() {
   const router = useRouter();

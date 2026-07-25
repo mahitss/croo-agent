@@ -64,6 +64,7 @@ export const useDemoStore = create<DemoState>((set, get) => {
       address: '0xDemoWalletAddress789c',
       balance: 100.0,
       escrowBalance: 0.0,
+      pendingBalance: 0.0,
       history: []
     },
     demoTransactions: [],
@@ -83,6 +84,7 @@ export const useDemoStore = create<DemoState>((set, get) => {
         address: '0xDemoWalletAddress789c',
         balance: 100.0,
         escrowBalance: 0.0,
+        pendingBalance: 0.0,
         history: []
       });
       const history = getStored<Transaction[]>('orbit-demo-history', []);
@@ -103,6 +105,7 @@ export const useDemoStore = create<DemoState>((set, get) => {
         address: '0xDemoWalletAddress789c',
         balance: 100.0,
         escrowBalance: 0.0,
+        pendingBalance: 0.0,
         history: []
       };
       setStored('orbit-demo-wallet', initialWallet);

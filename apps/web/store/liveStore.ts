@@ -39,6 +39,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
       address: '0x0000000000000000000000000000000000000000',
       balance: 0.0,
       escrowBalance: 0.0,
+      pendingBalance: 0.0,
       history: []
     },
     liveTransactions: [],
@@ -62,6 +63,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
           address: '0x0000000000000000000000000000000000000000',
           balance: 0.0,
           escrowBalance: 0.0,
+          pendingBalance: 0.0,
           history: []
         },
         liveTransactions: [],
@@ -75,6 +77,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
         address: '0x0000000000000000000000000000000000000000',
         balance: 0.0,
         escrowBalance: 0.0,
+        pendingBalance: 0.0,
         history: []
       };
 
@@ -104,6 +107,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
             address: liveAddr,
             balance: liveBal,
             escrowBalance: liveEsc,
+            pendingBalance: 0.0,
             history: txsList
           };
 

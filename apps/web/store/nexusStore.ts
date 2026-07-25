@@ -644,7 +644,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             const logs = await repos.workflow.getWorkflowLogs(workflow.id);
             set({ executionLogs: logs });
 
-            if (fresh.status === 'completed' || fresh.status === 'failed' || fresh.status === 'cancelled') {
+            if (fresh.status === 'completed' || fresh.status === 'failed' || (fresh.status as string) === 'cancelled') {
               isPolledRunning = false;
               set({ isRunning: false, appState: fresh.status === 'completed' ? 'completed' : 'history' });
               await get().initialize(); // Refresh wallets
