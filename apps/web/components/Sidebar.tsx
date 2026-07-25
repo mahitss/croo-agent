@@ -32,7 +32,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-[#0B0B0B] border-r border-[#232323] flex flex-col justify-between p-4 font-sans select-none min-h-[calc(100vh-80px)]">
+    <aside className="w-64 flex-shrink-0 bg-[#0B0B0B] border-r border-[#232323] flex flex-col justify-between p-4 font-sans select-none min-h-[calc(100vh-80px)]">
       <div className="flex flex-col gap-2">
         <div className="px-3 py-2 text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
           Platform Navigation
