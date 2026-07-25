@@ -29,9 +29,12 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isWorkspaceDropdown, setIsWorkspaceDropdown] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isEnvDropdownOpen, setIsEnvDropdownOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState('Default Enterprise Workspace');
-  const [mode, setMode] = useState<'demo' | 'live'>('demo');
   const [isCmdOpen, setIsCmdOpen] = useState(false);
+
+  const currentEnv = useAuthStore((state) => state.environment) || 'demo';
+  const setEnvironment = useAuthStore((state) => state.setEnvironment);
 
   useEffect(() => {
     setMounted(true);
@@ -60,11 +63,7 @@ export default function Navbar() {
     router.push('/');
   };
 
-  const handleToggleMode = () => {
-    const nextMode = mode === 'demo' ? 'live' : 'demo';
-    setMode(nextMode);
-    toast(`Switched to ${nextMode === 'demo' ? 'Demo Sandbox' : 'Live Mainnet'} environment.`, 'info');
-  };
+
 
   const notificationsList = [
     { id: '1', title: 'Swarm Completed', text: 'Research Consensus Swarm finished 3-node run.', time: '5m ago' },
@@ -162,17 +161,58 @@ export default function Navbar() {
           ) : (
             <>
               {/* Environment Switcher */}
-              <button
-                onClick={handleToggleMode}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono font-semibold border transition-all cursor-pointer ${
-                  mode === 'demo'
-                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${mode === 'demo' ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
-                <span>{mode === 'demo' ? 'Demo Sandbox' : 'Live Mainnet'}</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setIsEnvDropdownOpen(!isEnvDropdownOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono font-semibold border transition-all cursor-pointer ${
+                    currentEnv === 'demo'
+                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                      : currentEnv === 'sandbox'
+                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                        : currentEnv === 'testnet'
+                          ? 'bg-purple-500/10 border-purple-500/20 text-purple-400'
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    currentEnv === 'demo' ? 'bg-amber-400' : currentEnv === 'sandbox' ? 'bg-blue-400' : currentEnv === 'testnet' ? 'bg-purple-400' : 'bg-emerald-400 animate-pulse'
+                  }`} />
+                  <span>
+                    {currentEnv === 'demo' ? '🟡 Demo' : currentEnv === 'sandbox' ? '🔵 Sandbox' : currentEnv === 'testnet' ? '🟣 Testnet' : '🟢 Live Mainnet'}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+
+                {isEnvDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsEnvDropdownOpen(false)} />
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-[#111111] border border-[#232323] rounded-2xl shadow-2xl p-2 z-50 text-xs font-sans space-y-1">
+                      <div className="px-3 py-1.5 text-[10px] font-mono text-gray-500 uppercase font-bold border-b border-[#232323]">Select Environment</div>
+                      {[
+                        { key: 'demo', label: '🟡 Demo Sandbox', desc: 'Mock state & sandbox exploration' },
+                        { key: 'sandbox', label: '🔵 Dev Sandbox', desc: 'Real dev API & test DB' },
+                        { key: 'testnet', label: '🟣 Blockchain Testnet', desc: 'Testnet RPC & explorer links' },
+                        { key: 'live', label: '🟢 Live Mainnet', desc: 'Production APIs & real CAP wallet' },
+                      ].map((envObj) => (
+                        <button
+                          key={envObj.key}
+                          onClick={() => {
+                            setEnvironment(envObj.key as any);
+                            setIsEnvDropdownOpen(false);
+                            toast(`Switched to ${envObj.label}.`, 'info');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl transition-all border-0 cursor-pointer flex flex-col gap-0.5 ${
+                            currentEnv === envObj.key ? 'bg-white/10 font-bold text-white' : 'text-gray-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <span className="font-semibold text-xs">{envObj.label}</span>
+                          <span className="text-[10px] text-gray-500 font-mono">{envObj.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* Running Executions Pill */}
               <Link

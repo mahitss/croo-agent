@@ -46,6 +46,7 @@ export interface AuthState {
   initializationState: 'UNINITIALIZED' | 'CHECKING_SESSION' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
   rememberMe: boolean;
   isDemoMode: boolean;
+  environment: 'demo' | 'sandbox' | 'testnet' | 'live';
   isAuthModalOpen: boolean;
   authModalTab: 'login' | 'register' | 'forgot' | 'verify';
   
@@ -58,6 +59,7 @@ export interface AuthState {
   initializeAuth: () => Promise<boolean>;
   setAuthModal: (open: boolean, tab?: 'login' | 'register' | 'forgot' | 'verify') => void;
   toggleDemoMode: () => void;
+  setEnvironment: (env: 'demo' | 'sandbox' | 'testnet' | 'live') => void;
   loginUser: (usernameOrEmail: string, password: string) => Promise<boolean>;
   registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
   logoutUser: () => Promise<void>;
@@ -122,6 +124,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     initializationState: 'UNINITIALIZED',
     rememberMe: true,
     isDemoMode: true,
+    environment: 'demo',
     isAuthModalOpen: false,
     authModalTab: 'login',
     isSidebarCollapsed: false,
@@ -130,6 +133,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
     toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
     setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
     setRememberMe: (val) => set({ rememberMe: val }),
+    setEnvironment: (env) => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('orbit_environment', env);
+      }
+      set({ 
+        environment: env, 
+        isDemoMode: env === 'demo' 
+      });
+    },
 
     refreshTimeoutId: null as any,
 
