@@ -28,9 +28,79 @@ export default function MarketplacePage() {
     return matchesSearch && matchesCat;
   });
 
-  const handleHireAgent = (agentName: string) => {
-    toast(`Hired "${agentName}" for workflow execution.`, 'success');
-    router.push('/workflow');
+  const [selectedAgentForHire, setSelectedAgentForHire] = useState<any | null>(null);
+  const [selectedTargetWorkflow, setSelectedTargetWorkflow] = useState<string>('new');
+  const [customTaskName, setCustomTaskName] = useState<string>('');
+
+  const handleOpenHireModal = (agent: any) => {
+    setSelectedAgentForHire(agent);
+    setCustomTaskName(agent.name);
+  };
+
+  const handleConfirmHire = () => {
+    if (!selectedAgentForHire) return;
+
+    if (selectedTargetWorkflow === 'new') {
+      const newWfId = `wf-marketplace-${selectedAgentForHire.id}-${Date.now()}`;
+      const newWf = {
+        id: newWfId,
+        name: `${customTaskName || selectedAgentForHire.name} Swarm`,
+        query: `Executed via Marketplace Node: ${selectedAgentForHire.name}`,
+        budget: 1.50,
+        routingMode: 'balanced' as const,
+        retryCount: 0,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        nodes: [
+          {
+            id: `n-${Date.now()}`,
+            name: customTaskName || selectedAgentForHire.name,
+            task: selectedAgentForHire.name,
+            description: selectedAgentForHire.desc,
+            capability: selectedAgentForHire.category.toLowerCase(),
+            costEstimate: 0.10,
+            timeEstimate: 450,
+            trustScore: 98,
+            status: 'pending' as const,
+            positionX: 100,
+            positionY: 200
+          }
+        ],
+        edges: []
+      };
+      useNexusStore.setState({ activeWorkflow: newWf, appState: 'draft' });
+      toast(`Created new workspace with node "${selectedAgentForHire.name}".`, 'success');
+      router.push(`/workspace/${newWfId}`);
+    } else {
+      const currentActive = useNexusStore.getState().activeWorkflow;
+      if (currentActive) {
+        const newNodeId = `n-${Date.now()}`;
+        const newNode = {
+          id: newNodeId,
+          name: customTaskName || selectedAgentForHire.name,
+          task: selectedAgentForHire.name,
+          description: selectedAgentForHire.desc,
+          capability: selectedAgentForHire.category.toLowerCase(),
+          costEstimate: 0.10,
+          timeEstimate: 450,
+          trustScore: 98,
+          status: 'pending' as const,
+          positionX: (currentActive.nodes.length + 1) * 180,
+          positionY: 200
+        };
+        const updatedNodes = [...currentActive.nodes, newNode];
+        const lastNode = currentActive.nodes[currentActive.nodes.length - 1];
+        const updatedEdges = lastNode ? [...currentActive.edges, { id: `e-${Date.now()}`, source: lastNode.id, target: newNodeId }] : currentActive.edges;
+        useNexusStore.setState({
+          activeWorkflow: { ...currentActive, nodes: updatedNodes, edges: updatedEdges }
+        });
+        toast(`Inserted node "${selectedAgentForHire.name}" into active workflow canvas.`, 'success');
+        router.push(`/workspace/${currentActive.id}`);
+      } else {
+        router.push(`/workspace/${selectedTargetWorkflow}`);
+      }
+    }
+    setSelectedAgentForHire(null);
   };
 
   return (
@@ -108,7 +178,7 @@ export default function MarketplacePage() {
                 <span className="text-xs font-bold font-mono text-white">{agent.price}</span>
               </div>
               <button
-                onClick={() => handleHireAgent(agent.name)}
+                onClick={() => handleOpenHireModal(agent)}
                 className="flex items-center gap-1.5 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer border-0 shadow"
               >
                 <span>Hire Node</span>
@@ -118,6 +188,69 @@ export default function MarketplacePage() {
           </div>
         ))}
       </div>
+
+      {/* Node Details & Configuration Modal */}
+      {selectedAgentForHire && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111111] border border-[#232323] rounded-2xl max-w-lg w-full p-6 space-y-6 animate-in fade-in">
+            <div className="flex items-start justify-between border-b border-[#232323] pb-4">
+              <div>
+                <span className="text-[10px] font-mono text-[#4EA3FF] font-bold uppercase">{selectedAgentForHire.category} Node</span>
+                <h3 className="text-lg font-bold text-white mt-0.5">{selectedAgentForHire.name}</h3>
+              </div>
+              <button onClick={() => setSelectedAgentForHire(null)} className="text-gray-400 hover:text-white bg-transparent border-0 text-base cursor-pointer">✕</button>
+            </div>
+
+            <div className="space-y-4 text-xs text-gray-300">
+              <p className="leading-relaxed text-gray-400">{selectedAgentForHire.desc}</p>
+              
+              <div className="space-y-2">
+                <label className="font-semibold text-white">Configured Task Label</label>
+                <input
+                  type="text"
+                  value={customTaskName}
+                  onChange={(e) => setCustomTaskName(e.target.value)}
+                  className="w-full bg-[#050505] border border-[#232323] focus:border-[#4EA3FF] rounded-xl px-3 py-2 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-semibold text-white">Target Destination Workflow</label>
+                <select
+                  value={selectedTargetWorkflow}
+                  onChange={(e) => setSelectedTargetWorkflow(e.target.value)}
+                  className="w-full bg-[#050505] border border-[#232323] focus:border-[#4EA3FF] rounded-xl px-3 py-2 text-xs text-white outline-none"
+                >
+                  <option value="new">Create New Swarm Canvas</option>
+                  <option value="research-agent">Research Consensus Agent Swarm</option>
+                  <option value="sales-outreach">Sales Lead Outreach Swarm</option>
+                  <option value="compliance-audit">Legal Compliance Audit Swarm</option>
+                </select>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1 font-mono text-[10px]">
+                <div className="flex justify-between text-gray-400"><span>Execution Cost:</span> <span className="text-white font-bold">{selectedAgentForHire.price}</span></div>
+                <div className="flex justify-between text-gray-400"><span>SLA Rating:</span> <span className="text-amber-400 font-bold">★ {selectedAgentForHire.rating} ({selectedAgentForHire.hires} hires)</span></div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[#232323] pt-4">
+              <button
+                onClick={() => setSelectedAgentForHire(null)}
+                className="px-4 py-2 bg-transparent text-gray-400 hover:text-white text-xs font-semibold rounded-xl border border-[#232323] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmHire}
+                className="px-4 py-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-bold rounded-xl border-0 cursor-pointer"
+              >
+                Insert Node into Canvas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
