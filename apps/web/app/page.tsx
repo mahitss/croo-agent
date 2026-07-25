@@ -282,11 +282,22 @@ export default function PortalPage() {
   const logoutUser = useAuthStore((state) => state.logoutUser);
   const isAuthenticated = mounted && !!token && !!user;
 
-  const handleLaunchWorkspace = () => {
-    if (isAuthenticated) {
+  const isCheckingAuth = useAuthStore((state) => state.isCheckingAuth);
+  const initializationState = useAuthStore((state) => state.initializationState);
+
+  const handleLaunchWorkspace = async () => {
+    if (isCheckingAuth || initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') {
+      const ok = await useAuthStore.getState().initializeAuth();
+      if (ok || useAuthStore.getState().isAuthenticated) {
+        router.push('/workspaces');
+        return;
+      }
+    }
+    
+    if (useAuthStore.getState().isAuthenticated || (token && user)) {
       router.push('/workspaces');
     } else {
-      setAuthModal(true, 'register');
+      setAuthModal(true, 'login');
     }
   };
 
@@ -387,10 +398,10 @@ export default function PortalPage() {
                     {/* User Profile Header */}
                     <div className="px-3 py-2 border-b border-white/10 flex flex-col gap-0.5 select-none text-left">
                       <span className="font-semibold text-white truncate">
-                        {user.displayName || user.username || 'Mahit Saxena'}
+                        {user.displayName || user.username || user.email || 'User'}
                       </span>
                       <span className="text-[10px] text-gray-500 truncate">
-                        {user.email || 'mahitsaxena008@gmail.com'}
+                        {user.email || ''}
                       </span>
                     </div>
 
