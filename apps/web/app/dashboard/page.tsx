@@ -47,12 +47,33 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/templates"
+            className="flex items-center justify-center gap-1.5 bg-[#111111] hover:bg-white/[0.04] border border-[#232323] text-gray-300 hover:text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all no-underline"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Templates</span>
+          </Link>
+          <Link
+            href="/marketplace"
+            className="flex items-center justify-center gap-1.5 bg-[#111111] hover:bg-white/[0.04] border border-[#232323] text-gray-300 hover:text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all no-underline"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Marketplace</span>
+          </Link>
+          <Link
+            href="/analytics"
+            className="flex items-center justify-center gap-1.5 bg-[#111111] hover:bg-white/[0.04] border border-[#232323] text-gray-300 hover:text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all no-underline"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Analytics</span>
+          </Link>
           <button
             onClick={() => router.push('/workspace/new')}
-            className="flex items-center justify-center gap-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-0 shadow-lg"
+            className="flex items-center justify-center gap-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer border-0 shadow-lg"
           >
             <Plus className="w-4 h-4" />
-            <span>New Swarm Workflow</span>
+            <span>New Swarm</span>
           </button>
         </div>
       </div>

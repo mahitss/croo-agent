@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import AppLayout from '../../../components/AppLayout';
 import { ArrowLeft, Play, Cpu, ShieldCheck, Sparkles, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { DemoWorkflowRepository } from '../../../services/demo/DemoWorkflowRepository';
 
 const TEMPLATE_PRESETS: Record<string, { title: string; category: string; description: string; query: string; agents: string[]; nodes: string[] }> = {
   sales: {
@@ -62,8 +63,10 @@ export default function TemplateDetailPage() {
   const templateId = (params?.templateId as string) || 'sales';
   const template = TEMPLATE_PRESETS[templateId] || TEMPLATE_PRESETS.sales;
 
-  const handleDeploy = () => {
-    router.push(`/workspace/new?prompt=${encodeURIComponent(template.query)}`);
+  const handleDeploy = async () => {
+    const repo = new DemoWorkflowRepository();
+    const newWf = await repo.deployTemplate(templateId);
+    router.push(`/workspace/${newWf.id}`);
   };
 
   return (

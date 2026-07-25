@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Canvas from '../../components/Canvas';
 import { useActiveWorkflow } from '../../hooks/useActiveWorkflow';
 import { useNexusStore } from '../../store/nexusStore';
@@ -66,6 +67,8 @@ export default function WorkflowPage() {
     }
   }, [selectedNode]);
 
+  const router = useRouter();
+
   const handleGenerateWorkflow = async () => {
     if (!promptInput.trim()) return;
     setIsPlanning(true);
@@ -82,6 +85,12 @@ export default function WorkflowPage() {
       
       await generateWorkflow(promptInput, 'balanced', 2.0);
       toast('Workflow generated successfully.', 'success');
+      
+      const createdWf = useNexusStore.getState().activeWorkflow;
+      if (createdWf && createdWf.id && typeof window !== 'undefined' && window.location.pathname.includes('/new')) {
+        router.push(`/workspace/${createdWf.id}`);
+      }
+
       await startExecution(promptInput, 'balanced', 2.0);
     } catch (err: any) {
       const msg = err.message || err || 'Failed to connect to backend AI services';

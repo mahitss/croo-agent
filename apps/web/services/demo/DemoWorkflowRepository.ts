@@ -76,10 +76,86 @@ export class DemoWorkflowRepository implements WorkflowRepository {
         edges: [
           { id: 'e1', source: 'n1', target: 'n2' }
         ]
+      },
+      'finance': {
+        id: 'finance',
+        name: 'Finance Portfolio & Risk Audit Swarm',
+        query: 'Audit asset volatility metrics and generate SLA compliance summary',
+        budget: 1.80,
+        routingMode: 'balanced',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Asset Volatility Tracker', task: 'Volatility Analysis', description: 'Monitors asset variance & market indicators.', capability: 'analytics', costEstimate: 0.30, timeEstimate: 300, trustScore: 98, status: 'completed', assignedAgentId: 'agent-fin-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Risk Model Compiler', task: 'Risk Assessment', description: 'Calculates Sharpe ratio & VAR risk bounds.', capability: 'finance', costEstimate: 0.40, timeEstimate: 500, trustScore: 97, status: 'completed', assignedAgentId: 'agent-fin-2', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
+      },
+      'marketing': {
+        id: 'marketing',
+        name: 'Marketing Multi-Channel Copy Swarm',
+        query: 'Generate 5 social media posts and blog summary with brand voice alignment',
+        budget: 1.20,
+        routingMode: 'fastest',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'SEO Keyword Analyzer', task: 'Keyword Analysis', description: 'Extracts high-intent search keywords.', capability: 'marketing', costEstimate: 0.20, timeEstimate: 250, trustScore: 95, status: 'completed', assignedAgentId: 'agent-[#7BC9FF]-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Brand Voice Copywriter', task: 'Copy Generation', description: 'Generates ad variants aligned with brand style guide.', capability: 'writing', costEstimate: 0.35, timeEstimate: 400, trustScore: 99, status: 'completed', assignedAgentId: 'agent-[#7BC9FF]-2', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
+      },
+      'healthcare': {
+        id: 'healthcare',
+        name: 'Healthcare Clinical EHR Mapper Swarm',
+        query: 'Parse clinical EHR progress note and map ICD-10 diagnostic codes',
+        budget: 2.20,
+        routingMode: 'balanced',
+        retryCount: 0,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'EHR Progress Note Extractor', task: 'Note Extractor', description: 'Parses unstructured physician clinical notes safely.', capability: 'healthcare', costEstimate: 0.40, timeEstimate: 450, trustScore: 99, status: 'completed', assignedAgentId: 'agent-med-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'ICD-10 Diagnostic Coder', task: 'Diagnostic Coding', description: 'Maps extracted diagnoses to standard billing codes.', capability: 'coding', costEstimate: 0.50, timeEstimate: 600, trustScore: 96, status: 'completed', assignedAgentId: 'agent-med-2', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
       }
     };
 
     return presets[id] || null;
+  }
+
+  async deployTemplate(templateId: string): Promise<Workflow> {
+    const wfId = `wf-template-${templateId}-${Date.now()}`;
+    const baseWf = await this.getWorkflow(templateId);
+    
+    const clonedWf: Workflow = baseWf ? {
+      ...baseWf,
+      id: wfId,
+      name: `${baseWf.name} (Deployed)`,
+      createdAt: new Date().toISOString()
+    } : {
+      id: wfId,
+      name: `${templateId.toUpperCase()} Swarm Workflow`,
+      query: `Deployed from ${templateId} template`,
+      budget: 2.00,
+      routingMode: 'balanced' as const,
+      retryCount: 0,
+      status: 'pending' as const,
+      createdAt: new Date().toISOString(),
+      nodes: [
+        { id: 'n1', name: 'Task Executor', task: 'Execution', description: 'Template task node', capability: 'general', costEstimate: 0.25, timeEstimate: 400, trustScore: 98, status: 'pending' as const, positionX: 100, positionY: 200 }
+      ],
+      edges: []
+    };
+
+    const existingList = this.getStored<Workflow[]>('orbit-demo-workflows-list', []);
+    this.setStored('orbit-demo-workflows-list', [clonedWf, ...existingList]);
+    this.setStored('orbit-demo-workflow', clonedWf);
+    useNexusStore.setState({ activeWorkflow: clonedWf, appState: 'draft' });
+    return clonedWf;
   }
 
   async getWorkflowLogs(id: string): Promise<ExecutionLog[]> {
