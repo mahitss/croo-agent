@@ -8,27 +8,37 @@ import {
   Activity, 
   Store, 
   Wallet, 
-  UploadCloud, 
   ShieldAlert, 
   Settings, 
-  User, 
-  BookOpen 
+  Bot,
+  Rocket,
+  FolderGit2,
+  BookOpen,
+  PlusCircle
 } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname() || '';
 
   const navItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Workflow Builder', href: '/workspace/new', icon: Workflow },
-    { name: 'Templates', href: '/templates', icon: BookOpen },
-    { name: 'Analytics', href: '/analytics', icon: Activity },
+    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { 
+      name: 'Workspace', 
+      href: '/workspaces', 
+      icon: Workflow,
+      subItems: [
+        { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
+        { name: 'Create Workflow', href: '/workspace/new', icon: PlusCircle },
+        { name: 'Templates', href: '/templates', icon: BookOpen },
+      ]
+    },
     { name: 'Marketplace', href: '/marketplace', icon: Store },
-    { name: 'Wallet', href: '/wallet', icon: Wallet },
-    { name: 'Publish Agent', href: '/publish', icon: UploadCloud },
-    { name: 'Admin', href: '/admin', icon: ShieldAlert },
+    { name: 'Agents', href: '/agents', icon: Bot },
+    { name: 'Analytics', href: '/analytics', icon: Activity },
+    { name: 'Billing', href: '/wallet', icon: Wallet },
+    { name: 'Deployments', href: '/deployments', icon: Rocket },
+    { name: 'Administration', href: '/admin', icon: ShieldAlert },
     { name: 'Settings', href: '/settings', icon: Settings },
-    { name: 'Profile', href: '/profile', icon: User },
   ];
 
   return (
@@ -42,18 +52,42 @@ export default function Sidebar() {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all no-underline ${
-                  isActive
-                    ? 'bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#4EA3FF]' : 'text-gray-400'}`} />
-                <span>{item.name}</span>
-              </Link>
+              <div key={item.name} className="flex flex-col gap-0.5">
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all no-underline ${
+                    isActive
+                      ? 'bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20 font-semibold'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-[#4EA3FF]' : 'text-gray-400'}`} />
+                  <span>{item.name}</span>
+                </Link>
+
+                {item.subItems && (
+                  <div className="ml-4 pl-3 border-l border-[#232323] flex flex-col gap-0.5 my-1">
+                    {item.subItems.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = pathname === sub.href;
+                      return (
+                        <Link
+                          key={sub.name}
+                          href={sub.href}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all no-underline ${
+                            isSubActive
+                              ? 'text-[#4EA3FF] font-semibold bg-white/5'
+                              : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.02]'
+                          }`}
+                        >
+                          <SubIcon className="w-3.5 h-3.5" />
+                          <span>{sub.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
