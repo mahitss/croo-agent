@@ -32,14 +32,7 @@ export default function WorkspacesPage() {
     wf.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const templates = [
-    { name: 'Sales', route: '/templates/sales', icon: ArrowRight, desc: 'Automate outreach swarms, lead lists, and follow-ups.' },
-    { name: 'Research', route: '/templates/research', icon: BookOpen, desc: 'Aggregate compliance briefs, competitor analysis, and sources.' },
-    { name: 'Finance', route: '/templates/finance', icon: Layers, desc: 'Analyze portfolio performance, expense audits, and tax briefs.' },
-    { name: 'Marketing', route: '/templates/marketing', icon: Sparkles, desc: 'Generate multi-channel ad copy swarms and social posts.' },
-    { name: 'Legal', route: '/templates/legal', icon: Shield, desc: 'Parse contract terms, extract compliance risks, and verify briefs.' },
-    { name: 'Healthcare', route: '/templates/healthcare', icon: Cpu, desc: 'Scan clinical trial logs, optimize schedules, and map records.' }
-  ];
+
 
   const handleCreateWorkflow = () => {
     toast('Initializing new workflow builder canvas...', 'success');
@@ -124,33 +117,6 @@ export default function WorkspacesPage() {
               No workflows matching "{searchQuery}" found.
             </div>
           )}
-        </div>
-      </div>
-
-      {/* TEMPLATES */}
-      <div className="flex flex-col gap-6">
-        <h2 className="text-xs font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">
-          Templates
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {templates.map((tmpl) => {
-            const Icon = tmpl.icon;
-            return (
-              <div 
-                key={tmpl.name}
-                onClick={() => router.push(tmpl.route)}
-                className="bg-[#111111] border border-[#232323] hover:border-white/10 p-5 rounded-2xl flex items-start gap-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-300"
-              >
-                <div className="p-2.5 rounded-xl bg-white/5 text-[#4EA3FF] shrink-0">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <h3 className="text-sm font-semibold text-white">{tmpl.name}</h3>
-                  <p className="text-xs text-[#9CA3AF] leading-relaxed">{tmpl.desc}</p>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 
