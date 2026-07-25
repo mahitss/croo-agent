@@ -8,12 +8,10 @@ import {
   Activity, 
   Store, 
   Wallet, 
-  ShieldAlert, 
   Settings, 
   Bot,
   Rocket,
   FolderGit2,
-  BookOpen,
   PlusCircle,
   Play,
   Cpu,
@@ -25,7 +23,8 @@ import {
   User,
   LineChart,
   Terminal,
-  Receipt
+  Receipt,
+  Server
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -40,7 +39,6 @@ export default function Sidebar() {
       subItems: [
         { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
         { name: 'Builder', href: '/workspace/new', icon: PlusCircle },
-        { name: 'Templates', href: '/templates', icon: BookOpen },
         { name: 'Executions', href: '/workspace/executions', icon: Play },
       ]
     },
@@ -49,11 +47,12 @@ export default function Sidebar() {
       href: '/marketplace', 
       icon: Store,
       subItems: [
-        { name: 'Agents', href: '/marketplace?tab=agents', icon: Bot },
-        { name: 'Models', href: '/marketplace?tab=models', icon: Cpu },
-        { name: 'Plugins', href: '/marketplace?tab=plugins', icon: Layers },
+        { name: 'Agents', href: '/marketplace', icon: Bot },
+        { name: 'Models', href: '/models', icon: Cpu },
+        { name: 'Plugins', href: '/plugins', icon: Layers },
       ]
     },
+    { name: 'Infrastructure', href: '/agents', icon: Server },
     { 
       name: 'Deployments', 
       href: '/deployments', 
