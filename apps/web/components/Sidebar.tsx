@@ -14,7 +14,18 @@ import {
   Rocket,
   FolderGit2,
   BookOpen,
-  PlusCircle
+  PlusCircle,
+  Play,
+  Cpu,
+  Layers,
+  FileText,
+  Key,
+  Users,
+  Sliders,
+  User,
+  LineChart,
+  Terminal,
+  Receipt
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -28,24 +39,69 @@ export default function Sidebar() {
       icon: Workflow,
       subItems: [
         { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
-        { name: 'Create Workflow', href: '/workspace/new', icon: PlusCircle },
+        { name: 'Builder', href: '/workspace/new', icon: PlusCircle },
         { name: 'Templates', href: '/templates', icon: BookOpen },
+        { name: 'Executions', href: '/workspace/executions', icon: Play },
       ]
     },
-    { name: 'Marketplace', href: '/marketplace', icon: Store },
-    { name: 'Agents', href: '/agents', icon: Bot },
-    { name: 'Analytics', href: '/analytics', icon: Activity },
-    { name: 'Billing', href: '/wallet', icon: Wallet },
-    { name: 'Deployments', href: '/deployments', icon: Rocket },
-    { name: 'Administration', href: '/admin', icon: ShieldAlert },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { 
+      name: 'Marketplace', 
+      href: '/marketplace', 
+      icon: Store,
+      subItems: [
+        { name: 'Agents', href: '/marketplace?tab=agents', icon: Bot },
+        { name: 'Models', href: '/marketplace?tab=models', icon: Cpu },
+        { name: 'Plugins', href: '/marketplace?tab=plugins', icon: Layers },
+      ]
+    },
+    { 
+      name: 'Deployments', 
+      href: '/deployments', 
+      icon: Rocket,
+      subItems: [
+        { name: 'Releases', href: '/deployments?tab=releases', icon: Rocket },
+        { name: 'Environments', href: '/deployments?tab=environments', icon: Sliders },
+        { name: 'Versions', href: '/deployments?tab=versions', icon: FileText },
+      ]
+    },
+    { 
+      name: 'Observability', 
+      href: '/analytics', 
+      icon: Activity,
+      subItems: [
+        { name: 'Analytics', href: '/analytics', icon: LineChart },
+        { name: 'Monitoring', href: '/analytics?tab=monitoring', icon: Activity },
+        { name: 'Logs', href: '/analytics?tab=logs', icon: Terminal },
+      ]
+    },
+    { 
+      name: 'Billing', 
+      href: '/wallet', 
+      icon: Wallet,
+      subItems: [
+        { name: 'Wallet', href: '/wallet', icon: Wallet },
+        { name: 'Usage', href: '/wallet?tab=usage', icon: LineChart },
+        { name: 'Invoices', href: '/wallet?tab=invoices', icon: Receipt },
+      ]
+    },
+    { 
+      name: 'Settings', 
+      href: '/settings', 
+      icon: Settings,
+      subItems: [
+        { name: 'Team', href: '/settings?tab=team', icon: Users },
+        { name: 'API Keys', href: '/settings?tab=apikeys', icon: Key },
+        { name: 'Integrations', href: '/settings?tab=integrations', icon: Sliders },
+        { name: 'Profile', href: '/profile', icon: User },
+      ]
+    },
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-[#0B0B0B] border-r border-[#232323] flex flex-col justify-between p-4 font-sans select-none min-h-[calc(100vh-80px)]">
+    <aside className="w-64 flex-shrink-0 bg-[#0B0B0B] border-r border-[#232323] flex flex-col justify-between p-4 font-sans select-none min-h-[calc(100vh-64px)]">
       <div className="flex flex-col gap-2">
         <div className="px-3 py-2 text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
-          Platform Navigation
+          Enterprise OS
         </div>
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
@@ -55,9 +111,9 @@ export default function Sidebar() {
               <div key={item.name} className="flex flex-col gap-0.5">
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all no-underline ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all no-underline ${
                     isActive
-                      ? 'bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20 font-semibold'
+                      ? 'bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20'
                       : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                   }`}
                 >

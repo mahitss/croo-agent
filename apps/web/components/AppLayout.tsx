@@ -102,12 +102,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <AppSkeleton />;
   }
 
+  const pathSegments = pathname.split('/').filter(Boolean);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#050505] text-white">
       <Navbar />
-      <div className="flex-1 flex pt-[80px] relative z-10 min-w-0">
+      <div className="flex-1 flex pt-[64px] relative z-10 min-w-0">
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0 p-6 overflow-y-auto">
+          {/* Breadcrumb Header Bar */}
+          <div className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-6 pb-3 border-b border-[#232323]">
+            <span className="text-[#4EA3FF] font-semibold">Orbit OS</span>
+            {pathSegments.map((segment, idx) => (
+              <span key={idx} className="flex items-center gap-2 capitalize">
+                <span className="text-gray-600">/</span>
+                <span className={idx === pathSegments.length - 1 ? 'text-white font-bold' : 'text-gray-400'}>
+                  {segment}
+                </span>
+              </span>
+            ))}
+          </div>
+
           {children}
         </main>
       </div>
