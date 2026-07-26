@@ -446,7 +446,7 @@ export default function AuthModal() {
         <div className="mt-6 text-center text-xs text-gray-400 font-sans">
           {tab === 'login' && (
             <>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button onClick={() => setTab('register')} className="text-primary-neon hover:underline font-bold">
                 Register
               </button>

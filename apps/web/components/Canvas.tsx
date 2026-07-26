@@ -225,7 +225,7 @@ function CanvasInner({ onSelectNode }: CanvasProps) {
       {!activeWorkflow && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-20 font-mono text-xs text-gray-400 gap-2">
           <span className="text-sm font-bold text-white uppercase tracking-wider">No Workflow Yet</span>
-          <span>Describe a task above and click "Generate Workflow" to begin.</span>
+          <span>Describe a task above and click &quot;Generate Workflow&quot; to begin.</span>
         </div>
       )}
 

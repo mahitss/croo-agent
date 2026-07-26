@@ -114,7 +114,7 @@ export default function WorkspacesPage() {
             ))
           ) : (
             <div className="px-6 py-8 text-center text-xs text-[#9CA3AF]">
-              No workflows matching "{searchQuery}" found.
+              No workflows matching &quot;{searchQuery}&quot; found.
             </div>
           )}
         </div>
