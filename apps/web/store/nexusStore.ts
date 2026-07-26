@@ -42,6 +42,24 @@ const getRepos = (isDemoMode: boolean) => ({
   analytics: isDemoMode ? demoAnalyticsRepo : liveAnalyticsRepo
 });
 
+// Storage Helper Utilities
+const getStoredJSON = <T>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const val = localStorage.getItem(key);
+    return val ? JSON.parse(val) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const setStoredJSON = (key: string, val: any) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch (e) {}
+};
+
 interface NexusState {
   agents: Agent[];
   activeWorkflow: Workflow | null;
@@ -57,6 +75,16 @@ interface NexusState {
   estimatedCost: number;
   appState: 'planning' | 'draft' | 'running' | 'completed' | 'history';
   isLoading: boolean;
+
+  // Persistence & Preferences
+  selectedWorkspaceId: string;
+  setSelectedWorkspaceId: (id: string) => void;
+  hiredAgentIds: string[];
+  hireMarketplaceAgent: (agentId: string) => void;
+  recentlyUsedAgentIds: string[];
+  recordAgentUsage: (agentId: string) => void;
+  routingMode: 'cheapest' | 'fastest' | 'accuracy' | 'balanced';
+  budget: number;
 
   // Mode-isolated wallet states
   demoBalance: number;
@@ -139,8 +167,8 @@ interface NexusState {
 }
 
 export const useNexusStore = create<NexusState>((set, get) => {
-  // Sync state changes from useAuthStore
-  useAuthStore.subscribe((authState) => {
+  // Sync state changes from useAuthStore & trigger hydration when authenticated or mode changes
+  useAuthStore.subscribe((authState, previousState) => {
     const isAuth = authState.isAuthenticated;
     if (!isAuth) {
       set({
@@ -149,36 +177,6 @@ export const useNexusStore = create<NexusState>((set, get) => {
         isDemoMode: authState.isDemoMode,
         isAuthModalOpen: authState.isAuthModalOpen,
         authModalTab: authState.authModalTab,
-        
-        userWallet: {
-          address: '0x0000000000000000000000000000000000000000',
-          balance: 0.0,
-          escrowBalance: 0.0,
-          pendingBalance: 0.0,
-          history: []
-        },
-        demoBalance: 0.0,
-        demoEscrow: 0.0,
-        demoHistory: [],
-        demoTransactions: [],
-        demoWallet: {
-          address: '0x0000000000000000000000000000000000000000',
-          balance: 0.0,
-          escrowBalance: 0.0,
-          pendingBalance: 0.0,
-          history: []
-        },
-        liveBalance: 0.0,
-        liveEscrow: 0.0,
-        liveHistory: [],
-        liveTransactions: [],
-        liveWallet: {
-          address: '0x0000000000000000000000000000000000000000',
-          balance: 0.0,
-          escrowBalance: 0.0,
-          pendingBalance: 0.0,
-          history: []
-        }
       });
     } else {
       const nextUserWallet = authState.isDemoMode ? get().demoWallet : get().liveWallet;
@@ -190,49 +188,65 @@ export const useNexusStore = create<NexusState>((set, get) => {
         authModalTab: authState.authModalTab,
         userWallet: nextUserWallet
       });
+
+      // Hydrate nexus store data whenever auth session resolves or demo/live mode toggles
+      if (!previousState || !previousState.isAuthenticated || previousState.isDemoMode !== authState.isDemoMode) {
+        get().initialize();
+      }
     }
   });
+
+  const cachedDemoWallet = getStoredJSON<WalletState>('orbit_wallet_demo', {
+    address: '0xDemoWalletAddress789c',
+    balance: 100.0,
+    escrowBalance: 0.0,
+    pendingBalance: 0.0,
+    history: []
+  });
+
+  const cachedLiveWallet = getStoredJSON<WalletState>('orbit_wallet_live', {
+    address: '0x0000000000000000000000000000000000000000',
+    balance: 0.0,
+    escrowBalance: 0.0,
+    pendingBalance: 0.0,
+    history: []
+  });
+
+  const initialDemoMode = useAuthStore.getState().isDemoMode;
+  const initialUserWallet = initialDemoMode ? cachedDemoWallet : cachedLiveWallet;
 
   return {
     agents: [],
     activeWorkflow: null,
-    executionLogs: [],
+    executionLogs: getStoredJSON<ExecutionLog[]>('orbit_execution_logs', []),
     isLoading: false,
-    userWallet: {
-      address: '0xDemoWalletAddress789c',
-      balance: 100.0,
-      escrowBalance: 0.0,
-      pendingBalance: 0.0,
-      history: []
-    },
-    demoBalance: 100.0,
-    demoTransactions: [],
-    demoWalletAddress: '0xDemoWalletAddress789c',
-    demoEscrow: 0.0,
-    demoHistory: [],
-    demoWallet: {
-      address: '0xDemoWalletAddress789c',
-      balance: 100.0,
-      escrowBalance: 0.0,
-      pendingBalance: 0.0,
-      history: []
-    },
-    liveBalance: 0.0,
-    liveTransactions: [],
-    liveWalletAddress: '0x0000000000000000000000000000000000000000',
-    liveEscrow: 0.0,
-    liveHistory: [],
-    liveWallet: {
-      address: '0x0000000000000000000000000000000000000000',
-      balance: 0.0,
-      escrowBalance: 0.0,
-      pendingBalance: 0.0,
-      history: []
-    },
+    
+    // User Preferences & State Persistence
+    selectedWorkspaceId: getStoredJSON<string>('orbit_selected_workspace_id', 'ws-default'),
+    hiredAgentIds: getStoredJSON<string[]>('orbit_hired_agents', []),
+    recentlyUsedAgentIds: getStoredJSON<string[]>('orbit_recent_agents', []),
+    routingMode: getStoredJSON<'cheapest' | 'fastest' | 'accuracy' | 'balanced'>('orbit_pref_routing_mode', 'balanced'),
+    budget: getStoredJSON<number>('orbit_pref_budget', 5.0),
+
+    userWallet: initialUserWallet,
+    demoBalance: cachedDemoWallet.balance,
+    demoTransactions: cachedDemoWallet.history || [],
+    demoWalletAddress: cachedDemoWallet.address,
+    demoEscrow: cachedDemoWallet.escrowBalance,
+    demoHistory: cachedDemoWallet.history || [],
+    demoWallet: cachedDemoWallet,
+
+    liveBalance: cachedLiveWallet.balance,
+    liveTransactions: cachedLiveWallet.history || [],
+    liveWalletAddress: cachedLiveWallet.address,
+    liveEscrow: cachedLiveWallet.escrowBalance,
+    liveHistory: cachedLiveWallet.history || [],
+    liveWallet: cachedLiveWallet,
+
     agentWallets: {},
     isRunning: false,
     currentPhaseIndex: 0,
-    userQuery: '',
+    userQuery: getStoredJSON<string>('orbit_user_query', ''),
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,
@@ -240,48 +254,85 @@ export const useNexusStore = create<NexusState>((set, get) => {
     appState: 'planning',
     
     // Marketplace Persistent Defaults
-    marketplaceTab: 'all',
+    marketplaceTab: getStoredJSON<any>('orbit_mkt_tab', 'all'),
     marketplaceSearchTerm: '',
-    marketplaceCategory: 'All',
+    marketplaceCategory: getStoredJSON<string>('orbit_mkt_cat', 'All'),
     marketplaceSelectedAgent: null,
-    marketplaceOnlyVerified: false,
+    marketplaceOnlyVerified: getStoredJSON<boolean>('orbit_mkt_verified', false),
     marketplaceMinTrustScore: 0,
     marketplaceMaxPrice: 0.5,
-    marketplaceSortBy: 'trustScore',
+    marketplaceSortBy: getStoredJSON<string>('orbit_mkt_sort', 'trustScore'),
     marketplaceMatchmakerPrompt: '',
     marketplaceMatchedStack: null,
 
     // Auth state defaults
     user: useAuthStore.getState().user,
     token: useAuthStore.getState().token,
-    isDemoMode: useAuthStore.getState().isDemoMode,
+    isDemoMode: initialDemoMode,
     isAuthModalOpen: useAuthStore.getState().isAuthModalOpen,
     authModalTab: useAuthStore.getState().authModalTab,
     isWorkflowSaved: true,
     unsavedWorkflowTemplate: null,
-    isSidebarCollapsed: false,
+    isSidebarCollapsed: useAuthStore.getState().isSidebarCollapsed,
     isMobileSidebarOpen: false,
 
-    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+    setSelectedWorkspaceId: (id) => {
+      setStoredJSON('orbit_selected_workspace_id', id);
+      set({ selectedWorkspaceId: id });
+    },
+    hireMarketplaceAgent: (agentId) => {
+      const current = get().hiredAgentIds || [];
+      if (!current.includes(agentId)) {
+        const next = [...current, agentId];
+        set({ hiredAgentIds: next });
+        setStoredJSON('orbit_hired_agents', next);
+      }
+    },
+    recordAgentUsage: (agentId) => {
+      const current = get().recentlyUsedAgentIds || [];
+      const filtered = current.filter(id => id !== agentId);
+      const next = [agentId, ...filtered].slice(0, 10);
+      set({ recentlyUsedAgentIds: next });
+      setStoredJSON('orbit_recent_agents', next);
+    },
+
+    toggleSidebar: () => useAuthStore.getState().toggleSidebar(),
     setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
     
-    setMarketplaceTab: (tab) => set({ marketplaceTab: tab }),
+    setMarketplaceTab: (tab) => {
+      setStoredJSON('orbit_mkt_tab', tab);
+      set({ marketplaceTab: tab });
+    },
     setMarketplaceSearchTerm: (term) => set({ marketplaceSearchTerm: term }),
-    setMarketplaceCategory: (cat) => set({ marketplaceCategory: cat }),
+    setMarketplaceCategory: (cat) => {
+      setStoredJSON('orbit_mkt_cat', cat);
+      set({ marketplaceCategory: cat });
+    },
     setMarketplaceSelectedAgent: (agent) => set({ marketplaceSelectedAgent: agent }),
-    setMarketplaceOnlyVerified: (val) => set({ marketplaceOnlyVerified: val }),
+    setMarketplaceOnlyVerified: (val) => {
+      setStoredJSON('orbit_mkt_verified', val);
+      set({ marketplaceOnlyVerified: val });
+    },
     setMarketplaceMinTrustScore: (val) => set({ marketplaceMinTrustScore: val }),
     setMarketplaceMaxPrice: (val) => set({ marketplaceMaxPrice: val }),
-    setMarketplaceSortBy: (val) => set({ marketplaceSortBy: val }),
+    setMarketplaceSortBy: (val) => {
+      setStoredJSON('orbit_mkt_sort', val);
+      set({ marketplaceSortBy: val });
+    },
     setMarketplaceMatchmakerPrompt: (val) => set({ marketplaceMatchmakerPrompt: val }),
     setMarketplaceMatchedStack: (stack) => set({ marketplaceMatchedStack: stack }),
 
-    setUserQuery: (query) => set({ userQuery: query }),
+    setUserQuery: (query) => {
+      setStoredJSON('orbit_user_query', query);
+      set({ userQuery: query });
+    },
 
     resetExecution: () => {
       logger.info('Resetting active workflow and execution logs.');
       if (typeof window !== 'undefined') {
         localStorage.removeItem('orbit_last_workflow_id');
+        localStorage.removeItem('orbit_workflow_draft');
+        localStorage.removeItem('orbit_user_query');
         const params = new URLSearchParams(window.location.search);
         params.delete('workflowId');
         const searchStr = params.toString();
@@ -290,6 +341,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
       }
       set({
         activeWorkflow: null,
+        userQuery: '',
         executionLogs: [],
         isRunning: false,
         currentPhaseIndex: 0,
@@ -302,16 +354,24 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     setRoutingMode: (mode) => {
+      setStoredJSON('orbit_pref_routing_mode', mode);
+      set({ routingMode: mode });
       const activeWorkflow = get().activeWorkflow;
       if (activeWorkflow) {
-        set({ activeWorkflow: { ...activeWorkflow, routingMode: mode } });
+        const updatedWf = { ...activeWorkflow, routingMode: mode };
+        set({ activeWorkflow: updatedWf });
+        setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: updatedWf, timestamp: Date.now() });
       }
     },
 
     setBudget: (budget) => {
+      setStoredJSON('orbit_pref_budget', budget);
+      set({ budget });
       const activeWorkflow = get().activeWorkflow;
       if (activeWorkflow) {
-        set({ activeWorkflow: { ...activeWorkflow, budget } });
+        const updatedWf = { ...activeWorkflow, budget };
+        set({ activeWorkflow: updatedWf });
+        setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: updatedWf, timestamp: Date.now() });
       }
     },
 
@@ -320,18 +380,18 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const wf = get().activeWorkflow;
       if (!wf) return;
 
-      // Local optimistic update
       const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, name: newName } : n);
       const updatedWf = { ...wf, nodes: updatedNodes };
       set({ activeWorkflow: updatedWf });
+      setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: updatedWf, timestamp: Date.now() });
 
       try {
         const repos = getRepos(get().isDemoMode);
         const resolved = await repos.workflow.renameNode(wf.id, nodeId, newName);
         set({ activeWorkflow: resolved });
+        setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: resolved, timestamp: Date.now() });
       } catch (err) {
         logger.error('Failed to rename node:', err);
-        // Revert on error
         set({ activeWorkflow: wf });
       }
     },
@@ -341,58 +401,50 @@ export const useNexusStore = create<NexusState>((set, get) => {
       const wf = get().activeWorkflow;
       if (!wf) return;
 
-      // Local optimistic update
       const updatedNodes = wf.nodes.filter(n => n.id !== nodeId);
       const updatedEdges = wf.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
       const updatedWf = { ...wf, nodes: updatedNodes, edges: updatedEdges };
       set({ activeWorkflow: updatedWf });
+      setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: updatedWf, timestamp: Date.now() });
 
       try {
         const repos = getRepos(get().isDemoMode);
         const resolved = await repos.workflow.deleteNode(wf.id, nodeId);
         set({ activeWorkflow: resolved });
+        setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: resolved, timestamp: Date.now() });
       } catch (err) {
         logger.error('Failed to delete node:', err);
-        // Revert on error
         set({ activeWorkflow: wf });
       }
     },
 
-    // Optimistic Updates for Node Retry
     retryNode: async (nodeId) => {
       const wf = get().activeWorkflow;
       if (!wf) return;
-
-      // Local optimistic update
-      const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const } : n);
-      const updatedWf = { ...wf, nodes: updatedNodes };
-      set({ activeWorkflow: updatedWf });
-
       try {
         const repos = getRepos(get().isDemoMode);
         const resolved = await repos.workflow.retryNode(wf.id, nodeId);
         set({ activeWorkflow: resolved });
+        setStoredJSON('orbit_workflow_draft', { query: get().userQuery, activeWorkflow: resolved, timestamp: Date.now() });
       } catch (err) {
         logger.error('Failed to retry node:', err);
-        // Revert on error
-        set({ activeWorkflow: wf });
       }
     },
 
     generateWorkflow: async (query, routingMode, budget) => {
-      logger.info('Generating workflow:', { query, routingMode, budget });
+      logger.info('Generating workflow template for query:', query);
       set({ isLoading: true });
       try {
-        const repos = getRepos(get().isDemoMode);
+        const isDemo = get().isDemoMode;
+        const repos = getRepos(isDemo);
         const wf = await repos.workflow.generateWorkflow(query, routingMode, budget);
         
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && wf && wf.id) {
           localStorage.setItem('orbit_last_workflow_id', wf.id);
           const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?workflowId=${wf.id}`;
           window.history.pushState({ path: newUrl }, '', newUrl);
         }
 
-        // Mock token statistics update
         const pt = Math.floor(2000 + Math.random() * 4000);
         const ct = Math.floor(1000 + Math.random() * 2000);
         const cost = Math.round((pt * 0.00015 + ct * 0.0006) * 100) / 100;
@@ -407,6 +459,9 @@ export const useNexusStore = create<NexusState>((set, get) => {
           totalTokens: pt + ct,
           estimatedCost: cost
         });
+
+        setStoredJSON('orbit_user_query', query);
+        setStoredJSON('orbit_workflow_draft', { query, activeWorkflow: wf, timestamp: Date.now() });
       } catch (err) {
         const friendly = errorHandler.getFriendlyMessage(err);
         logger.error('Failed to generate workflow template:', friendly);
@@ -426,6 +481,11 @@ export const useNexusStore = create<NexusState>((set, get) => {
         if (!wf) {
           wf = await repos.workflow.generateWorkflow(query, routingMode, budget);
           set({ activeWorkflow: wf, userQuery: query });
+        }
+
+        if (typeof window !== 'undefined' && wf && wf.id) {
+          localStorage.setItem('orbit_last_workflow_id', wf.id);
+          setStoredJSON('orbit_workflow_draft', { query, activeWorkflow: wf, timestamp: Date.now() });
         }
 
         const runRes = await repos.workflow.runWorkflow(wf.id);
@@ -490,13 +550,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
         await repos.wallet.withdraw(amount);
         await get().initialize();
       } catch (err) {
-        logger.error('Wallet withdrawal error:', err);
+        logger.error('Wallet withdraw error:', err);
       }
     },
 
     settleUserWallet: async () => {
       try {
-        const res = await apiClient.post<any>('/api/v1/wallet/settlement', {});
+        const repos = getRepos(get().isDemoMode);
+        const res = await repos.wallet.settle();
         await get().initialize();
         return res;
       } catch (err) {
@@ -506,7 +567,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
     },
 
     initialize: async () => {
-      logger.info('Initializing application data state...');
+      logger.info('Initializing application data state and restoring persistence...');
       
       if (typeof window !== 'undefined') {
         if (!(window as any)._hasSessionExpiredListener) {
@@ -548,7 +609,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const list = await repos.agents.getAgents();
         set({ agents: list });
 
-        // Load mode-specific wallet metrics
+        // Load mode-specific wallet metrics & persist
         const wallet = await repos.wallet.getBalance();
         if (isDemo) {
           set({
@@ -559,6 +620,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
             demoWallet: wallet,
             userWallet: wallet
           });
+          setStoredJSON('orbit_wallet_demo', wallet);
         } else {
           set({
             liveBalance: wallet.balance,
@@ -568,13 +630,14 @@ export const useNexusStore = create<NexusState>((set, get) => {
             liveWallet: wallet,
             userWallet: wallet
           });
+          setStoredJSON('orbit_wallet_live', wallet);
         }
 
-        // Restore active workflow session if URL parameter present
+        // Restore active workflow session or last opened workflow
         let workflowId = '';
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
-          workflowId = params.get('workflowId') || '';
+          workflowId = params.get('workflowId') || localStorage.getItem('orbit_last_workflow_id') || '';
         }
 
         if (workflowId) {
@@ -585,16 +648,32 @@ export const useNexusStore = create<NexusState>((set, get) => {
             
             set({
               activeWorkflow: activeWf,
+              userQuery: activeWf.name || get().userQuery,
               isRunning,
               appState: isRunning ? 'running' : (isTerminal ? 'completed' : 'draft'),
               currentPhaseIndex: isRunning ? 7 : (activeWf.status === 'completed' ? 9 : 0)
             });
+
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('orbit_last_workflow_id', activeWf.id);
+            }
 
             if (isDemo && isRunning) {
               repos.workflow.runWorkflow(activeWf.id);
             } else if (!isDemo && (isRunning || activeWf.status === 'pending')) {
               get().pollActiveWorkflowStatus(activeWf);
             }
+          }
+        } else {
+          // Fall back to restoring unsaved draft workflow if present
+          const draft = getStoredJSON<any>('orbit_workflow_draft', null);
+          if (draft && draft.activeWorkflow) {
+            set({
+              activeWorkflow: draft.activeWorkflow,
+              userQuery: draft.query || get().userQuery,
+              unsavedWorkflowTemplate: draft.unsavedTemplate || null,
+              appState: 'draft'
+            });
           }
         }
       } catch (err) {
@@ -608,14 +687,16 @@ export const useNexusStore = create<NexusState>((set, get) => {
         localStorage.removeItem('orbit_demo_escrow');
         localStorage.removeItem('orbit_demo_history');
         localStorage.removeItem('orbit-demo-workflow');
+        localStorage.removeItem('orbit_last_workflow_id');
+        localStorage.removeItem('orbit_workflow_draft');
       }
       get().resetExecution();
       get().initialize();
     },
 
     logExecution: (phase, message, type = 'info', metadata) => {
-      set(prev => ({
-        executionLogs: [
+      set(prev => {
+        const nextLogs = [
           ...prev.executionLogs,
           {
             id: `log-${Date.now()}-${Math.random()}`,
@@ -625,8 +706,10 @@ export const useNexusStore = create<NexusState>((set, get) => {
             type,
             metadata
           }
-        ]
-      }));
+        ];
+        setStoredJSON('orbit_execution_logs', nextLogs);
+        return { executionLogs: nextLogs };
+      });
     },
 
     pollActiveWorkflowStatus: async (workflow) => {
@@ -639,10 +722,13 @@ export const useNexusStore = create<NexusState>((set, get) => {
           
           if (fresh) {
             set({ activeWorkflow: fresh });
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('orbit_last_workflow_id', fresh.id);
+            }
             
-            // Query logs
             const logs = await repos.workflow.getWorkflowLogs(workflow.id);
             set({ executionLogs: logs });
+            setStoredJSON('orbit_execution_logs', logs);
 
             if (fresh.status === 'completed' || fresh.status === 'failed' || (fresh.status as string) === 'cancelled') {
               isPolledRunning = false;

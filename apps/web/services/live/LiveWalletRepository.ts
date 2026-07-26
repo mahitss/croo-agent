@@ -145,4 +145,9 @@ export class LiveWalletRepository implements WalletRepository {
     const res = await apiClient.post<any>('/api/v1/wallet/cap/link', {});
     return { success: res.success };
   }
+
+  async settle(): Promise<{ success: boolean; message?: string }> {
+    const res = await apiClient.post<any>('/api/v1/wallet/settle', {});
+    return { success: res?.success ?? true, message: res?.message };
+  }
 }

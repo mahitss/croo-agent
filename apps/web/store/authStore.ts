@@ -122,20 +122,41 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isCheckingAuth: true,
     isAuthenticated: false,
     initializationState: 'UNINITIALIZED',
-    rememberMe: true,
-    isDemoMode: true,
-    environment: 'demo',
+    rememberMe: typeof window !== 'undefined' ? localStorage.getItem('orbit_remember_me') !== 'false' : true,
+    isDemoMode: typeof window !== 'undefined' ? (localStorage.getItem('orbit_demomode') === null ? true : localStorage.getItem('orbit_demomode') === 'true') : true,
+    environment: typeof window !== 'undefined' ? ((localStorage.getItem('orbit_environment') as any) || 'demo') : 'demo',
     isAuthModalOpen: false,
     authModalTab: 'login',
-    isSidebarCollapsed: false,
+    isSidebarCollapsed: typeof window !== 'undefined' ? localStorage.getItem('orbit_sidebar_collapsed') === 'true' : false,
     isMobileSidebarOpen: false,
     
-    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+    toggleSidebar: () => set((state) => {
+      const next = !state.isSidebarCollapsed;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('orbit_sidebar_collapsed', next ? 'true' : 'false');
+      }
+      return { isSidebarCollapsed: next };
+    }),
     setMobileSidebarOpen: (val) => set({ isMobileSidebarOpen: val }),
-    setRememberMe: (val) => set({ rememberMe: val }),
+    setRememberMe: (val) => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('orbit_remember_me', val ? 'true' : 'false');
+      }
+      set({ rememberMe: val });
+    },
+    toggleDemoMode: () => set((state) => {
+      const nextDemo = !state.isDemoMode;
+      const nextEnv = nextDemo ? 'demo' : 'live';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('orbit_demomode', nextDemo ? 'true' : 'false');
+        localStorage.setItem('orbit_environment', nextEnv);
+      }
+      return { isDemoMode: nextDemo, environment: nextEnv };
+    }),
     setEnvironment: (env) => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('orbit_environment', env);
+        localStorage.setItem('orbit_demomode', env === 'demo' ? 'true' : 'false');
       }
       set({ 
         environment: env, 
@@ -383,18 +404,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
     setAuthModal: (open, tab = 'login') => {
       console.log(`[AUTH_STORE] setAuthModal: open=${open}, tab=${tab}`);
       set({ isAuthModalOpen: open, authModalTab: tab });
-    },
-
-    toggleDemoMode: () => {
-      const currentMode = get().isDemoMode;
-      const nextMode = !currentMode;
-      console.log('[AUTH_STORE] toggleDemoMode: switching to', nextMode ? 'DEMO' : 'LIVE');
-      set({ isDemoMode: nextMode });
-      localStorage.setItem('orbit_demomode', String(nextMode));
-      
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('nexus_mode_changed', { detail: { mode: nextMode ? 'demo' : 'live' } }));
-      }
     },
 
     loginUser: async (usernameOrEmail, password) => {

@@ -112,4 +112,8 @@ export class DemoWalletRepository implements WalletRepository {
   async linkCapWallet(): Promise<{ success: boolean }> {
     return { success: true };
   }
+
+  async settle(): Promise<{ success: boolean; message?: string }> {
+    return { success: true };
+  }
 }

@@ -36,6 +36,7 @@ export interface WalletRepository {
   transfer(amount: number, recipientAddress: string): Promise<{ success: boolean; message?: string }>;
   getCapTransactions(): Promise<any[]>;
   linkCapWallet(): Promise<{ success: boolean }>;
+  settle(): Promise<{ success: boolean; message?: string }>;
 }
 
 export interface AnalyticsRepository {
