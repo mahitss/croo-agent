@@ -204,6 +204,12 @@ export class AuthController {
     }
   }
 
+  @Get('auth/me')
+  @UseGuards(GatewayAuthGuard)
+  async getAuthMe(@Req() req: any) {
+    return this.getMe(req);
+  }
+
   @Patch('users/me')
   updateMe(@Body() body: any) {
     return { success: true, message: 'Profile updated', data: body };

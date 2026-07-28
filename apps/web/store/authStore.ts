@@ -382,6 +382,39 @@ export const useAuthStore = create<AuthState>((set, get) => {
             console.error('[TOKEN REFRESH] Silent refresh failed:', e);
           }
         }
+
+        // Fallback: Attempt session verification via credentials/cookies if local storage token was missing
+        console.log('[AUTH INIT] Attempting backend cookie session verification fallback...');
+        try {
+          const cookiePing = await fetch(`${BASE_URL}/api/v1/users/me`, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+            credentials: 'include'
+          });
+
+          if (cookiePing.ok) {
+            const meData = await cookiePing.json();
+            const freshUser = (meData?.id || meData?.email) ? meData : (meData?.data?.profile || meData?.data?.user || meData?.data || meData?.profile || meData?.user || parsedUser);
+            if (freshUser && (freshUser.id || freshUser.email)) {
+              console.log('[AUTH READY] Cookie session verified successfully via backend! User ID:', freshUser?.id);
+              const restoredToken = token || getCookie('orbit_token') || getCookie('token') || 'oauth-session-token';
+              const storageToUse = localStorage;
+              storageToUse.setItem('orbit_user', JSON.stringify(freshUser));
+              storageToUse.setItem('orbit_token', restoredToken);
+              
+              set({
+                token: restoredToken,
+                user: freshUser,
+                isAuthenticated: true,
+                initializationState: 'AUTHENTICATED',
+                isCheckingAuth: false
+              });
+              get().scheduleAutoRefresh();
+              return true;
+            }
+          }
+        } catch (cookieErr) {
+          console.warn('[AUTH INIT] Cookie session verification ping failed:', cookieErr);
+        }
         
         console.log('[AUTH READY] No valid session restored. Transitioning to UNAUTHENTICATED.');
         storage.removeItem('orbit_token');

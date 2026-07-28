@@ -60,28 +60,37 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Unified States mapping
   const transactions = wallet?.history || [];
-
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const refreshData = async () => {
-    if (!isAuthenticated) {
-      console.log('[MODE_PROVIDER] Session is not authenticated. Bypassing state loading.');
+    // Guard 1: Do not make decisions or bypass loading while session restoration is still in progress
+    if (initializationState === 'UNINITIALIZED' || initializationState === 'CHECKING_SESSION') {
+      console.log(`[MODE_PROVIDER] Session restoration in progress (State: ${initializationState}). Deferring state hydration...`);
       return;
     }
+
+    if (!isAuthenticated) {
+      console.log('[MODE_PROVIDER] Session restoration completed. User is not authenticated. Bypassing state loading.');
+      return;
+    }
+
     try {
+      console.log('[MODE_PROVIDER] Session authenticated! Hydrating platform state, wallet, and workflows...');
       await initialize();
     } catch (err: any) {
+      console.error('[MODE_PROVIDER_ERROR] State loading failed:', err);
       toast(`State loading failed: ${err.message || err}`, 'error');
     }
   };
 
   useEffect(() => {
+    console.log(`[MODE_PROVIDER] Initializing auth session check. Current initializationState: ${initializationState}`);
     initializeAuth();
   }, [initializeAuth]);
 
   useEffect(() => {
     refreshData();
-  }, [isDemoMode, isAuthenticated]);
+  }, [isDemoMode, isAuthenticated, initializationState]);
 
   const toggleMode = () => {
     // Reset/clear current mode states before switching to prevent leakage
