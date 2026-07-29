@@ -21,6 +21,7 @@ import { DemoAnalyticsRepository } from '../services/demo/DemoAnalyticsRepositor
 import { LiveAnalyticsRepository } from '../services/live/LiveAnalyticsRepository';
 import { logger } from '../utils/logger';
 import { errorHandler } from '../utils/errorHandler';
+import { dbPersistenceService, executeOptimisticMutation } from '../services/persistence';
 
 // Re-export seed agents for component backwards compatibility
 export { seedAgents };
@@ -279,6 +280,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
     setSelectedWorkspaceId: (id) => {
       setStoredJSON('orbit_selected_workspace_id', id);
       set({ selectedWorkspaceId: id });
+      dbPersistenceService.saveWorkspace(id, { selectedWorkspaceId: id });
     },
     hireMarketplaceAgent: (agentId) => {
       const current = get().hiredAgentIds || [];
@@ -286,6 +288,7 @@ export const useNexusStore = create<NexusState>((set, get) => {
         const next = [...current, agentId];
         set({ hiredAgentIds: next });
         setStoredJSON('orbit_hired_agents', next);
+        dbPersistenceService.saveMarketplaceInstall(agentId, { hiredAgentIds: next });
       }
     },
     recordAgentUsage: (agentId) => {
