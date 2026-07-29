@@ -96,7 +96,14 @@ export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Reset/clear current mode states before switching to prevent leakage
     resetExecution();
     toggleDemoMode();
-    toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Mode'}`, 'info');
+    toast(`Switched to ${!isDemoMode ? 'Demo Sandbox' : 'Live Production'} Mode. Reloading platform context...`, 'info');
+    
+    // Complete platform context reload
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
+    }
   };
 
   // Prevent app render and protected calls until session init finishes
