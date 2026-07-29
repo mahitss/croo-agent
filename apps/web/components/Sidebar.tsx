@@ -31,7 +31,8 @@ import {
   Cloud,
   ShieldCheck,
   Globe,
-  Code
+  Code,
+  GitBranch
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -46,6 +47,7 @@ export default function Sidebar() {
       subItems: [
         { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
         { name: 'Builder', href: '/workspace/new', icon: PlusCircle },
+        { name: 'Digital Twin', href: '/workspace/twin', icon: GitBranch },
         { name: 'Data Intelligence', href: '/workspace/data', icon: Database },
         { name: 'Integrations Hub', href: '/workspace/integrations', icon: Share2 },
         { name: 'Swarm Teams', href: '/workspace/swarm', icon: Users },
