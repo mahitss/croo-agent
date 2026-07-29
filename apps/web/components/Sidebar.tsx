@@ -24,7 +24,8 @@ import {
   LineChart,
   Terminal,
   Receipt,
-  Server
+  Server,
+  Brain
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -52,6 +53,7 @@ export default function Sidebar() {
         { name: 'Plugins', href: '/plugins', icon: Layers },
       ]
     },
+    { name: 'Knowledge & RAG', href: '/knowledge', icon: Brain },
     { name: 'Infrastructure', href: '/agents', icon: Server },
     { 
       name: 'Deployments', 
