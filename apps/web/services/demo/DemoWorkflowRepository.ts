@@ -1,6 +1,7 @@
 import { Workflow, ExecutionLog, TaskNode } from '@nexus-ai/types';
 import { WorkflowRepository } from '../repositories';
 import { useNexusStore } from '../../store/nexusStore';
+import { WorkflowPlannerEngine } from '../workflow-planner.engine';
 
 export class DemoWorkflowRepository implements WorkflowRepository {
   private getStored<T>(key: string, defaultValue: T): T {
@@ -163,78 +164,8 @@ export class DemoWorkflowRepository implements WorkflowRepository {
   }
 
   async generateWorkflow(query: string, routingMode: string, budget: number): Promise<Workflow> {
-    const demoTemplates = [
-      {
-        name: 'Pattern A - Smart Contract Audit Swarm',
-        nodes: [
-          { id: 'n1', label: 'Vuln Analysis', capability: 'Security', posX: 100, posY: 200 },
-          { id: 'n2', label: 'Safety Proof verification', capability: 'QA', posX: 300, posY: 200 }
-        ],
-        edges: [{ source: 'n1', target: 'n2' }]
-      },
-      {
-        name: 'Pattern B - Market Risk Swarm',
-        nodes: [
-          { id: 'n1', label: 'Asset Volatility Tracker', capability: 'Analytics', posX: 80, posY: 200 },
-          { id: 'n2', label: 'Risk Model Compiler', capability: 'Finance', posX: 260, posY: 100 },
-          { id: 'n3', label: 'SLA Limit Reviewer', capability: 'Legal', posX: 260, posY: 300 },
-          { id: 'n4', label: 'Consensus Dispatcher', capability: 'Compliance', posX: 440, posY: 200 }
-        ],
-        edges: [
-          { source: 'n1', target: 'n2' },
-          { source: 'n1', target: 'n3' },
-          { source: 'n2', target: 'n4' },
-          { source: 'n3', target: 'n4' }
-        ]
-      }
-    ];
-
-    const template = demoTemplates[Math.floor(Math.random() * demoTemplates.length)] || demoTemplates[0];
-    const scaleX = 0.95 + Math.random() * 0.25;
-    const scaleY = 0.95 + Math.random() * 0.25;
-
-    const nodes: TaskNode[] = template.nodes.map((n, idx) => {
-      const costEstimate = Math.round((0.02 + Math.random() * 0.48) * 100) / 100;
-      const timeEstimate = Math.floor(200 + Math.random() * 1200);
-      const trustScore = Math.floor(85 + Math.random() * 14);
-      const jitterX = Math.floor(Math.random() * 40 - 20);
-      const jitterY = Math.floor(Math.random() * 40 - 20);
-
-      return {
-        id: n.id,
-        name: n.label,
-        task: n.label,
-        description: `Simulated capability run: ${n.capability.toLowerCase()}. Selected because: ${trustScore}% trust success.`,
-        capability: n.capability.toLowerCase(),
-        costEstimate,
-        timeEstimate,
-        trustScore,
-        status: 'pending' as const,
-        assignedAgentId: `agent-${n.capability.toLowerCase()}-1`,
-        assignedAgent: `InsightFinder ${n.capability}`,
-        positionX: Math.round(n.posX * scaleX) + jitterX,
-        positionY: Math.round(n.posY * scaleY) + jitterY
-      };
-    });
-
-    const edges = template.edges.map((e, idx) => ({
-      id: `e-${idx}-${Date.now()}`,
-      source: e.source,
-      target: e.target
-    }));
-
-    const workflow: Workflow = {
-      id: `demo-${Date.now()}`,
-      name: query.slice(0, 30) + ' Pipeline',
-      query,
-      nodes,
-      edges,
-      budget,
-      routingMode: routingMode as any,
-      retryCount: 0,
-      status: 'pending' as const,
-      createdAt: new Date().toISOString()
-    };
+    const planned = WorkflowPlannerEngine.plan(query, routingMode, budget);
+    const workflow = planned.workflow;
 
     this.setStored('orbit-demo-workflow', workflow);
     return workflow;

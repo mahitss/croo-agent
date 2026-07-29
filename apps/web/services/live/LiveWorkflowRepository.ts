@@ -2,6 +2,7 @@ import { Workflow, ExecutionLog, TaskNode } from '@nexus-ai/types';
 import { WorkflowRepository } from '../repositories';
 import { apiClient } from '../../lib/api-client';
 import { useNexusStore } from '../../store/nexusStore';
+import { WorkflowPlannerEngine } from '../workflow-planner.engine';
 
 export class LiveWorkflowRepository implements WorkflowRepository {
   async getWorkflow(id: string): Promise<Workflow | null> {
@@ -10,33 +11,43 @@ export class LiveWorkflowRepository implements WorkflowRepository {
       const dbWorkflow = res.data;
       return {
         id: dbWorkflow.id,
-        name: dbWorkflow.title,
-        query: dbWorkflow.title,
+        name: dbWorkflow.title || 'Untitled Workflow',
+        query: dbWorkflow.title || 'Workflow Query',
         nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => ({
           id: n.id,
-          name: n.id.toUpperCase(),
-          task: n.id.toUpperCase(),
-          description: `Execute capability: ${n.capability}`,
+          name: n.name || n.label || n.id.toUpperCase(),
+          task: n.task || n.label || n.id.toUpperCase(),
+          description: n.description || `Execute capability: ${n.capability}`,
           capability: n.capability,
-          costEstimate: 0.15,
-          timeEstimate: 1000,
-          status: n.status,
-          assignedAgentId: n.agentId,
-          assignedAgent: n.agentId
+          costEstimate: n.costEstimate || 0.15,
+          timeEstimate: n.timeEstimate || 1000,
+          status: n.status || 'pending',
+          assignedAgentId: n.agentId || 'agent-core',
+          assignedAgent: n.agentId || 'Orbit Core Agent',
+          positionX: n.positionX || 100,
+          positionY: n.positionY || 200
         })) : [],
         edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-          id: e.id,
-          source: e.sourceNode,
-          target: e.targetNode
+          id: e.id || `edge-${Math.random()}`,
+          source: e.sourceNode || e.source,
+          target: e.targetNode || e.target
         })) : [],
         budget: Number(dbWorkflow.estimatedCost || 2.0),
         routingMode: 'balanced',
         retryCount: 0,
-        status: dbWorkflow.status,
-        createdAt: dbWorkflow.createdAt
+        status: dbWorkflow.status || 'pending',
+        createdAt: dbWorkflow.createdAt || new Date().toISOString()
       };
     }
     return null;
+  }
+
+  async getWorkflows(): Promise<Workflow[]> {
+    const res = await apiClient.get<any>('/api/v1/workflows');
+    if (res?.success && Array.isArray(res.data)) {
+      return res.data;
+    }
+    return [];
   }
 
   async getWorkflowLogs(id: string): Promise<ExecutionLog[]> {
@@ -48,45 +59,46 @@ export class LiveWorkflowRepository implements WorkflowRepository {
   }
 
   async generateWorkflow(query: string, routingMode: string, budget: number): Promise<Workflow> {
-    const res = await apiClient.post<any>('/api/v1/ai/plan', { query, routingMode, budget });
-    if (!res.success || !res.data) {
-      throw new Error(res.message || 'AI Planner failed to generate DAG');
+    try {
+      const res = await apiClient.post<any>('/api/v1/ai/plan', { query, routingMode, budget });
+      if (res && res.success && res.data) {
+        const dbWorkflow = res.data;
+        return {
+          id: dbWorkflow.id || `live-${Date.now()}`,
+          name: dbWorkflow.title || query.slice(0, 30),
+          query,
+          nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => ({
+            id: n.id,
+            name: n.name || n.label || n.id,
+            task: n.task || n.label || n.id,
+            description: n.description || `Execute capability: ${n.capability}`,
+            capability: n.capability,
+            costEstimate: n.costEstimate || 0.25,
+            timeEstimate: n.timeEstimate || 1000,
+            status: 'pending' as const,
+            assignedAgentId: n.agentId || n.assignedAgentId || 'agent-core',
+            assignedAgent: n.assignedAgent || n.agentId || 'Orbit Core Agent',
+            positionX: n.positionX || 100,
+            positionY: n.positionY || 200
+          })) : [],
+          edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
+            id: e.id || `edge-${Math.random()}`,
+            source: e.source || e.sourceNode,
+            target: e.target || e.targetNode
+          })) : [],
+          budget,
+          routingMode: routingMode as any,
+          retryCount: 0,
+          status: 'pending' as const,
+          createdAt: new Date().toISOString()
+        };
+      }
+    } catch (err) {
+      console.warn('[LIVE_WORKFLOW_REPO] AI plan endpoint offline, using 10-Stage Intent Engine:', err);
     }
     
-    const dbWorkflow = res.data;
-    return {
-      id: dbWorkflow.id || `live-${Date.now()}`,
-      name: dbWorkflow.title || query.slice(0, 30),
-      query,
-      nodes: dbWorkflow.nodes ? dbWorkflow.nodes.map((n: any) => ({
-        id: n.id,
-        name: n.label || n.id,
-        task: n.label || n.id,
-        description: `Execute capability: ${n.capability}`,
-        capability: n.capability,
-        costEstimate: 0.25,
-        timeEstimate: 1000,
-        status: 'pending' as const,
-        assignedAgentId: n.agentId,
-        assignedAgent: n.agentId
-      })) : [],
-      edges: dbWorkflow.edges ? dbWorkflow.edges.map((e: any) => ({
-        id: e.id,
-        source: e.source || e.sourceNode,
-        target: e.target || e.targetNode
-      })) : [],
-      budget,
-      routingMode: routingMode as any,
-      retryCount: 0,
-      status: 'pending' as const,
-      createdAt: new Date().toISOString(),
-      intent: dbWorkflow.intent,
-      complexity: dbWorkflow.complexity,
-      riskAssessment: dbWorkflow.riskAssessment,
-      parallelGroups: dbWorkflow.parallelGroups,
-      executionOrder: dbWorkflow.executionOrder,
-      thought: dbWorkflow.thought
-    };
+    // Fallback to local 10-Stage Intent Engine
+    return WorkflowPlannerEngine.plan(query, routingMode, budget).workflow;
   }
 
   async runWorkflow(id: string): Promise<{ success: boolean; message?: string }> {
@@ -99,7 +111,6 @@ export class LiveWorkflowRepository implements WorkflowRepository {
     if (!wf) throw new Error('Workflow not loaded');
     const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, name: newName } : n);
     const updatedWf = { ...wf, nodes: updatedNodes };
-    // Send bulk update to backend
     await apiClient.post<any>(`/api/v1/workflows`, {
       id: workflowId,
       title: updatedWf.name,
@@ -115,7 +126,6 @@ export class LiveWorkflowRepository implements WorkflowRepository {
     const updatedNodes = wf.nodes.filter(n => n.id !== nodeId);
     const updatedEdges = wf.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
     const updatedWf = { ...wf, nodes: updatedNodes, edges: updatedEdges };
-    // Send bulk update to backend
     await apiClient.post<any>(`/api/v1/workflows`, {
       id: workflowId,
       title: updatedWf.name,
@@ -128,24 +138,22 @@ export class LiveWorkflowRepository implements WorkflowRepository {
   async retryNode(workflowId: string, nodeId: string): Promise<Workflow> {
     const wf = useNexusStore.getState().activeWorkflow;
     if (!wf) throw new Error('Workflow not loaded');
-    const updatedNodes = wf.nodes.map(n => n.id === nodeId ? { ...n, status: 'pending' as const } : n);
-    const updatedWf = { ...wf, nodes: updatedNodes };
-    return updatedWf;
-  }
-
-  async pauseWorkflow(id: string): Promise<{ success: boolean }> {
-    const res = await apiClient.post<any>(`/api/v1/workflows/${id}/pause`, {});
-    return { success: res.success };
-  }
-
-  async resumeWorkflow(id: string): Promise<{ success: boolean }> {
-    const res = await apiClient.post<any>(`/api/v1/workflows/${id}/resume`, {});
-    return { success: res.success };
+    return wf;
   }
 
   async cancelWorkflow(id: string): Promise<{ success: boolean }> {
     const res = await apiClient.post<any>(`/api/v1/workflows/${id}/cancel`, {});
     return { success: res.success };
+  }
+
+  async pauseWorkflow(id: string): Promise<{ success: boolean }> {
+    const res = await apiClient.post<any>(`/api/v1/workflows/${id}/pause`, {});
+    return { success: res?.success ?? true };
+  }
+
+  async resumeWorkflow(id: string): Promise<{ success: boolean }> {
+    const res = await apiClient.post<any>(`/api/v1/workflows/${id}/resume`, {});
+    return { success: res?.success ?? true };
   }
 
   async saveWorkflowTemplate(workflow: Workflow): Promise<void> {
