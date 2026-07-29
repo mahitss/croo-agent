@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
 import { Search, Plus, ArrowRight, BookOpen, Layers, Terminal, Sparkles, Shield, Cpu, HelpCircle } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { apiClient } from '../../lib/api-client';
 
 export default function WorkspacesPage() {
   const router = useRouter();
@@ -13,23 +14,37 @@ export default function WorkspacesPage() {
   const user = useAuthStore((state) => state.user);
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [loadingWorkflows, setLoadingWorkflows] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const loadRealWorkflows = async () => {
+      try {
+        const res = await apiClient.get<any>('/api/v1/workflows');
+        if (res && Array.isArray(res.data)) {
+          setWorkflows(res.data);
+        } else if (Array.isArray(res)) {
+          setWorkflows(res);
+        }
+      } catch (e) {
+        console.warn('[WORKSPACES] Failed to fetch workflows:', e);
+      } finally {
+        setLoadingWorkflows(false);
+      }
+    };
+    loadRealWorkflows();
   }, []);
 
   if (!mounted) return null;
 
   const displayName = user?.displayName || 'Mahit Saxena';
 
-  const mockWorkflows = [
-    { id: 'research-agent', name: 'Research Agent', updated: 'Updated 2 hours ago' },
-    { id: 'sales-outreach', name: 'Sales Outreach', updated: 'Updated yesterday' },
-    { id: 'compliance-audit', name: 'Compliance Audit', updated: 'Updated 3 days ago' },
-  ];
-
-  const filteredWorkflows = mockWorkflows.filter(wf => 
-    wf.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredWorkflows = workflows.filter(wf => 
+    (wf.name || wf.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
 

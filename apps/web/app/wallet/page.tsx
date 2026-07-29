@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Wallet, ArrowUpRight, Shield, Plus, ExternalLink, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { useAuthStore } from '../../store/authStore';
+import { apiClient } from '../../lib/api-client';
 
 export default function WalletPage() {
   const { toast } = useToast();
   const environment = useAuthStore((state) => state.environment) || 'demo';
 
-  const [balance, setBalance] = useState(150.0);
-  const [escrowBalance, setEscrowBalance] = useState(12.50);
+  const [balance, setBalance] = useState(0.0);
+  const [escrowBalance, setEscrowBalance] = useState(0.0);
   const [autoTopUp, setAutoTopUp] = useState(true);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -20,13 +21,37 @@ export default function WalletPage() {
   // Withdrawal transaction state machine: 'idle' | 'signing' | 'broadcasting' | 'confirming' | 'success' | 'error'
   const [txStep, setTxStep] = useState<'idle' | 'signing' | 'broadcasting' | 'confirming' | 'success' | 'error'>('idle');
   const [activeTxHash, setActiveTxHash] = useState('');
-  const [isWalletConnected, setIsWalletConnected] = useState(environment === 'demo' || environment === 'sandbox');
+  const [isWalletConnected, setIsWalletConnected] = useState(true);
 
-  const [transactions, setTransactions] = useState([
-    { id: 'tx-1', type: 'Execution Escrow', agent: 'Research Consensus Swarm', amount: '-1.50 USDC', date: 'Today 10:14 AM', status: 'Completed', txHash: '0x3a82f...a1b4' },
-    { id: 'tx-2', type: 'Credit Deposit', agent: 'CAP Escrow Top-up', amount: '+50.00 USDC', date: 'Yesterday 04:30 PM', status: 'Completed', txHash: '0x8b12e...c4f9' },
-    { id: 'tx-3', type: 'Execution Escrow', agent: 'Sales Outreach Agent', amount: '-2.00 USDC', date: 'Jul 22, 2026', status: 'Completed', txHash: '0x92f1c...e3d2' },
-  ]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWalletData = async () => {
+      try {
+        const [wRes, txRes] = await Promise.all([
+          apiClient.get<any>('/api/v1/wallet').catch(() => null),
+          apiClient.get<any>('/api/v1/wallet/transactions').catch(() => null)
+        ]);
+
+        if (wRes && (wRes.balance !== undefined || wRes.data?.balance !== undefined)) {
+          setBalance(Number(wRes.balance ?? wRes.data?.balance ?? 0));
+          setEscrowBalance(Number(wRes.escrowBalance ?? wRes.data?.escrowBalance ?? 0));
+        }
+
+        if (txRes && Array.isArray(txRes.data)) {
+          setTransactions(txRes.data);
+        } else if (Array.isArray(txRes)) {
+          setTransactions(txRes);
+        }
+      } catch (e) {
+        console.warn('[WALLET] Failed to fetch wallet data:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWalletData();
+  }, []);
 
   const handleConfirmWithdraw = async () => {
     const val = parseFloat(amountInput);
@@ -172,28 +197,36 @@ export default function WalletPage() {
           Settlement Transaction Log
         </h3>
         <div className="flex flex-col bg-[#111111] border border-[#232323] rounded-2xl overflow-hidden text-xs">
-          {transactions.map((tx) => (
-            <div key={tx.id} className="flex items-center justify-between p-4 border-b border-[#232323] last:border-b-0 hover:bg-white/[0.02]">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-semibold text-white">{tx.agent}</span>
-                <span className="text-[10px] text-gray-500">{tx.type} • {tx.date}</span>
+          {transactions.length > 0 ? (
+            transactions.map((tx) => (
+              <div key={tx.id || tx.txHash} className="flex items-center justify-between p-4 border-b border-[#232323] last:border-b-0 hover:bg-white/[0.02]">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-white">{tx.agent || tx.description || 'Wallet Settlement'}</span>
+                  <span className="text-[10px] text-gray-500">{tx.type || 'Transfer'} • {tx.date || (tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'Recently')}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  {tx.txHash && (
+                    <a 
+                      href={`https://etherscan.io/tx/${tx.txHash}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="flex items-center gap-1 text-[10px] font-mono text-gray-500 hover:text-[#4EA3FF] no-underline"
+                    >
+                      <span>{tx.txHash}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <span className={`font-mono font-bold ${(tx.amount || '').toString().startsWith('+') ? 'text-emerald-400' : 'text-gray-300'}`}>
+                    {tx.amount ? (tx.amount.toString().includes('USDC') ? tx.amount : `${tx.amount} USDC`) : '0.00 USDC'}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <a 
-                  href={`https://etherscan.io/tx/${tx.txHash}`} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="flex items-center gap-1 text-[10px] font-mono text-gray-500 hover:text-[#4EA3FF] no-underline"
-                >
-                  <span>{tx.txHash}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-                <span className={`font-mono font-bold ${tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-gray-300'}`}>
-                  {tx.amount}
-                </span>
-              </div>
+            ))
+          ) : (
+            <div className="p-8 text-center font-mono text-xs text-gray-500">
+              No settlement transactions recorded. Deposits and execution escrow settlements will stream here.
             </div>
-          ))}
+          )}
         </div>
       </div>
 

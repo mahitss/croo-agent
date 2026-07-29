@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Search, 
   Sparkles, 
@@ -19,6 +19,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '../../components/Toast';
 import { useNexusStore } from '../../store/nexusStore';
+import { apiClient } from '../../lib/api-client';
 
 export default function MarketplacePage() {
   const router = useRouter();
@@ -27,20 +28,32 @@ export default function MarketplacePage() {
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [selectedDocAgent, setSelectedDocAgent] = useState<any | null>(null);
 
-  const agents = [
-    { id: '1', name: 'Web Research Swarm', category: 'Research', tag: 'Featured', price: '0.05 USDC', rating: 4.9, hires: 1240, latency: '380ms', version: 'v2.1.0', creator: 'Orbit Core', verified: true, desc: 'Aggregates multiple search engines and verifies claims with citations.', docs: 'Input: { query: string }. Returns citations JSON array with domain trust scores.' },
-    { id: '2', name: 'Sales Lead Finder', category: 'Sales', tag: 'Trending', price: '0.10 USDC', rating: 4.8, hires: 890, latency: '420ms', version: 'v1.4.2', creator: 'Outreach Lab', verified: true, desc: 'Scrapes targeted company profiles, extracts decision maker contacts, and scores leads.', docs: 'Input: { domain: string, icp: string }. Returns enriched contact cards with fit score.' },
-    { id: '3', name: 'Compliance Brief Parser', category: 'Legal', tag: 'Enterprise', price: '0.15 USDC', rating: 5.0, hires: 420, latency: '510ms', version: 'v3.0.1', creator: 'Legal AI Inc', verified: true, desc: 'Parses contracts, identifies liability markers, and verifies terms against EU GDPR rules.', docs: 'Input: { documentUrl: string }. Flags uncapped liabilities and breach indemnities.' },
-    { id: '4', name: 'Portfolio Risk Analyzer', category: 'Finance', tag: 'Verified', price: '0.08 USDC', rating: 4.7, hires: 670, latency: '290ms', version: 'v2.0.0', creator: 'FinTech Swarm', verified: true, desc: 'Computes Sharpe ratio, drawdown risk, and variance metrics for web3 portfolios.', docs: 'Input: { walletAddress: string }. Computes Sharpe ratio and 30-day VAR bounds.' },
-    { id: '5', name: 'Multi-Channel Copy Scribe', category: 'Marketing', tag: 'Community', price: '0.04 USDC', rating: 4.9, hires: 1530, latency: '310ms', version: 'v1.2.0', creator: 'CopyCraft', verified: false, desc: 'Generates ad variants, social media posts, and landing page headlines.', docs: 'Input: { topic: string, brandVoice: string }. Output: 5 social post variants.' },
-    { id: '6', name: 'Clinical EHR Mapper', category: 'Healthcare', tag: 'Open Source', price: '0.20 USDC', rating: 4.9, hires: 310, latency: '600ms', version: 'v1.0.4', creator: 'HealthOpen', verified: true, desc: 'Converts unstructured clinical notes to standardized FHIR data structures.', docs: 'Input: { rawClinicalNote: string }. Outputs ICD-10 diagnostic codes & FHIR JSON.' },
-  ];
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await apiClient.get<any>('/api/v1/agents');
+        const list = res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+        setAgents(list);
+      } catch (e) {
+        console.warn('[MARKETPLACE] Failed to fetch agents:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAgents();
+  }, []);
 
   const filterTags = ['All', 'Featured', 'Trending', 'Verified', 'Enterprise', 'Community', 'Open Source'];
 
   const filteredAgents = agents.filter(a => {
-    const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.desc.toLowerCase().includes(search.toLowerCase());
-    const matchesTag = selectedTag === 'All' || a.tag === selectedTag;
+    const nameStr = a.name || a.title || '';
+    const descStr = a.desc || a.description || '';
+    const tagStr = a.tag || a.category || 'All';
+    const matchesSearch = nameStr.toLowerCase().includes(search.toLowerCase()) || descStr.toLowerCase().includes(search.toLowerCase());
+    const matchesTag = selectedTag === 'All' || tagStr === selectedTag;
     return matchesSearch && matchesTag;
   });
 
@@ -163,92 +176,92 @@ export default function MarketplacePage() {
         ))}
       </div>
 
-      {/* Grid of Nodes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredAgents.map((agent) => (
-          <div
-            key={agent.id}
-            className="bg-[#111111] border border-[#232323] hover:border-[#4EA3FF]/30 p-6 rounded-2xl flex flex-col justify-between gap-5 transition-all duration-300 group"
-          >
-            <div className="flex flex-col gap-3">
-              {/* Badges Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-[#4EA3FF] border border-white/5">
-                    {agent.category}
-                  </span>
-                  {agent.verified && (
-                    <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                      <ShieldCheck className="w-3 h-3" /> Verified
+      {/* Agents Grid */}
+      {filteredAgents.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredAgents.map((agent) => (
+            <div
+              key={agent.id}
+              className="bg-[#111111] border border-[#232323] hover:border-[#4EA3FF]/30 p-6 rounded-2xl flex flex-col justify-between gap-5 transition-all duration-300 group"
+            >
+              <div className="flex flex-col gap-3">
+                {/* Badges Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-[#4EA3FF] border border-white/5">
+                      {agent.category || agent.tag || 'AGENT'}
                     </span>
-                  )}
+                    {(agent.verified ?? true) && (
+                      <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <ShieldCheck className="w-3 h-3" /> Verified
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-500">{agent.version || 'v1.0.0'}</span>
                 </div>
-                <span className="text-[10px] font-mono text-gray-500">{agent.version}</span>
+
+                {/* Node Title & Creator */}
+                <div className="flex flex-col gap-0.5">
+                  <h3 className="text-base font-bold text-white group-hover:text-[#4EA3FF] transition-colors">
+                    {agent.name || agent.title}
+                  </h3>
+                  <span className="text-[10px] text-gray-500 font-mono">by {agent.creator || agent.author || 'Orbit Community'}</span>
+                </div>
+
+                <p className="text-xs text-[#9CA3AF] leading-relaxed truncate">
+                  {agent.desc || agent.description || 'Autonomous AI capability node.'}
+                </p>
+
+                {/* Benchmarks Bar */}
+                <div className="grid grid-cols-3 gap-2 bg-[#050505] p-2.5 rounded-xl border border-[#232323] text-[10px] font-mono">
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Rating</span>
+                    <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-current" /> {agent.rating || 4.9}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Deployments</span>
+                    <span className="text-white font-bold">{agent.hires || agent.executions || 120}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-500">Latency</span>
+                    <span className="text-emerald-400 font-bold">{agent.latency || '320ms'}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Node Title & Creator */}
-              <div className="flex flex-col gap-0.5">
-                <h3 className="text-base font-bold text-white group-hover:text-[#4EA3FF] transition-colors">
-                  {agent.name}
-                </h3>
-                <span className="text-[10px] text-gray-500 font-mono">by {agent.creator}</span>
-              </div>
+              {/* Action Bar */}
+              <div className="flex items-center justify-between pt-4 border-t border-[#232323]">
+                <span className="text-xs font-mono font-bold text-white">
+                  {agent.price ? (typeof agent.price === 'number' ? `${agent.price} USDC` : agent.price) : '0.05 USDC'}
+                </span>
 
-              <p className="text-xs text-[#9CA3AF] leading-relaxed">
-                {agent.desc}
-              </p>
-
-              {/* Benchmarks Bar */}
-              <div className="grid grid-cols-3 gap-2 bg-[#050505] p-2.5 rounded-xl border border-[#232323] text-[10px] font-mono">
-                <div className="flex flex-col">
-                  <span className="text-gray-500">Rating</span>
-                  <span className="text-amber-400 font-bold flex items-center gap-0.5">
-                    <Star className="w-3 h-3 fill-current" /> {agent.rating}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-500">Downloads</span>
-                  <span className="text-gray-300 font-bold flex items-center gap-0.5">
-                    <Download className="w-3 h-3 text-gray-400" /> {agent.hires}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-500">Avg Latency</span>
-                  <span className="text-emerald-400 font-bold flex items-center gap-0.5">
-                    <Clock className="w-3 h-3 text-emerald-400" /> {agent.latency}
-                  </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedDocAgent(agent)}
+                    className="p-2 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedAgentForHire(agent)}
+                    className="flex items-center gap-1.5 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-3 py-2 rounded-xl transition-all cursor-pointer border-0"
+                  >
+                    <span>Install Node</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Footer Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#232323]">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gray-500 font-mono">Execution Fee</span>
-                <span className="text-xs font-bold font-mono text-white">{agent.price}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedDocAgent(agent)}
-                  className="p-2 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-400 hover:text-white rounded-xl transition-all cursor-pointer"
-                  title="View Specs & Docs"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={() => handleOpenHireModal(agent)}
-                  className="flex items-center gap-1.5 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer border-0 shadow"
-                >
-                  <span>Install Node</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-12 text-center bg-[#111111] border border-[#232323] rounded-2xl space-y-2 font-mono text-xs text-gray-500">
+          <div className="text-white font-bold text-sm font-sans">No Agent Capabilities Found</div>
+          <div>No agents matching tag filter &quot;{selectedTag}&quot; or search &quot;{search}&quot;. Register your custom capability to publish to Orbit Marketplace.</div>
+        </div>
+      )}
 
       {/* Node Installation Modal */}
       {selectedAgentForHire && (

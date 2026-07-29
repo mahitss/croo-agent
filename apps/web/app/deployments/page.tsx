@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../../components/AppLayout';
 import { Rocket, ShieldCheck, RefreshCw, Key, Layers, Globe, CheckCircle2, ArrowRight, ExternalLink } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { apiClient } from '../../lib/api-client';
 
 export default function VercelStyleDeploymentsPage() {
   const { toast } = useToast();
@@ -18,11 +19,34 @@ export default function VercelStyleDeploymentsPage() {
     { key: 'MAX_ESCROW_CAP', value: '150.00 USDC', env: 'Production' },
   ]);
 
-  const deployments = [
-    { id: 'dep-101', name: 'Research Consensus Agent Swarm', version: 'v2.4.0', env: 'Production', region: 'us-east-1', traffic: '100%', status: 'Deployed', deployedAt: 'Today 09:30 AM', url: 'https://research.orbitai.dev' },
-    { id: 'dep-102', name: 'Sales Lead Outreach Swarm', version: 'v1.8.1', env: 'Production', region: 'us-west-2', traffic: '100%', status: 'Deployed', deployedAt: 'Yesterday 02:15 PM', url: 'https://sales.orbitai.dev' },
-    { id: 'dep-103', name: 'Legal GDPR Compliance Audit', version: 'v3.0.0', env: 'Staging', region: 'eu-west-1', traffic: '50% Split', status: 'Deployed', deployedAt: 'Jul 21, 2026', url: 'https://staging-legal.orbitai.dev' },
-  ];
+  const [deployments, setDeployments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDeployments = async () => {
+      try {
+        const res = await apiClient.get<any>('/api/v1/workflows');
+        const list = res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+        const deployedList = list.filter((w: any) => w.status === 'DEPLOYED' || w.isDeployed || w.status === 'ACTIVE').map((w: any) => ({
+          id: w.id,
+          name: w.name || w.title || 'Workflow Swarm',
+          version: w.version || 'v1.0.0',
+          env: 'Production',
+          region: 'us-east-1',
+          traffic: '100%',
+          status: 'Deployed',
+          deployedAt: w.updatedAt ? new Date(w.updatedAt).toLocaleDateString() : 'Recently deployed',
+          url: `https://${(w.id || 'swarm').toLowerCase()}.orbitai.dev`
+        }));
+        setDeployments(deployedList);
+      } catch (e) {
+        console.warn('[DEPLOYMENTS] Failed to fetch deployments:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDeployments();
+  }, []);
 
   const handleRollback = (id: string, name: string) => {
     toast(`Initiating rollback for deployment "${name}" to previous stable release...`, 'info');
@@ -82,49 +106,58 @@ export default function VercelStyleDeploymentsPage() {
         </button>
       </div>
 
-      {/* Tab 1: Production Releases */}
+      {/* Tab 1: Releases */}
       {selectedTab === 'releases' && (
         <div className="flex flex-col bg-[#111111] border border-[#232323] rounded-2xl overflow-hidden text-xs">
-          <div className="grid grid-cols-12 px-6 py-3.5 border-b border-[#232323] text-gray-500 font-mono text-[10px] uppercase">
-            <span className="col-span-4">Deployment Manifest & Domain</span>
-            <span className="col-span-2">Environment & Region</span>
-            <span className="col-span-2">Traffic Split</span>
-            <span className="col-span-2">Status & Release Date</span>
-            <span className="col-span-2 text-right">Rollback Control</span>
-          </div>
-
-          {deployments.map((dep) => (
-            <div key={dep.id} className="grid grid-cols-12 items-center px-6 py-4 border-b border-[#232323] last:border-b-0 hover:bg-white/[0.02]">
-              <div className="col-span-4 flex flex-col gap-0.5">
-                <span className="font-bold text-white text-xs">{dep.name} ({dep.version})</span>
-                <a href={dep.url} target="_blank" rel="noreferrer" className="text-[10px] font-mono text-[#4EA3FF] hover:underline flex items-center gap-1">
-                  <span>{dep.url}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+          {deployments.length > 0 ? (
+            <>
+              <div className="grid grid-cols-12 px-6 py-3.5 border-b border-[#232323] text-gray-500 font-mono text-[10px] uppercase">
+                <span className="col-span-4">Deployment Manifest</span>
+                <span className="col-span-2">Environment & Region</span>
+                <span className="col-span-2">Traffic Split</span>
+                <span className="col-span-2">Status & Release Date</span>
+                <span className="col-span-2 text-right">Rollback Control</span>
               </div>
 
-              <div className="col-span-2 font-mono">
-                <span className="text-purple-400">{dep.env}</span> • <span className="text-gray-500">{dep.region}</span>
-              </div>
+              {deployments.map((dep) => (
+                <div key={dep.id} className="grid grid-cols-12 items-center px-6 py-4 border-b border-[#232323] last:border-b-0 hover:bg-white/[0.02]">
+                  <div className="col-span-4 flex flex-col gap-0.5">
+                    <span className="font-bold text-white text-xs">{dep.name} ({dep.version})</span>
+                    <a href={dep.url} target="_blank" rel="noreferrer" className="text-[10px] font-mono text-[#4EA3FF] hover:underline flex items-center gap-1">
+                      <span>{dep.url}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
 
-              <div className="col-span-2 font-mono text-gray-300 font-bold">{dep.traffic}</div>
+                  <div className="col-span-2 font-mono">
+                    <span className="text-purple-400">{dep.env}</span> • <span className="text-gray-500">{dep.region}</span>
+                  </div>
 
-              <div className="col-span-2 font-mono">
-                <span className="text-emerald-400 font-bold block">{dep.status}</span>
-                <span className="text-gray-500 text-[10px]">{dep.deployedAt}</span>
-              </div>
+                  <div className="col-span-2 font-mono text-gray-300 font-bold">{dep.traffic}</div>
 
-              <div className="col-span-2 flex justify-end">
-                <button
-                  onClick={() => handleRollback(dep.id, dep.name)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-300 hover:text-amber-400 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Rollback</span>
-                </button>
-              </div>
+                  <div className="col-span-2 font-mono">
+                    <span className="text-emerald-400 font-bold block">{dep.status}</span>
+                    <span className="text-gray-500 text-[10px]">{dep.deployedAt}</span>
+                  </div>
+
+                  <div className="col-span-2 flex justify-end">
+                    <button
+                      onClick={() => handleRollback(dep.id, dep.name)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-300 hover:text-amber-400 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Rollback</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className="p-12 text-center font-mono text-xs text-gray-500 space-y-2">
+              <div className="text-white font-bold text-sm font-sans">No Production Deployments Recorded</div>
+              <div>Deploy a workflow DAG from the Workflow Builder to release it to production infrastructure.</div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
