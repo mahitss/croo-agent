@@ -46,7 +46,7 @@ export default function Sidebar() {
       icon: Workflow,
       subItems: [
         { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
-        { name: 'Builder', href: '/workspace/new', icon: PlusCircle },
+        { name: 'AI App Studio', href: '/workspace/builder', icon: PlusCircle },
         { name: 'Digital Twin', href: '/workspace/twin', icon: GitBranch },
         { name: 'Data Intelligence', href: '/workspace/data', icon: Database },
         { name: 'Integrations Hub', href: '/workspace/integrations', icon: Share2 },
