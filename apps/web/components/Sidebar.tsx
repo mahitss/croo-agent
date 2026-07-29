@@ -27,7 +27,11 @@ import {
   Server,
   Brain,
   Share2,
-  Database
+  Database,
+  Cloud,
+  ShieldCheck,
+  Globe,
+  Code
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -46,6 +50,18 @@ export default function Sidebar() {
         { name: 'Integrations Hub', href: '/workspace/integrations', icon: Share2 },
         { name: 'Swarm Teams', href: '/workspace/swarm', icon: Users },
         { name: 'Executions', href: '/workspace/executions', icon: Play },
+      ]
+    },
+    { 
+      name: 'Enterprise', 
+      href: '/deployments', 
+      icon: Cloud,
+      subItems: [
+        { name: 'Deployments', href: '/deployments', icon: Cloud },
+        { name: 'Governance & RBAC', href: '/admin', icon: ShieldCheck },
+        { name: 'Federation Network', href: '/federation', icon: Globe },
+        { name: 'Developer Portal', href: '/publish', icon: Code },
+        { name: 'Enterprise Billing', href: '/finance', icon: Receipt },
       ]
     },
     { 
