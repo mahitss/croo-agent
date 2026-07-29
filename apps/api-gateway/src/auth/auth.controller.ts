@@ -179,6 +179,12 @@ export class AuthController {
     }
   }
 
+  @Post('auth/logout-everywhere')
+  @HttpCode(HttpStatus.OK)
+  async logoutEverywhere(@Req() req: any, @Res({ passthrough: true }) response: any) {
+    return this.logout(req, response);
+  }
+
   @Post('auth/forgot-password')
   forgotPassword() {
     return { success: true, message: 'Reset email dispatched' };

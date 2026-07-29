@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import { ModeProvider } from "../providers/ModeProvider";
+import { AuthProvider } from "../providers/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -28,15 +29,17 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased min-h-screen flex flex-col font-sans`}>
         <ToastProvider>
-          <ModeProvider>
-            <ErrorBoundary>
-              <AppLayout>
-                {children}
-              </AppLayout>
-              <AiAssistant />
-              <AuthModal />
-            </ErrorBoundary>
-          </ModeProvider>
+          <AuthProvider>
+            <ModeProvider>
+              <ErrorBoundary>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+                <AiAssistant />
+                <AuthModal />
+              </ErrorBoundary>
+            </ModeProvider>
+          </AuthProvider>
         </ToastProvider>
       </body>
     </html>

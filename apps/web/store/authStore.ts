@@ -579,7 +579,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     logoutEverywhere: async () => {
       console.log('[LOGOUT] Clearing credentials and session state (Everywhere)...');
       try {
-        await apiClient.post<any>('/api/v1/auth/logout', {});
+        await apiClient.post<any>('/api/v1/auth/logout-everywhere', {});
       } catch (e) {
         // Continue local clear
       }
