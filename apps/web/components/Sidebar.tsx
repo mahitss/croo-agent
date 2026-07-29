@@ -40,6 +40,7 @@ export default function Sidebar() {
       subItems: [
         { name: 'My Workflows', href: '/workspaces', icon: FolderGit2 },
         { name: 'Builder', href: '/workspace/new', icon: PlusCircle },
+        { name: 'Swarm Teams', href: '/workspace/swarm', icon: Users },
         { name: 'Executions', href: '/workspace/executions', icon: Play },
       ]
     },
