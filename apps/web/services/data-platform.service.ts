@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export type DataSourceType = 'postgres' | 'snowflake' | 'bigquery' | 'mongodb' | 's3' | 'kafka' | 'clickhouse';
 

@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export type TwinNodeType = 'department' | 'project' | 'workflow' | 'agent' | 'model' | 'infrastructure' | 'knowledge_base' | 'database';
 
