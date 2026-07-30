@@ -1,0 +1,21 @@
+# Ignore documentation and markdown files from triggering Vercel build pipeline minutes
+*.md
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.gif
+docs/
+reports/
+scripts/
+UI_UX_REPORT.md
+FINAL_WOW_REPORT.md
+TECH_DEBT_REPORT.md
+SECURITY_REPORT.md
+RELEASE_CANDIDATE_REPORT.md
+RELIABILITY_REPORT.md
+ANALYTICS_REPORT.md
+BUG_HUNT_REPORT.md
+EXECUTIVE_DEMO_REPORT.md
+INVESTOR_REVIEW.md
+MARKETPLACE_REPORT.md
