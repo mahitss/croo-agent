@@ -23,6 +23,70 @@ export class DemoWorkflowRepository implements WorkflowRepository {
     if (stored && stored.id === id) return stored;
 
     const presets: Record<string, Workflow> = {
+      'wf-demo-1': {
+        id: 'wf-demo-1',
+        name: 'Enterprise Security Audit Swarm',
+        query: 'Conduct automated SAST/DAST vulnerability scan, dependency audit & SOC 2 brief',
+        budget: 2.50,
+        routingMode: 'balanced',
+        retryCount: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Static Code Analysis (SAST)', task: 'Vulnerability Scan', description: 'Scans source repository for OWASP Top 10 vulnerabilities.', capability: 'security', costEstimate: 0.40, timeEstimate: 500, trustScore: 99, status: 'pending', assignedAgentId: 'agent-sast-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Dependency Vulnerability Audit', task: 'CVE Inspector', description: 'Cross-checks npm/pnpm package manifests against National Vulnerability Database.', capability: 'audit', costEstimate: 0.35, timeEstimate: 450, trustScore: 98, status: 'pending', assignedAgentId: 'agent-cve-1', positionX: 320, positionY: 200 },
+          { id: 'n3', name: 'SOC 2 Executive Brief Compiler', task: 'Report Generation', description: 'Synthesizes findings into PDF compliance report.', capability: 'reporting', costEstimate: 0.45, timeEstimate: 600, trustScore: 97, status: 'pending', assignedAgentId: 'agent-writer-1', positionX: 540, positionY: 200 }
+        ],
+        edges: [
+          { id: 'e1', source: 'n1', target: 'n2' },
+          { id: 'e2', source: 'n2', target: 'n3' }
+        ]
+      },
+      'wf-demo-2': {
+        id: 'wf-demo-2',
+        name: 'Automated Financial Statement Analyzer',
+        query: 'Audit enterprise P&L, balance sheets, and compute USDC escrow settlement',
+        budget: 3.00,
+        routingMode: 'fastest',
+        retryCount: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'P&L Statement Parser', task: 'Financial Extraction', description: 'Parses quarterly revenue and EBITDA statements.', capability: 'finance', costEstimate: 0.50, timeEstimate: 400, trustScore: 99, status: 'pending', assignedAgentId: 'agent-fin-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Variance & Ratio Model', task: 'Financial Modeling', description: 'Computes YoY margin growth and debt ratios.', capability: 'analytics', costEstimate: 0.45, timeEstimate: 500, trustScore: 96, status: 'pending', assignedAgentId: 'agent-fin-2', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
+      },
+      'wf-demo-3': {
+        id: 'wf-demo-3',
+        name: 'Autonomous Code Review & Refactoring Agent',
+        query: 'Analyze PR diffs, check lint rules, and auto-generate optimized TypeScript refactors',
+        budget: 1.80,
+        routingMode: 'balanced',
+        retryCount: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Git Diff Analyzer', task: 'Code Review', description: 'Extracts modified lines & AST changes from pull request.', capability: 'engineering', costEstimate: 0.30, timeEstimate: 350, trustScore: 98, status: 'pending', assignedAgentId: 'agent-dev-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'TypeScript Refactoring Engine', task: 'Refactor', description: 'Applies performance optimizations and type fixes.', capability: 'coding', costEstimate: 0.45, timeEstimate: 550, trustScore: 97, status: 'pending', assignedAgentId: 'agent-dev-2', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
+      },
+      'wf-demo-4': {
+        id: 'wf-demo-4',
+        name: 'Multi-Agent Customer Support Escalation Pipeline',
+        query: 'Categorize incoming support tickets, run sentiment analysis, and trigger Slack notifications',
+        budget: 1.20,
+        routingMode: 'fastest',
+        retryCount: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          { id: 'n1', name: 'Ticket Intent Classifier', task: 'Sentiment Analysis', description: 'Categorizes incoming customer tickets by urgency.', capability: 'nlp', costEstimate: 0.20, timeEstimate: 200, trustScore: 95, status: 'pending', assignedAgentId: 'agent-support-1', positionX: 100, positionY: 200 },
+          { id: 'n2', name: 'Slack Incident Dispatcher', task: 'Notification', description: 'Dispatches high-urgency alerts to tier-2 engineering channel.', capability: 'slack', costEstimate: 0.25, timeEstimate: 300, trustScore: 99, status: 'pending', assignedAgentId: 'agent-slack-1', positionX: 320, positionY: 200 }
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
+      },
       'research-agent': {
         id: 'research-agent',
         name: 'Research Consensus Agent Swarm',
