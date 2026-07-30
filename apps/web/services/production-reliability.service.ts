@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export interface SLOStatus {
   serviceName: string;
@@ -31,6 +32,17 @@ export interface RunbookItem {
 export class ProductionReliabilityService {
 
   public static async getSLOSummary(): Promise<{ uptimePercent: number; slos: SLOStatus[] }> {
+    if (useAuthStore.getState().isDemoMode) {
+      return {
+        uptimePercent: 99.99,
+        slos: [
+          { serviceName: 'API Gateway Ingress', targetSLA: '99.99%', currentSLI: '99.994%', errorBudgetRemainingPercent: 94.2, status: 'MEETING_SLO' },
+          { serviceName: 'Dashboard UI Interaction', targetSLA: '< 100ms', currentSLI: '18ms (p99)', errorBudgetRemainingPercent: 100.0, status: 'MEETING_SLO' },
+          { serviceName: 'Workflow Startup SLA', targetSLA: '< 1.0s', currentSLI: '240ms', errorBudgetRemainingPercent: 98.5, status: 'MEETING_SLO' },
+          { serviceName: 'pgvector RAG Retrieval', targetSLA: '< 150ms', currentSLI: '42ms', errorBudgetRemainingPercent: 97.0, status: 'MEETING_SLO' }
+        ]
+      };
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/reliability/slos');
       if (res && res.data) return res.data;
