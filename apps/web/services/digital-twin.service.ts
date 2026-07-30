@@ -45,6 +45,9 @@ export interface ExecutiveMetrics {
 export class DigitalTwinService {
 
   public static async getOrgGraph(): Promise<{ nodes: TwinNode[]; edges: TwinEdge[] }> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultOrgGraph();
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/twin/graph');
       if (res && res.data && Array.isArray(res.data.nodes)) {
@@ -58,6 +61,37 @@ export class DigitalTwinService {
   }
 
   public static async runWhatIfSimulation(scenario: string): Promise<SimulationResult> {
+    if (useAuthStore.getState().isDemoMode) {
+      const simulations: Record<string, SimulationResult> = {
+        traffic_spike: {
+          scenarioName: 'Increase Traffic by 500%',
+          status: 'success',
+          affectedNodes: ['node-auth', 'node-gateway', 'node-payments'],
+          costDeltaUsdc: 4.50,
+          latencyDeltaMs: 120,
+          riskScore: 24,
+          recommendation: 'Auto-scale Auth Service instances by +4 workers and enable Redis caching'
+        },
+        database_failover: {
+          scenarioName: 'Primary PostgreSQL Database Outage',
+          status: 'success',
+          affectedNodes: ['node-db-primary', 'node-db-replica'],
+          costDeltaUsdc: 1.20,
+          latencyDeltaMs: 450,
+          riskScore: 68,
+          recommendation: 'Trigger automated read-replica promotion via Patroni cluster manager'
+        }
+      };
+      return simulations[scenario] || {
+        scenarioName: scenario,
+        status: 'success',
+        affectedNodes: ['node-[#4EA3FF]'],
+        costDeltaUsdc: 0.80,
+        latencyDeltaMs: 45,
+        riskScore: 15,
+        recommendation: 'Simulation completed under nominal bounds'
+      };
+    }
     try {
       const res = await apiClient.post<any>('/api/v1/twin/simulate', { scenario });
       if (res && res.data) {
