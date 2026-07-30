@@ -120,7 +120,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col md:flex-row gap-8 select-none">
+    <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row gap-10 select-none w-full">
       
       {/* 1. LEFT SIDEBAR PANEL NAVIGATION */}
       <div className="w-full md:w-[220px] shrink-0 flex flex-row md:flex-col gap-1 border-b md:border-b-0 md:border-r border-[#232323] pb-4 md:pb-0 md:pr-4 overflow-x-auto">
