@@ -233,7 +233,12 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     console.log(`[API_CLIENT] [${new Date().toISOString()}] fetchWithAuth finished: ${BASE_URL}${url} with status ${response.status} (Duration: ${duration}ms)`);
   } catch (fetchErr: any) {
     const duration = Date.now() - startTime;
-    console.error(`[API_CLIENT_ERROR] [${new Date().toISOString()}] fetchWithAuth request to ${BASE_URL}${url} failed/timed out after ${duration}ms:`, fetchErr.message);
+    const isDemo = useAuthStore.getState().isDemoMode;
+    if (isDemo) {
+      console.warn(`[API_CLIENT] Demo mode fallback for ${url}: Using internal execution engine.`);
+    } else {
+      console.error(`[API_CLIENT_ERROR] [${new Date().toISOString()}] fetchWithAuth request to ${BASE_URL}${url} failed/timed out after ${duration}ms:`, fetchErr.message);
+    }
     throw fetchErr;
   }
 
