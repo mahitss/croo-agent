@@ -86,6 +86,8 @@ export default function IntegrationsPage() {
     setConnectors(prev => prev.map(c => c.id === connector.id ? { ...c, isConnected: false, status: 'disconnected' } : c));
   };
 
+  const [expandedConnectorId, setExpandedConnectorId] = useState<string | null>(null);
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 font-sans select-none animate-fade-in px-4 py-6">
       
@@ -99,50 +101,57 @@ export default function IntegrationsPage() {
             Central intelligence layer connecting 40+ business systems (GitHub, Slack, Salesforce, Postgres, AWS, Stripe) into Builder DAG nodes.
           </p>
         </div>
-
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
-          <input
-            type="text"
-            placeholder="Search connectors by API or triggers..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#111111] border border-[#232323] focus:border-[#4EA3FF] rounded-xl pl-10 pr-4 py-2 text-xs text-white outline-none"
-          />
-        </div>
       </div>
 
-      {/* Tab Switcher */}
-      <div className="flex items-center gap-2 border-b border-[#232323] pb-2 font-mono text-xs">
-        {[
-          { id: 'catalog', label: 'Connector Catalog', icon: Share2 },
-          { id: 'webhooks', label: 'Webhook Engine & API Gateway', icon: Globe },
-          { id: 'secrets', label: 'Secrets & Keys', icon: Key },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all cursor-pointer ${
-                isActive 
-                  ? 'bg-white/10 text-white border-white/20 font-bold' 
-                  : 'bg-transparent text-gray-400 border-transparent hover:text-white'
-              }`}
-            >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#4EA3FF]' : 'text-gray-500'}`} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Tabs */}
+      <div className="flex items-center gap-3 border-b border-[#232323] pb-3 text-xs font-mono">
+        <button
+          onClick={() => setActiveTab('catalog')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'catalog' ? 'bg-[#4EA3FF] text-black font-bold' : 'bg-[#111111] text-gray-400 border border-[#232323] hover:text-white'
+          }`}
+        >
+          <Share2 className="w-4 h-4" />
+          <span>Connector Catalog</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('webhooks')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'webhooks' ? 'bg-[#4EA3FF] text-black font-bold' : 'bg-[#111111] text-gray-400 border border-[#232323] hover:text-white'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Webhook Engine & API Gateway</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('secrets')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'secrets' ? 'bg-[#4EA3FF] text-black font-bold' : 'bg-[#111111] text-gray-400 border border-[#232323] hover:text-white'
+          }`}
+        >
+          <Lock className="w-4 h-4" />
+          <span>Secrets & Credential Vault</span>
+        </button>
       </div>
 
       {/* TAB 1: CONNECTOR CATALOG */}
       {activeTab === 'catalog' && (
         <div className="space-y-6">
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none font-mono text-xs">
+          {/* Filter Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+              <input
+                type="text"
+                placeholder="Search 40+ connectors (GitHub, Slack, SAP, AWS)..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[#111111] border border-[#232323] hover:border-white/10 focus:border-[#4EA3FF] rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 outline-none transition-all font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 text-xs font-mono">
             {CATEGORIES.map(cat => (
               <button
                 key={cat.id}
@@ -159,75 +168,114 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {connectors.map(connector => (
-              <div key={connector.id} className="bg-[#111111] border border-[#232323] hover:border-[#4EA3FF]/30 p-6 rounded-2xl space-y-4 flex flex-col justify-between transition-all group">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20">
-                      {connector.category}
-                    </span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      connector.isConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                    }`}>
-                      {connector.isConnected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-base font-bold text-white group-hover:text-[#4EA3FF] transition-colors">{connector.name}</h3>
-                    <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2 leading-relaxed">{connector.description}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 bg-[#050505] p-2.5 rounded-xl border border-[#232323] font-mono text-[10px]">
-                    <div>
-                      <span className="text-gray-500 block">Triggers</span>
-                      <span className="text-white font-bold block">{connector.triggersCount} triggers</span>
+            {connectors.map(connector => {
+              const isExpanded = expandedConnectorId === connector.id;
+              return (
+                <div key={connector.id} className="bg-[#111111] border border-[#232323] hover:border-[#4EA3FF]/30 p-6 rounded-2xl space-y-4 flex flex-col justify-between transition-all group">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#4EA3FF]/10 text-[#4EA3FF] border border-[#4EA3FF]/20">
+                        {connector.category}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        connector.isConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-bold' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                      }`}>
+                        {connector.isConnected ? '● Connected' : '○ Disconnected'}
+                      </span>
                     </div>
+
                     <div>
-                      <span className="text-gray-500 block">API Actions</span>
-                      <span className="text-emerald-400 font-bold block">{connector.actionsCount} actions</span>
+                      <h3 className="text-base font-bold text-white group-hover:text-[#4EA3FF] transition-colors">{connector.name}</h3>
+                      <p className="text-xs text-[#9CA3AF] mt-1 line-clamp-2 leading-relaxed">{connector.description}</p>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-[#232323]">
-                  <button
-                    onClick={() => setSelectedDocConnector(connector)}
-                    className="text-xs font-mono text-gray-400 hover:text-white cursor-pointer"
-                  >
-                    Triggers & Actions
-                  </button>
+                    {connector.isConnected && (
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-xl text-[10px] font-mono text-emerald-400 flex items-center justify-between">
+                        <span>⚡ Active Sync Engine</span>
+                        <span>SLA 99.9%</span>
+                      </div>
+                    )}
 
-                  <div className="flex items-center gap-2">
-                    {connector.isConnected ? (
-                      <>
-                        <button
-                          onClick={() => handleTestConnection(connector)}
-                          className="px-2.5 py-1.5 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-300 rounded-xl text-xs font-mono cursor-pointer"
-                          title="Test Connection SLA"
-                        >
-                          Ping
-                        </button>
-                        <button
-                          onClick={() => handleDisconnect(connector)}
-                          className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl cursor-pointer"
-                          title="Disconnect System"
-                        >
-                          <Unplug className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => handleConnect(connector)}
-                        className="px-4 py-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold rounded-xl cursor-pointer border-0 shadow font-mono"
-                      >
-                        Connect System
-                      </button>
+                    <div className="grid grid-cols-2 gap-2 bg-[#050505] p-2.5 rounded-xl border border-[#232323] font-mono text-[10px]">
+                      <div>
+                        <span className="text-gray-500 block">Triggers</span>
+                        <span className="text-white font-bold block">{connector.triggersCount} triggers</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block">API Actions</span>
+                        <span className="text-emerald-400 font-bold block">{connector.actionsCount} actions</span>
+                      </div>
+                    </div>
+
+                    {/* Inline Expanded Triggers & Actions List */}
+                    {isExpanded && (
+                      <div className="bg-[#050505] border border-[#232323] p-3 rounded-xl space-y-3 font-mono text-[11px] animate-fade-in mt-2">
+                        <div>
+                          <span className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Supported Triggers</span>
+                          <div className="space-y-1">
+                            {connector.triggers.map(t => (
+                              <div key={t.id} className="text-gray-300 text-[10px] bg-[#111111] p-1.5 rounded border border-[#232323]">
+                                <strong className="text-white">{t.name}</strong> — {t.description}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Exposed Actions</span>
+                          <div className="space-y-1">
+                            {connector.actions.map(a => (
+                              <div key={a.id} className="text-emerald-400 text-[10px] bg-[#111111] p-1.5 rounded border border-[#232323]">
+                                <strong className="text-emerald-300">{a.name}</strong> — {a.description}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-[#232323]">
+                    <button
+                      onClick={() => {
+                        setExpandedConnectorId(isExpanded ? null : connector.id);
+                        setSelectedDocConnector(connector);
+                      }}
+                      className="text-xs font-mono text-[#4EA3FF] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{isExpanded ? 'Hide Specs' : 'Inspect Triggers & Actions'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {connector.isConnected ? (
+                        <>
+                          <button
+                            onClick={() => handleTestConnection(connector)}
+                            className="px-2.5 py-1.5 bg-[#050505] hover:bg-white/5 border border-[#232323] text-gray-300 rounded-xl text-xs font-mono cursor-pointer"
+                            title="Test Connection SLA"
+                          >
+                            Ping
+                          </button>
+                          <button
+                            onClick={() => handleDisconnect(connector)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl cursor-pointer"
+                            title="Disconnect System"
+                          >
+                            <Unplug className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleConnect(connector)}
+                          className="px-4 py-2 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black text-xs font-semibold rounded-xl cursor-pointer border-0 shadow font-mono"
+                        >
+                          Connect System
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
