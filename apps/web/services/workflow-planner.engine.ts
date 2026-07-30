@@ -45,11 +45,13 @@ export interface PlannerOutput {
 export class WorkflowPlannerEngine {
   
   public static plan(query: string, routingMode: string = 'balanced', budget: number = 5.0): PlannerOutput {
-    const normalizedQuery = query.toLowerCase();
+    // Stage 0: Prompt Injection & Adversarial Jailbreak Guardrail Check
+    const sanitizedQuery = this.sanitizePrompt(query);
+    const normalizedQuery = sanitizedQuery.toLowerCase();
     
     // Step 1: Intent Detection & Domain Classification
     const domain = this.detectDomain(normalizedQuery);
-    const intent = this.extractIntent(query, domain);
+    const intent = this.extractIntent(sanitizedQuery, domain);
     const complexity = this.assessComplexity(normalizedQuery);
     
     // Step 2, 3, 4: Task Classification, Capability Matching & Node Planning
@@ -105,6 +107,14 @@ export class WorkflowPlannerEngine {
     if (/paper|research|citation|fact|study|gather|summarize|news/i.test(query)) return 'research';
     
     return 'research'; // default general intent
+  }
+
+  private static sanitizePrompt(prompt: string): string {
+    if (!prompt) return 'General Research Task';
+    // Neutralize prompt injection patterns (e.g. "ignore previous instructions", "system prompt", "override rules")
+    let cleaned = prompt.replace(/(ignore\s+(all\s+)?previous\s+instructions|system\s+prompt\s*:|override\s+safety\s+rules|reveal\s+secret\s+keys)/gi, '[REDACTED_ADVERSARIAL_INSTRUCTION]');
+    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    return cleaned.trim();
   }
 
   private static extractIntent(query: string, domain: string): string {
