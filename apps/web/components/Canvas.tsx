@@ -373,8 +373,16 @@ function CanvasInner({ onSelectNode }: CanvasProps) {
 
   // Dry-Run Simulation Mode Toggle
   const handleToggleSimulation = () => {
-    setIsSimulating(prev => !prev);
-    setEdges(prev => prev.map(e => ({ ...e, animated: !isSimulating })));
+    const nextState = !isSimulating;
+    setIsSimulating(nextState);
+    setEdges(prev => prev.map(e => ({ ...e, animated: nextState })));
+    
+    if (nextState) {
+      const activeWf = useNexusStore.getState().activeWorkflow;
+      if (activeWf && activeWf.id) {
+        useNexusStore.getState().startExecution(activeWf.query || activeWf.name, activeWf.routingMode || 'balanced', activeWf.budget || 2.0);
+      }
+    }
   };
 
   // Create Snapshot

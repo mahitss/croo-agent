@@ -177,8 +177,13 @@ export class DemoWorkflowRepository implements WorkflowRepository {
       return { success: false, message: 'Workflow not found or loaded' };
     }
 
+    // Reset nodes to pending if all completed so re-running triggers live execution
+    const resetNodes = activeWorkflow.nodes.map(n => ({ ...n, status: 'pending' as const }));
+    const resetWf = { ...activeWorkflow, status: 'running' as const, nodes: resetNodes };
+    useNexusStore.setState({ activeWorkflow: resetWf, executionLogs: [], isRunning: true, appState: 'running' });
+
     // Trigger simulation in the background asynchronously
-    this.simulateLocalRun(activeWorkflow);
+    this.simulateLocalRun(resetWf);
     return { success: true };
   }
 
