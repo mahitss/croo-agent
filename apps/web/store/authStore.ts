@@ -61,6 +61,7 @@ export interface AuthState {
   toggleDemoMode: () => void;
   setEnvironment: (env: 'demo' | 'sandbox' | 'testnet' | 'live') => void;
   loginUser: (usernameOrEmail: string, password: string) => Promise<boolean>;
+  loginDemoUser: () => Promise<boolean>;
   registerUser: (email: string, username: string, password: string, displayName?: string, role?: string) => Promise<boolean>;
   logoutUser: () => Promise<void>;
   logoutEverywhere: () => Promise<void>;
@@ -437,6 +438,31 @@ export const useAuthStore = create<AuthState>((set, get) => {
     setAuthModal: (open, tab = 'login') => {
       console.log(`[AUTH_STORE] setAuthModal: open=${open}, tab=${tab}`);
       set({ isAuthModalOpen: open, authModalTab: tab });
+    },
+
+    loginDemoUser: async () => {
+      console.log('[AUTH_STORE] Instant Demo Sign-In triggered');
+      const profile: AuthUser = {
+        id: 'user-demo-1',
+        email: 'mahitsaxena12@gmail.com',
+        username: 'mahitss',
+        displayName: 'Mahit Saxena',
+        role: 'developer',
+        permissions: ['*'],
+        avatarUrl: '',
+        walletAddress: '0x32A4B3e265432198e2',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const token = 'local-mock-token';
+      const storage = localStorage;
+      storage.setItem('orbit_token', token);
+      storage.setItem('orbit_user', JSON.stringify(profile));
+      const maxAge = 30 * 24 * 60 * 60;
+      document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax`;
+      document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax`;
+      set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
+      return true;
     },
 
     loginUser: async (usernameOrEmail, password) => {

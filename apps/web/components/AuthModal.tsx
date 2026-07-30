@@ -430,8 +430,24 @@ export default function AuthModal() {
 
         {/* OAuth Dividers & Buttons */}
         {(tab === 'login' || tab === 'register') && (
-          <div className="mt-6 flex flex-col gap-4 relative z-10 border-t border-border-dark pt-5">
-            <div className="flex items-center justify-center gap-2">
+          <div className="mt-6 flex flex-col gap-3 relative z-10 border-t border-border-dark pt-5">
+            <button
+              type="button"
+              onClick={async () => {
+                const { loginDemoUser } = useAuthStore.getState();
+                await loginDemoUser();
+                toast('Signed in as Mahit Saxena (Demo)', 'success');
+                setAuthModal(false);
+                if (typeof window !== 'undefined') {
+                  window.location.href = '/workspaces';
+                }
+              }}
+              className="w-full bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold py-2.5 rounded-xl transition-all font-mono text-xs flex items-center justify-center gap-2 shadow-sm"
+            >
+              <span>⚡</span> Instant Demo Sign In (1-Click)
+            </button>
+
+            <div className="flex items-center justify-center gap-2 my-1">
               <div className="flex-1 h-[1px] bg-border-dark"></div>
               <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Or continue with</span>
               <div className="flex-1 h-[1px] bg-border-dark"></div>
