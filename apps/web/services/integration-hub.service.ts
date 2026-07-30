@@ -68,6 +68,9 @@ export interface WebhookEndpoint {
 export class IntegrationHubService {
 
   public static async getConnectors(category: string = 'all', query: string = ''): Promise<EnterpriseConnector[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultConnectors(category, query);
+    }
     try {
       const res = await apiClient.get<any>(`/api/v1/integrations?category=${category}&q=${encodeURIComponent(query)}`);
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -81,6 +84,10 @@ export class IntegrationHubService {
   }
 
   public static async testConnection(id: string): Promise<{ success: boolean; latencyMs: number; message: string }> {
+    if (useAuthStore.getState().isDemoMode) {
+      const latency = Math.floor(90 + Math.random() * 80);
+      return { success: true, latencyMs: latency, message: `Ping acknowledged in ${latency}ms. Connection status HEALTHY.` };
+    }
     try {
       const res = await apiClient.post<any>(`/api/v1/integrations/${id}/test`, {});
       if (res && res.success) {
@@ -93,20 +100,50 @@ export class IntegrationHubService {
   }
 
   public static async connectConnector(id: string, authConfig: any): Promise<{ success: boolean; message: string }> {
-    try {
-      await apiClient.post(`/api/v1/integrations/${id}/connect`, authConfig);
-    } catch (e) {}
+    if (!useAuthStore.getState().isDemoMode) {
+      try {
+        await apiClient.post(`/api/v1/integrations/${id}/connect`, authConfig);
+      } catch (e) {}
+    }
     return { success: true, message: `Successfully authenticated & connected ${id}.` };
   }
 
   public static async disconnectConnector(id: string): Promise<{ success: boolean; message: string }> {
-    try {
-      await apiClient.post(`/api/v1/integrations/${id}/disconnect`, {});
-    } catch (e) {}
+    if (!useAuthStore.getState().isDemoMode) {
+      try {
+        await apiClient.post(`/api/v1/integrations/${id}/disconnect`, {});
+      } catch (e) {}
+    }
     return { success: true, message: `Disconnected connector ${id}.` };
   }
 
   public static async getWebhooks(): Promise<WebhookEndpoint[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return [
+        {
+          id: 'wh-github-pr',
+          name: 'GitHub PR Opened Webhook Trigger',
+          targetWorkflowId: 'wf-security-audit',
+          url: 'https://api.orbit.ai/v1/webhooks/wh-github-pr',
+          method: 'POST',
+          headers: { 'X-Hub-Signature-256': 'sha256=...' },
+          totalInvocations: 1420,
+          lastTriggeredAt: new Date().toISOString(),
+          status: 'active'
+        },
+        {
+          id: 'wh-stripe-payment',
+          name: 'Stripe Escrow Release Webhook Trigger',
+          targetWorkflowId: 'wf-finance-reconcile',
+          url: 'https://api.orbit.ai/v1/webhooks/wh-stripe-payment',
+          method: 'POST',
+          headers: { 'Stripe-Signature': 't=...' },
+          totalInvocations: 890,
+          lastTriggeredAt: new Date().toISOString(),
+          status: 'active'
+        }
+      ];
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/integrations/webhooks');
       if (res && Array.isArray(res.data)) {
