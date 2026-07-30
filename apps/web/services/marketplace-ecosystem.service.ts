@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export type EcosystemCategory = 
   | 'agents'
@@ -8,7 +9,8 @@ export type EcosystemCategory =
   | 'tools'
   | 'connectors'
   | 'templates'
-  | 'mcp';
+  | 'mcp'
+  | 'all';
 
 export interface EcosystemDeveloper {
   name: string;
@@ -49,6 +51,9 @@ export interface EcosystemAsset {
 export class MarketplaceEcosystemService {
   
   public static async getCatalog(category: string = 'all', query: string = ''): Promise<EcosystemAsset[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultCatalog(category, query);
+    }
     try {
       const res = await apiClient.get<any>(`/api/v1/marketplace/catalog?category=${category}&q=${encodeURIComponent(query)}`);
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -58,6 +63,10 @@ export class MarketplaceEcosystemService {
       console.warn('[MARKETPLACE_ECOSYSTEM] Fetch catalog warning, generating ecosystem items:', e);
     }
 
+    return this.getDefaultCatalog(category, query);
+  }
+
+  private static getDefaultCatalog(category: string, query: string): EcosystemAsset[] {
     // Default Ecosystem Catalog returned dynamically
     const catalog: EcosystemAsset[] = [
       {
