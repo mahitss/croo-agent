@@ -220,9 +220,10 @@ export default function AuthModal() {
       if (friendlyMsg.includes('400') || friendlyMsg.includes('BadRequest') || friendlyMsg.includes('validation')) {
         friendlyMsg = `Invalid input details: ${friendlyMsg}`;
       } else if (friendlyMsg.includes('401') || friendlyMsg.includes('Unauthorized') || friendlyMsg.includes('Invalid credentials')) {
-        friendlyMsg = 'Unauthorized request. Incorrect credentials.';
-      } else if (friendlyMsg.includes('409') || friendlyMsg.includes('Conflict') || friendlyMsg.includes('already registered') || friendlyMsg.includes('already taken')) {
-        friendlyMsg = 'This email address or username is already in use.';
+        friendlyMsg = 'Incorrect email or password. Please try again.';
+      } else if (friendlyMsg.includes('409') || friendlyMsg.includes('Conflict') || friendlyMsg.includes('already registered') || friendlyMsg.includes('already taken') || friendlyMsg.includes('exists')) {
+        friendlyMsg = 'An account with this email or username already exists. Switched to Sign In!';
+        setTab('login');
       } else if (friendlyMsg.includes('500') || friendlyMsg.includes('InternalServerError')) {
         friendlyMsg = 'Internal server or database error. Please try again later.';
       }
