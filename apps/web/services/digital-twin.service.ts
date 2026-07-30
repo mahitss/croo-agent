@@ -66,30 +66,27 @@ export class DigitalTwinService {
       const simulations: Record<string, SimulationResult> = {
         traffic_spike: {
           scenarioName: 'Increase Traffic by 500%',
-          status: 'success',
-          affectedNodes: ['node-auth', 'node-gateway', 'node-payments'],
-          costDeltaUsdc: 4.50,
-          latencyDeltaMs: 120,
-          riskScore: 24,
+          predictedLatencyMs: 120,
+          predictedCostImpactPercent: 18,
+          predictedThroughputReqSec: 8500,
+          bottleneckNode: 'node-auth',
           recommendation: 'Auto-scale Auth Service instances by +4 workers and enable Redis caching'
         },
         database_failover: {
           scenarioName: 'Primary PostgreSQL Database Outage',
-          status: 'success',
-          affectedNodes: ['node-db-primary', 'node-db-replica'],
-          costDeltaUsdc: 1.20,
-          latencyDeltaMs: 450,
-          riskScore: 68,
+          predictedLatencyMs: 450,
+          predictedCostImpactPercent: 5,
+          predictedThroughputReqSec: 3200,
+          bottleneckNode: 'node-db-primary',
           recommendation: 'Trigger automated read-replica promotion via Patroni cluster manager'
         }
       };
       return simulations[scenario] || {
         scenarioName: scenario,
-        status: 'success',
-        affectedNodes: ['node-[#4EA3FF]'],
-        costDeltaUsdc: 0.80,
-        latencyDeltaMs: 45,
-        riskScore: 15,
+        predictedLatencyMs: 45,
+        predictedCostImpactPercent: 2,
+        predictedThroughputReqSec: 12000,
+        bottleneckNode: 'node-gateway',
         recommendation: 'Simulation completed under nominal bounds'
       };
     }

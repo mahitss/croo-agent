@@ -65,7 +65,8 @@ export class DataPlatformService {
   public static async queryDataCopilot(prompt: string): Promise<NaturalLanguageQueryResult> {
     if (useAuthStore.getState().isDemoMode) {
       return {
-        sqlQuery: `SELECT user_id, COUNT(transaction_id) as total_swarms, SUM(amount_usdc) as spent_usdc FROM platform_ledger GROUP BY user_id ORDER BY spent_usdc DESC LIMIT 10;`,
+        queryPrompt: prompt || 'Show top spending accounts',
+        generatedSql: `SELECT user_id, COUNT(transaction_id) as total_swarms, SUM(amount_usdc) as spent_usdc FROM platform_ledger GROUP BY user_id ORDER BY spent_usdc DESC LIMIT 10;`,
         explanation: 'Generated SQL aggregates user swarm activity and computes top USDC spending accounts.',
         dataColumns: ['user_id', 'total_swarms', 'spent_usdc'],
         dataRows: [

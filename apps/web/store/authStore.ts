@@ -466,17 +466,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     loginDemoUser: async () => {
       console.log('[AUTH_STORE] Instant Demo Sign-In triggered');
-      const profile: AuthUser = {
+      const profile: UserProfile = {
         id: 'user-demo-1',
         email: 'mahitsaxena12@gmail.com',
         username: 'mahitss',
         displayName: 'Mahit Saxena',
-        role: 'developer',
-        permissions: ['*'],
+        role: 'admin',
         avatarUrl: '',
-        walletAddress: '0x32A4B3e265432198e2',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
       const token = 'local-mock-token';
       const storage = localStorage;
