@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export type SpanKind = 'workflow' | 'agent' | 'llm' | 'tool' | 'rag_search' | 'database' | 'http' | 'webhook';
 
@@ -18,11 +19,11 @@ export interface TraceSpan {
   parentId?: string;
   name: string;
   kind: SpanKind;
-  status: 'ok' | 'error';
+  status: 'ok' | 'error' | 'in_progress';
   startTimeMs: number;
   durationMs: number;
-  cpuPercent: number;
-  memoryMb: number;
+  cpuPercent?: number;
+  memoryMb?: number;
   promptTokens?: number;
   completionTokens?: number;
   costUsdc?: number;
@@ -31,18 +32,24 @@ export interface TraceSpan {
 }
 
 export interface DistributedTrace {
-  id: string;
-  workflowId: string;
-  executionId: string;
-  requestId: string;
-  correlationId: string;
+  id?: string;
+  traceId?: string;
+  requestId?: string;
   rootSpanName: string;
-  status: 'ok' | 'error';
-  totalDurationMs: number;
-  totalTokens: number;
-  totalCostUsdc: number;
-  spansCount: number;
-  timestamp: string;
+  workflowId?: string;
+  agentId?: string;
+  executionId?: string;
+  correlationId?: string;
+  durationMs?: number;
+  totalDurationMs?: number;
+  status: 'success' | 'failed' | 'running' | 'ok' | 'error';
+  totalSpansCount?: number;
+  spansCount?: number;
+  totalTokens?: number;
+  totalCostUsdc?: number;
+  timestamp?: string;
+  startTime?: string;
+  endTime?: string;
   spans: TraceSpan[];
 }
 
@@ -60,8 +67,11 @@ export interface ModelPerformanceMetric {
   modelName: string;
   provider: string;
   avgLatencyMs: number;
-  reliabilityPercent: number;
-  hallucinationRatePercent: number;
+  p99LatencyMs?: number;
+  tokensPerSecond?: number;
+  reliabilityPercent?: number;
+  hallucinationRatePercent?: number;
+  errorRatePercent?: number;
   costPer1kTokensUsdc: number;
   totalTokensProcessed: number;
   contextUtilizationPercent: number;
@@ -75,6 +85,9 @@ export interface ModelPerformanceMetric {
 export class AIObservabilityService {
 
   public static async getTraces(query: string = ''): Promise<DistributedTrace[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultTraces();
+    }
     try {
       const res = await apiClient.get<any>(`/api/v1/observability/traces?q=${encodeURIComponent(query)}`);
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -88,6 +101,28 @@ export class AIObservabilityService {
   }
 
   public static async getErrorDiagnostics(): Promise<ErrorDiagnostic[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return [
+        {
+          id: 'diag-1',
+          executionId: 'exec-9421',
+          category: 'Rate Limit',
+          failedNodeOrAgent: 'Web Research Swarm Agent',
+          probableCause: 'SerpAPI search tool hit HTTP 429 Rate Limit threshold during parallel Google query execution.',
+          recommendedFix: 'Enable exponential backoff retry policy (initialDelayMs: 1000, maxRetries: 5) or allocate secondary API Key pool.',
+          timestamp: new Date().toISOString()
+        },
+        {
+          id: 'diag-2',
+          executionId: 'exec-9418',
+          category: 'Timeout',
+          failedNodeOrAgent: 'Claude 3.5 Sonnet Synthesis Node',
+          probableCause: 'LLM completion request exceeded 15,000ms context processing timeout threshold on high-volume prompt payload.',
+          recommendedFix: 'Split input payload into parallel chunk streams using Map-Reduce node pattern or switch routing to Claude 3.5 Haiku.',
+          timestamp: new Date(Date.now() - 3600000).toISOString()
+        }
+      ];
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/observability/error-diagnostics');
       if (res && Array.isArray(res.data)) {
