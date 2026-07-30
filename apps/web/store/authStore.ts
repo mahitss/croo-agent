@@ -294,6 +294,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
             token,
             user: demoUser,
             isAuthenticated: true,
+            isDemoMode: true,
             initializationState: 'AUTHENTICATED',
             isCheckingAuth: false
           });
@@ -481,7 +482,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const maxAge = 30 * 24 * 60 * 60;
       document.cookie = `orbit_token=${token}; max-age=${maxAge}; path=/; SameSite=Lax`;
       document.cookie = `token=${token}; max-age=${maxAge}; path=/; SameSite=Lax`;
-      set({ user: profile, token, isAuthenticated: true, initializationState: 'AUTHENTICATED' });
+      set({ user: profile, token, isAuthenticated: true, isDemoMode: true, initializationState: 'AUTHENTICATED' });
       return true;
     },
 
