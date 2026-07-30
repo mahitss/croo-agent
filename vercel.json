@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter web build",
+  "buildCommand": "npx turbo run build --filter=web...",
   "outputDirectory": "apps/web/.next",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD apps/ packages/ package.json pnpm-lock.yaml"
+  "framework": "nextjs"
 }
