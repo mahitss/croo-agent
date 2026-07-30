@@ -46,6 +46,9 @@ export interface NaturalLanguageQueryResult {
 export class DataPlatformService {
 
   public static async getDatasets(query: string = ''): Promise<CatalogDataset[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultDatasets();
+    }
     try {
       const res = await apiClient.get<any>(`/api/v1/data/datasets?q=${encodeURIComponent(query)}`);
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -59,6 +62,20 @@ export class DataPlatformService {
   }
 
   public static async queryDataCopilot(prompt: string): Promise<NaturalLanguageQueryResult> {
+    if (useAuthStore.getState().isDemoMode) {
+      return {
+        sqlQuery: `SELECT user_id, COUNT(transaction_id) as total_swarms, SUM(amount_usdc) as spent_usdc FROM platform_ledger GROUP BY user_id ORDER BY spent_usdc DESC LIMIT 10;`,
+        explanation: 'Generated SQL aggregates user swarm activity and computes top USDC spending accounts.',
+        dataColumns: ['user_id', 'total_swarms', 'spent_usdc'],
+        dataRows: [
+          { user_id: 'usr_mahit_01', total_swarms: 42, spent_usdc: 154.20 },
+          { user_id: 'usr_enterprise_88', total_swarms: 29, spent_usdc: 98.40 },
+          { user_id: 'usr_fintech_12', total_swarms: 18, spent_usdc: 62.10 }
+        ],
+        chartType: 'bar',
+        aiInsight: 'Top 5% of enterprise accounts drive 78% of autonomous swarm execution volume.'
+      };
+    }
     try {
       const res = await apiClient.post<any>('/api/v1/data/copilot-query', { prompt });
       if (res && res.data) {
