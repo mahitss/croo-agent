@@ -89,9 +89,22 @@ export default function DigitalTwinPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs bg-[#111111] border border-[#232323] px-3.5 py-2 rounded-xl">
-          <span className="text-gray-400">Digital Twin Mesh:</span>
-          <span className="text-emerald-400 font-bold">100% IN SYNC (6 Nodes, 5 Edges)</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setActiveTab('simulator');
+              handleRunSimulation();
+            }}
+            disabled={isSimulating}
+            className="flex items-center gap-1.5 bg-[#4EA3FF] hover:bg-[#4EA3FF]/90 text-black font-extrabold text-xs font-mono px-3.5 py-2 rounded-xl transition-all cursor-pointer border-0 shadow disabled:opacity-50"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>{isSimulating ? 'Simulating...' : 'Run What-If Simulation'}</span>
+          </button>
+          <div className="flex items-center gap-2 font-mono text-xs bg-[#111111] border border-[#232323] px-3.5 py-2 rounded-xl">
+            <span className="text-gray-400">Digital Twin Mesh:</span>
+            <span className="text-emerald-400 font-bold">100% IN SYNC</span>
+          </div>
         </div>
       </div>
 
