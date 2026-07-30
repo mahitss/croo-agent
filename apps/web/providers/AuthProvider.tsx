@@ -47,6 +47,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setMounted(true);
     console.log('[AUTH_PROVIDER] Initializing session restoration manager...');
     initializeAuth();
+
+    // Prevent third-party Web3 browser extension errors (MetaMask inpage.js) from breaking Next.js UI overlay
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || event.reason || '';
+      if (
+        typeof reason === 'string' &&
+        (reason.includes('MetaMask') ||
+         reason.includes('inpage.js') ||
+         reason.includes('nkbihfbeogaeaoehlefnkodbefgpgknn') ||
+         reason.includes('user rejected') ||
+         reason.includes('User rejected the request'))
+      ) {
+        event.preventDefault();
+        console.warn('[WEB3_PROVIDER] Third-party wallet extension event handled gracefully:', reason);
+      }
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      const msg = event.message || '';
+      const filename = event.filename || '';
+      if (
+        msg.includes('MetaMask') ||
+        filename.includes('inpage.js') ||
+        filename.includes('chrome-extension://')
+      ) {
+        event.preventDefault();
+        console.warn('[WEB3_PROVIDER] Third-party extension script error suppressed:', msg);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
+      window.addEventListener('error', handleError);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        window.removeEventListener('error', handleError);
+      }
+    };
   }, [initializeAuth]);
 
   const userRole = user?.role || 'user';

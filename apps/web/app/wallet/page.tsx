@@ -102,6 +102,27 @@ export default function WalletPage() {
     }
   };
 
+  const handleConnectMetaMask = async () => {
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      try {
+        const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
+        if (accounts && accounts.length > 0) {
+          setIsWalletConnected(true);
+          toast(`Connected to MetaMask: ${accounts[0].substring(0, 6)}...${accounts[0].slice(-4)}`, 'success');
+          return;
+        }
+      } catch (err: any) {
+        console.warn('[WALLET] MetaMask connection attempt handled:', err);
+        toast(err?.message || 'MetaMask connection canceled. Operating in Demo Mode.', 'info');
+        return;
+      }
+    }
+    // Fallback to demo mode connection
+    const nextState = !isWalletConnected;
+    setIsWalletConnected(nextState);
+    toast(nextState ? 'Connected Orbit CAP Demo Wallet.' : 'Disconnected wallet.', 'success');
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 select-none animate-fade-in font-sans">
       
@@ -124,7 +145,7 @@ export default function WalletPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#232323]">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white font-sans flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-[#FFFFFF] font-sans flex items-center gap-2">
             <span>USDC Settlement Wallet</span>
             <Wallet className="w-5 h-5 text-purple-400" />
           </h1>
@@ -162,7 +183,7 @@ export default function WalletPage() {
           <div className="flex items-center justify-between text-xs text-emerald-400 font-mono border-t border-[#232323] pt-4">
             <span className="flex items-center gap-1.5"><Shield className="w-4 h-4" /> Address: 0xUserWallet8f2b...</span>
             <button 
-              onClick={() => setIsWalletConnected(!isWalletConnected)}
+              onClick={handleConnectMetaMask}
               className="text-[10px] font-semibold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-300 cursor-pointer"
             >
               {isWalletConnected ? 'Connected ✓' : 'Connect Wallet'}
