@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export interface FrameworkComplianceStatus {
   frameworkName: string;
@@ -42,6 +43,9 @@ export interface AuditReportExport {
 export class GovernanceAutomationService {
 
   public static async getFrameworkStatuses(): Promise<FrameworkComplianceStatus[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultFrameworks();
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/governance/frameworks');
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -55,6 +59,13 @@ export class GovernanceAutomationService {
   }
 
   public static async validatePolicy(model: string, classification: string, region: string): Promise<{ allowed: boolean; violationReason?: string }> {
+    if (useAuthStore.getState().isDemoMode) {
+      const isBlocked = model.includes('unapproved') || (classification === 'PHI' && region !== 'us-east-1-hipaa');
+      return {
+        allowed: !isBlocked,
+        violationReason: isBlocked ? `Data Classification ${classification} violates EU AI Act / HIPAA residency policy.` : undefined
+      };
+    }
     try {
       const res = await apiClient.post<any>('/api/v1/governance/validate-policy', { model, classification, region });
       if (res && res.data) return res.data;
