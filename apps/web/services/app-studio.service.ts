@@ -1,4 +1,5 @@
 import { apiClient } from '../lib/api-client';
+import { useAuthStore } from '../store/authStore';
 
 export type AppProjectType = 'chatbot' | 'enterprise_tool' | 'rag_app' | 'voice_ai' | 'vision_ai' | 'data_dashboard';
 
@@ -24,13 +25,16 @@ export interface AppProject {
 }
 
 /**
- * Production Enterprise AI Application Studio Service.
- * Implements Natural Language to Full-Stack AI App Generation,
- * Component Data Binding, and One-Click Web/Embeddable Widget Deployment.
+ * AI Application Studio Service.
+ * Implements Natural Language to Full-Stack AI App Generator,
+ * Visual Drag & Drop Canvas Builder, and Embeddable Widget Snippet Generator.
  */
 export class AppStudioService {
 
   public static async getProjects(): Promise<AppProject[]> {
+    if (useAuthStore.getState().isDemoMode) {
+      return this.getDefaultProjects();
+    }
     try {
       const res = await apiClient.get<any>('/api/v1/studio/projects');
       if (res && Array.isArray(res.data) && res.data.length > 0) {
@@ -44,6 +48,43 @@ export class AppStudioService {
   }
 
   public static async generateAppFromPrompt(prompt: string): Promise<AppProject> {
+    if (useAuthStore.getState().isDemoMode) {
+      const newId = `app-gen-${Date.now()}`;
+      return {
+        id: newId,
+        name: `Generated AI Portal: ${prompt.slice(0, 32)}...`,
+        type: 'enterprise_tool',
+        description: `Synthesized full-stack AI application powered by Orbit Swarm Orchestrator and pgvector RAG. Prompt: "${prompt}"`,
+        theme: 'dark',
+        status: 'deployed',
+        deploymentUrl: `https://${newId}.orbit.ai`,
+        embedSnippet: `<script src="https://cdn.orbit.ai/widget.js" data-app-id="${newId}"></script>`,
+        components: [
+          {
+            id: 'comp-1',
+            type: 'chat',
+            title: 'Autonomous Swarm Interactive Chat Console',
+            boundEntityId: 'swarm-security-team',
+            props: { placeholder: 'Ask AI Employee Team...', autoStream: true }
+          },
+          {
+            id: 'comp-2',
+            type: 'workflow_trigger',
+            title: 'Trigger Automated SAST Security Scan',
+            boundEntityId: 'wf-security-audit',
+            props: { buttonLabel: 'Run SAST Audit Workflow' }
+          },
+          {
+            id: 'comp-3',
+            type: 'data_table',
+            title: 'Live Vulnerability Telemetry Ledger',
+            boundEntityId: 'ledger-transactions',
+            props: { dataSource: 'PostgreSQL Financial Transactions Ledger' }
+          }
+        ],
+        createdAt: new Date().toISOString()
+      };
+    }
     try {
       const res = await apiClient.post<any>('/api/v1/studio/generate-app', { prompt });
       if (res && res.data) {

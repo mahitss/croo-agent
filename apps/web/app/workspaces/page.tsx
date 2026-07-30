@@ -65,7 +65,7 @@ export default function WorkspacesPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col gap-12 select-none">
+    <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col gap-10 select-none w-full">
       
       {/* HEADER CONTROLS (ChatGPT/Linear layout integration) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[#232323]">
