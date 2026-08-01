@@ -56,7 +56,17 @@ export default function WorkflowsListPage() {
       </div>
 
       {/* Grid of Workflows */}
-      {workflows.length > 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-[#111111] border border-[#232323] p-6 rounded-2xl animate-pulse space-y-4">
+              <div className="h-4 bg-white/10 rounded w-1/4"></div>
+              <div className="h-6 bg-white/10 rounded w-3/4"></div>
+              <div className="h-4 bg-white/10 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      ) : workflows.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {workflows.map((wf) => (
             <div
