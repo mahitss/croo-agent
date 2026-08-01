@@ -285,7 +285,7 @@ export default function WorkflowPage() {
 
             {/* MINIMAL NODE DETAIL PANEL */}
             {liveSelectedNode && (
-              <div className="w-[340px] border-l border-[#232323] bg-[#111111] p-6 flex flex-col gap-6 overflow-y-auto z-10 animate-slide-in select-none">
+              <div className="w-full md:w-[340px] max-w-full absolute md:relative inset-y-0 right-0 border-l border-[#232323] bg-[#111111] p-6 flex flex-col gap-6 overflow-y-auto z-20 md:z-10 shadow-2xl md:shadow-none animate-slide-in select-none">
                 <div className="flex items-center justify-between border-b border-[#232323] pb-4">
                   <h3 className="text-xs font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">
                     Agent Node Config
